@@ -1,26 +1,102 @@
-import { Box, Typography, Button } from '@mui/material';
-import Image from 'next/image';
-import Link from 'next/link';
+import {
+  Box,
+  Chip,
+  Divider,
+  Stack,
+  Typography,
+} from "@mui/material";
+
+import {
+  IconDatabase,
+  IconServer,
+} from "@tabler/icons-react";
 
 export const Upgrade = () => {
-    return (
-        <Box
-            display='flex'
-            alignItems="center"
-            gap={2}
-            sx={{ mt: 3, p: 3, bgcolor: 'primary.light', borderRadius: '8px' }}
+  return (
+    <Box
+      sx={{
+        mt: 3,
+        p: 3,
+        borderRadius: 2,
+        bgcolor: "primary.light",
+      }}
+    >
+      <Typography
+        variant="h6"
+        fontWeight={700}
+        gutterBottom
+      >
+        System Status
+      </Typography>
+
+      <Typography
+        variant="body2"
+        color="text.secondary"
+        mb={2}
+      >
+        Membership Management System
+      </Typography>
+
+      <Divider sx={{ mb: 2 }} />
+
+      <Stack spacing={2}>
+        <Stack
+          direction="row"
+          justifyContent="space-between"
+          alignItems="center"
         >
-            <>
-                <Box >
-                    <Typography variant="h5" sx={{ width: "80px" }} fontSize='16px' mb={1}>Haven&apos;t account ?</Typography>
-                    <Button color="primary" target="_blank" disableElevation component={Link} href="/authentication/register" variant="contained" aria-label="logout" size="small">
-                        Sign Up
-                    </Button>
-                </Box>
-                <Box mt="-35px" >
-                    <Image alt="Remy Sharp" src='/images/backgrounds/rocket.png' width={100} height={100} />
-                </Box>
-            </>
-        </Box>
-    );
+          <Stack
+            direction="row"
+            spacing={1}
+            alignItems="center"
+          >
+            <IconServer size={18} />
+
+            <Typography variant="body2">
+              Backend
+            </Typography>
+          </Stack>
+
+          <Chip
+            label="Online"
+            color="success"
+            size="small"
+          />
+        </Stack>
+
+        <Stack
+          direction="row"
+          justifyContent="space-between"
+          alignItems="center"
+        >
+          <Stack
+            direction="row"
+            spacing={1}
+            alignItems="center"
+          >
+            <IconDatabase size={18} />
+
+            <Typography variant="body2">
+              Database
+            </Typography>
+          </Stack>
+
+          <Chip
+            label="Connected"
+            color="success"
+            size="small"
+          />
+        </Stack>
+
+        <Divider />
+
+        <Typography
+          variant="caption"
+          color="text.secondary"
+        >
+          Version 1.0.0
+        </Typography>
+      </Stack>
+    </Box>
+  );
 };

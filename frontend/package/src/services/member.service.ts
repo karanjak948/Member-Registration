@@ -2,8 +2,6 @@ import api from "@/services/api";
 
 import {
   Member,
-  CreateMemberRequest,
-  UpdateMemberRequest,
 } from "@/interfaces/member";
 
 class MemberService {
@@ -21,7 +19,7 @@ class MemberService {
   }
 
   async create(
-    member: CreateMemberRequest
+    member: FormData
   ): Promise<Member> {
     const { data } = await api.post<Member>(
       "/members/",
@@ -33,7 +31,7 @@ class MemberService {
 
   async update(
     id: number,
-    member: UpdateMemberRequest
+    member: FormData
   ): Promise<Member> {
     const { data } = await api.patch<Member>(
       `/members/${id}/`,

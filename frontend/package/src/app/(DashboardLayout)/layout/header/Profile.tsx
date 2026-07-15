@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import Link from "next/link";
+import { signOut } from "next-auth/react";
 import {
   Avatar,
   Box,
@@ -83,11 +84,14 @@ const Profile = () => {
         </MenuItem>
         <Box mt={1} py={1} px={2}>
           <Button
-            href="/authentication/login"
             variant="outlined"
             color="primary"
-            component={Link}
             fullWidth
+            onClick={() =>
+              signOut({
+                callbackUrl: "/authentication/login",
+              })
+            }
           >
             Logout
           </Button>

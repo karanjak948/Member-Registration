@@ -3,9 +3,11 @@ export interface Member {
 
   membership_number: string;
 
-  category?: number;
-
-  category_name?: string;
+  category?: {
+    id: number;
+    name: string;
+    code: string;
+  };
 
   first_name: string;
 

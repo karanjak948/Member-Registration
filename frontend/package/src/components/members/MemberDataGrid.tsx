@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import { useRouter } from "next/navigation";
 
 import {
   DataGrid,
@@ -14,11 +15,15 @@ import {
 } from "@mui/material";
 
 import DeleteIcon from "@mui/icons-material/Delete";
+import EditIcon from "@mui/icons-material/Edit";
+import VisibilityIcon from "@mui/icons-material/Visibility";
 
 import { Member } from "@/interfaces/member";
 
 interface MemberDataGridProps {
   members: Member[];
+
+  loading?: boolean;
 
   onDelete: (member: Member) => void;
 
@@ -27,11 +32,13 @@ interface MemberDataGridProps {
 
 export default function MemberDataGrid({
   members,
+  loading = false,
   onDelete,
 }: MemberDataGridProps) {
+  const router = useRouter();
 
-  const columns = useMemo<GridColDef[]>(() => [
-
+  const columns = useMemo<GridColDef[]>((
+  ) => [
     {
       field: "membership_number",
       headerName: "Membership No",
@@ -64,8 +71,8 @@ export default function MemberDataGrid({
             value === "ACTIVE"
               ? "success"
               : value === "INACTIVE"
-              ? "warning"
-              : "error"
+                ? "warning"
+                : "error"
           }
           size="small"
         />
@@ -78,21 +85,23 @@ export default function MemberDataGrid({
       width: 220,
 
       renderCell: ({ value }) => {
-
         let color:
           | "success"
           | "warning"
           | "error"
           | "primary" = "warning";
 
-        if (value === "APPROVED")
+        if (value === "APPROVED") {
           color = "primary";
+        }
 
-        if (value === "ACTIVE")
+        if (value === "ACTIVE") {
           color = "success";
+        }
 
-        if (value === "REJECTED")
+        if (value === "REJECTED") {
           color = "error";
+        }
 
         return (
           <Chip
@@ -107,20 +116,43 @@ export default function MemberDataGrid({
     {
       field: "actions",
       type: "actions",
-      width: 90,
+      headerName: "Actions",
+      width: 120,
 
       getActions: ({ row }) => [
+        <GridActionsCellItem
+          key="view"
+          icon={<VisibilityIcon />}
+          label="View"
+          onClick={() =>
+            router.push(`/members/${row.id}`)
+          }
+          showInMenu
+        />,
+
+        <GridActionsCellItem
+          key="edit"
+          icon={<EditIcon />}
+          label="Edit"
+          onClick={() =>
+            router.push(`/members/${row.id}/edit`)
+          }
+          showInMenu
+        />,
 
         <GridActionsCellItem
           key="delete"
           icon={<DeleteIcon />}
           label="Delete"
           onClick={() => onDelete(row)}
+          showInMenu
         />,
       ],
     },
-
-  ], [onDelete]);
+  ], [
+    onDelete,
+    router,
+  ]);
 
   return (
     <Box
@@ -132,6 +164,7 @@ export default function MemberDataGrid({
       <DataGrid
         rows={members}
         columns={columns}
+        loading={loading}
         pageSizeOptions={[10, 25, 50]}
         disableRowSelectionOnClick
         initialState={{

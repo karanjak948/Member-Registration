@@ -1,6 +1,17 @@
 "use client";
-import { styled, Container, Box } from "@mui/material";
-import React, { useState, Activity } from "react";
+
+import { useEffect, useState } from "react";
+
+import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
+
+import {
+  styled,
+  Container,
+  Box,
+  CircularProgress,
+} from "@mui/material";
+
 import Header from "@/app/(DashboardLayout)/layout/header/Header";
 import Sidebar from "@/app/(DashboardLayout)/layout/sidebar/Sidebar";
 
@@ -25,46 +36,72 @@ interface Props {
 
 export default function RootLayout({
   children,
-}: {
-  children: React.ReactNode;
-}) {
-  const [isSidebarOpen, setSidebarOpen] = useState(true);
-  const [isMobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+}: Props) {
+  const router = useRouter();
+
+  const { status } = useSession();
+
+  const [isSidebarOpen] = useState(true);
+
+  const [
+    isMobileSidebarOpen,
+    setMobileSidebarOpen,
+  ] = useState(false);
+
+  useEffect(() => {
+    if (status === "unauthenticated") {
+      router.replace("/authentication/login");
+    }
+  }, [status, router]);
+
+  if (status === "loading") {
+    return (
+      <Box
+        display="flex"
+        justifyContent="center"
+        alignItems="center"
+        minHeight="100vh"
+      >
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  if (status === "unauthenticated") {
+    return null;
+  }
+
   return (
     <MainWrapper className="mainwrapper">
-      {/* ------------------------------------------- */}
-      {/* Sidebar */}
-      {/* ------------------------------------------- */}
       <Sidebar
         isSidebarOpen={isSidebarOpen}
         isMobileSidebarOpen={isMobileSidebarOpen}
-        onSidebarClose={() => setMobileSidebarOpen(false)}
+        onSidebarClose={() =>
+          setMobileSidebarOpen(false)
+        }
       />
 
-      {/* ------------------------------------------- */}
-      {/* Main Wrapper */}
-      {/* ------------------------------------------- */}
       <PageWrapper className="page-wrapper">
-        {/* ------------------------------------------- */}
-        {/* Header */}
-        {/* ------------------------------------------- */}
-        <Header toggleMobileSidebar={() => setMobileSidebarOpen(true)} />
-        {/* ------------------------------------------- */}
-        {/* PageContent */}
-        {/* ------------------------------------------- */}
+        <Header
+          toggleMobileSidebar={() =>
+            setMobileSidebarOpen(true)
+          }
+        />
+
         <Container
           sx={{
-            paddingTop: "20px",
+            pt: 3,
             maxWidth: "1200px",
           }}
         >
-          {/* ------------------------------------------- */}
-          {/* Page Route */}
-          {/* ------------------------------------------- */}
-          <Box sx={{ minHeight: "calc(100vh - 170px)" }}>{children}</Box>
-          {/* ------------------------------------------- */}
-          {/* End Page */}
-          {/* ------------------------------------------- */}
+          <Box
+            sx={{
+              minHeight:
+                "calc(100vh - 170px)",
+            }}
+          >
+            {children}
+          </Box>
         </Container>
       </PageWrapper>
     </MainWrapper>
