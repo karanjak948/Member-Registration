@@ -209,7 +209,7 @@ export default function Dashboard() {
                   lg: 6,
                 }}
               >
-                <RecentMembers />
+                <RecentMembers members={members} />
               </Grid>
 
               <Grid

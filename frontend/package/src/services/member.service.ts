@@ -1,8 +1,6 @@
 import api from "@/services/api";
 
-import {
-  Member,
-} from "@/interfaces/member";
+import { Member } from "@/interfaces/member";
 
 class MemberService {
   async getAll(): Promise<Member[]> {
@@ -18,27 +16,41 @@ class MemberService {
     return data;
   }
 
-  async create(
-    member: FormData
-  ): Promise<Member> {
-    const { data } = await api.post<Member>(
-      "/members/",
-      member
-    );
+  async create(member: FormData): Promise<Member> {
+    try {
+      const { data } = await api.post<Member>(
+        "/members/",
+        member
+      );
 
-    return data;
+      return data;
+    } catch (error: any) {
+      console.error("Failed to create member.");
+      console.error("Status:", error.response?.status);
+      console.error("Validation Errors:", error.response?.data);
+
+      throw error;
+    }
   }
 
   async update(
     id: number,
     member: FormData
   ): Promise<Member> {
-    const { data } = await api.patch<Member>(
-      `/members/${id}/`,
-      member
-    );
+    try {
+      const { data } = await api.patch<Member>(
+        `/members/${id}/`,
+        member
+      );
 
-    return data;
+      return data;
+    } catch (error: any) {
+      console.error("Failed to update member.");
+      console.error("Status:", error.response?.status);
+      console.error("Validation Errors:", error.response?.data);
+
+      throw error;
+    }
   }
 
   async delete(id: number): Promise<void> {

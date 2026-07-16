@@ -15,13 +15,15 @@ import api from "@/services/api";
 
 export interface Guarantor {
   id: number;
-  member: number;
 
-  full_name: string;
-  national_id: string;
+  member: number;
+  guarantor_member: number | null;
+
+  first_name: string;
+  other_names: string;
   phone_number: string;
-  email: string;
-  physical_address: string;
+  national_id: string;
+  relationship: string;
 
   created_at?: string;
   updated_at?: string;
@@ -45,11 +47,12 @@ export default function GuarantorStep({
   const [error, setError] = useState("");
 
   const [form, setForm] = useState({
-    full_name: "",
+    first_name: "",
+    other_names: "",
     national_id: "",
     phone_number: "",
-    email: "",
-    physical_address: "",
+    relationship: "",
+    guarantor_member: "",
   });
 
   function handleChange(
@@ -72,13 +75,24 @@ export default function GuarantorStep({
         "/guarantors/",
         {
           member: memberId,
-          ...form,
+
+          first_name: form.first_name,
+          other_names: form.other_names,
+
+          national_id: form.national_id,
+          phone_number: form.phone_number,
+          relationship: form.relationship,
+
+          guarantor_member:
+            form.guarantor_member === ""
+              ? null
+              : Number(form.guarantor_member),
         }
       );
 
       onComplete(response.data);
     } catch (err: any) {
-      console.error(err);
+      console.error(err.response?.data);
 
       if (err.response?.data) {
         if (typeof err.response.data === "string") {
@@ -86,7 +100,11 @@ export default function GuarantorStep({
         } else if (err.response.data.detail) {
           setError(err.response.data.detail);
         } else {
-          setError("Please correct the highlighted errors.");
+          setError(
+            Object.values(err.response.data)
+              .flat()
+              .join(" ")
+          );
         }
       } else {
         setError("Failed to save guarantor.");
@@ -99,13 +117,24 @@ export default function GuarantorStep({
   return (
     <Box>
       <Grid container spacing={3}>
-        <Grid size={{ xs: 12 }}>
+        <Grid size={{ xs: 12, md: 6 }}>
           <TextField
             fullWidth
             required
-            label="Full Name"
-            name="full_name"
-            value={form.full_name}
+            label="First Name"
+            name="first_name"
+            value={form.first_name}
+            onChange={handleChange}
+          />
+        </Grid>
+
+        <Grid size={{ xs: 12, md: 6 }}>
+          <TextField
+            fullWidth
+            required
+            label="Other Names"
+            name="other_names"
+            value={form.other_names}
             onChange={handleChange}
           />
         </Grid>
@@ -135,10 +164,9 @@ export default function GuarantorStep({
         <Grid size={{ xs: 12 }}>
           <TextField
             fullWidth
-            label="Email"
-            name="email"
-            type="email"
-            value={form.email}
+            label="Relationship"
+            name="relationship"
+            value={form.relationship}
             onChange={handleChange}
           />
         </Grid>
@@ -146,11 +174,10 @@ export default function GuarantorStep({
         <Grid size={{ xs: 12 }}>
           <TextField
             fullWidth
-            multiline
-            minRows={3}
-            label="Physical Address"
-            name="physical_address"
-            value={form.physical_address}
+            label="Guarantor Member ID (optional)"
+            name="guarantor_member"
+            type="number"
+            value={form.guarantor_member}
             onChange={handleChange}
           />
         </Grid>
@@ -161,7 +188,9 @@ export default function GuarantorStep({
           severity="error"
           sx={{ mt: 3 }}
         >
-          {error}
+          <pre style={{ margin: 0, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+            {error}
+          </pre>
         </Alert>
       )}
 

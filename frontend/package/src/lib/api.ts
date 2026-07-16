@@ -8,6 +8,9 @@ const api = axios.create({
   },
 });
 
+// Log once when the application starts
+console.log("API Base URL:", process.env.NEXT_PUBLIC_API_URL);
+
 /*
 |--------------------------------------------------------------------------
 | Request Interceptor
@@ -24,6 +27,10 @@ api.interceptors.request.use(
     if (session?.accessToken) {
       config.headers.Authorization = `Bearer ${session.accessToken}`;
     }
+
+    const requestUrl = `${config.baseURL ?? ""}${config.url ?? ""}`;
+
+    console.log("Request URL:", requestUrl);
 
     return config;
   },

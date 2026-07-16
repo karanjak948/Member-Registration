@@ -1,56 +1,44 @@
 "use client";
 
-import { useEffect, useState } from "react";
-
 import Link from "next/link";
 
 import {
+  Avatar,
   Box,
   Button,
   Card,
   CardContent,
   Chip,
-  CircularProgress,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableRow,
+  Divider,
+  Stack,
   Typography,
 } from "@mui/material";
 
 import VisibilityIcon from "@mui/icons-material/Visibility";
+import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 
-import memberService from "@/services/member.service";
 import { Member } from "@/interfaces/member";
 
-export default function RecentMembers() {
-  const [members, setMembers] = useState<Member[]>([]);
-  const [loading, setLoading] = useState(true);
+interface RecentMembersProps {
+  members: Member[];
+}
 
-  useEffect(() => {
-    loadMembers();
-  }, []);
+export default function RecentMembers({
+  members,
+}: RecentMembersProps) {
+  const latestMembers = [...members]
+    .sort((a, b) => {
+      const aDate = a.created_at
+        ? new Date(a.created_at).getTime()
+        : 0;
 
-  async function loadMembers() {
-    try {
-      const data = await memberService.getAll();
+      const bDate = b.created_at
+        ? new Date(b.created_at).getTime()
+        : 0;
 
-      const latest = [...data]
-        .sort(
-          (a, b) =>
-            new Date(b.created_at).getTime() -
-            new Date(a.created_at).getTime()
-        )
-        .slice(0, 5);
-
-      setMembers(latest);
-    } catch (error) {
-      console.error(error);
-    } finally {
-      setLoading(false);
-    }
-  }
+      return bDate - aDate;
+    })
+    .slice(0, 5);
 
   function statusColor(status: string) {
     switch (status) {
@@ -68,158 +56,134 @@ export default function RecentMembers() {
     }
   }
 
-  function stageColor(stage: string) {
-    switch (stage) {
-      case "ACTIVE":
-        return "success";
-
-      case "APPROVED":
-        return "primary";
-
-      case "REJECTED":
-        return "error";
-
-      default:
-        return "warning";
-    }
-  }
-
   return (
-    <Card>
+    <Card
+      elevation={3}
+      sx={{
+        height: "100%",
+        borderRadius: 3,
+      }}
+    >
       <CardContent>
-
-        <Typography
-          variant="h5"
+        <Stack
+          direction="row"
+          justifyContent="space-between"
+          alignItems="center"
           mb={3}
         >
-          Recent Members
-        </Typography>
+          <Box>
+            <Typography
+              variant="h6"
+              fontWeight={700}
+            >
+              Recent Members
+            </Typography>
 
-        {loading ? (
-          <Box
-            py={6}
-            display="flex"
-            justifyContent="center"
-          >
-            <CircularProgress />
+            <Typography
+              variant="body2"
+              color="text.secondary"
+            >
+              Latest registered members
+            </Typography>
           </Box>
-        ) : (
-          <Table>
 
-            <TableHead>
+          <Button
+            component={Link}
+            href="/members"
+            endIcon={<ArrowForwardIcon />}
+            size="small"
+          >
+            View All
+          </Button>
+        </Stack>
 
-              <TableRow>
-
-                <TableCell>
-                  Membership No
-                </TableCell>
-
-                <TableCell>
-                  Member
-                </TableCell>
-
-                <TableCell>
-                  Category
-                </TableCell>
-
-                <TableCell>
-                  Status
-                </TableCell>
-
-                <TableCell>
-                  Registration Stage
-                </TableCell>
-
-                <TableCell>
-                  Created
-                </TableCell>
-
-                <TableCell align="right">
-                  Action
-                </TableCell>
-
-              </TableRow>
-
-            </TableHead>
-
-            <TableBody>
-
-              {members.map((member) => (
-
-                <TableRow
-                  key={member.id}
-                  hover
+        <Stack divider={<Divider />}>
+          {latestMembers.length === 0 ? (
+            <Box py={5}>
+              <Typography
+                align="center"
+                color="text.secondary"
+              >
+                No members found.
+              </Typography>
+            </Box>
+          ) : (
+            latestMembers.map((member) => (
+              <Stack
+                key={member.id}
+                direction="row"
+                spacing={2}
+                alignItems="center"
+                justifyContent="space-between"
+                py={2}
+              >
+                <Stack
+                  direction="row"
+                  spacing={2}
+                  alignItems="center"
+                  flex={1}
                 >
-                  <TableCell>
-                    {member.membership_number}
-                  </TableCell>
+                  <Avatar
+                    sx={{
+                      bgcolor: "primary.main",
+                      width: 48,
+                      height: 48,
+                      fontWeight: 700,
+                    }}
+                  >
+                    {member.first_name?.charAt(0)}
+                  </Avatar>
 
-                  <TableCell>
-                    {member.first_name}{" "}
-                    {member.other_names}
-                  </TableCell>
+                  <Box>
+                    <Typography fontWeight={600}>
+                      {member.first_name}{" "}
+                      {member.other_names}
+                    </Typography>
 
-                  <TableCell>
-                    {member.category?.name ??
-                      "-"}
-                  </TableCell>
-
-                  <TableCell>
-
-                    <Chip
-                      size="small"
-                      label={member.status}
-                      color={statusColor(
-                        member.status
-                      )}
-                    />
-
-                  </TableCell>
-
-                  <TableCell>
-
-                    <Chip
-                      size="small"
-                      label={
-                        member.registration_stage
-                      }
-                      color={stageColor(
-                        member.registration_stage
-                      )}
-                    />
-
-                  </TableCell>
-
-                  <TableCell>
-                    {new Date(
-                      member.created_at
-                    ).toLocaleDateString()}
-                  </TableCell>
-
-                  <TableCell align="right">
-
-                    <Button
-                      component={Link}
-                      href={`/members/${member.id}`}
-                      startIcon={
-                        <VisibilityIcon />
-                      }
-                      size="small"
+                    <Typography
+                      variant="body2"
+                      color="text.secondary"
                     >
-                      View
-                    </Button>
+                      {member.membership_number}
+                    </Typography>
 
-                  </TableCell>
+                    <Typography
+                      variant="caption"
+                      color="text.secondary"
+                    >
+                      {member.category?.name ??
+                        "No Category"}
+                    </Typography>
+                  </Box>
+                </Stack>
 
-                </TableRow>
+                <Stack
+                  spacing={1}
+                  alignItems="flex-end"
+                >
+                  <Chip
+                    size="small"
+                    label={member.status}
+                    color={statusColor(
+                      member.status
+                    )}
+                  />
 
-              ))}
-
-            </TableBody>
-
-          </Table>
-        )}
-
+                  <Button
+                    component={Link}
+                    href={`/members/${member.id}`}
+                    startIcon={
+                      <VisibilityIcon />
+                    }
+                    size="small"
+                  >
+                    View
+                  </Button>
+                </Stack>
+              </Stack>
+            ))
+          )}
+        </Stack>
       </CardContent>
     </Card>
   );

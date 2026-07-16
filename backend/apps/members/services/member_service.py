@@ -1,4 +1,5 @@
 from copy import deepcopy
+from datetime import date, datetime
 
 from django.core.exceptions import ValidationError
 from django.db import transaction
@@ -16,6 +17,56 @@ class MemberService:
     """
     Central business logic for Member operations.
     """
+
+    @staticmethod
+    def _member_to_dict(member):
+        """
+        Convert a Member instance into a JSON-safe dictionary
+        suitable for audit logging.
+        """
+
+        data = model_to_dict(member)
+
+        # Foreign Keys
+        data["category"] = (
+            member.category.id
+            if member.category
+            else None
+        )
+
+        data["created_by"] = (
+            member.created_by.id
+            if member.created_by
+            else None
+        )
+
+        # ImageField
+        data["passport_photo"] = (
+            member.passport_photo.name
+            if member.passport_photo
+            else None
+        )
+
+        # Datetime fields
+        data["created_at"] = (
+            member.created_at.isoformat()
+            if member.created_at
+            else None
+        )
+
+        data["updated_at"] = (
+            member.updated_at.isoformat()
+            if member.updated_at
+            else None
+        )
+
+        # Convert any remaining non-JSON objects
+        for key, value in data.items():
+
+            if isinstance(value, (datetime, date)):
+                data[key] = value.isoformat()
+
+        return data
 
     @staticmethod
     def _create_audit_log(
@@ -66,14 +117,16 @@ class MemberService:
         Create member and audit the operation.
         """
 
-        member = serializer.save(created_by=user)
+        member = serializer.save(
+            created_by=user
+        )
 
         MemberService._create_audit_log(
             member=member,
             action=MemberAudit.Action.CREATE,
             user=user,
             old_data=None,
-            new_data=model_to_dict(member),
+            new_data=MemberService._member_to_dict(member),
         )
 
         return member
@@ -88,12 +141,15 @@ class MemberService:
 
         member = serializer.instance
 
-        old_data = deepcopy(model_to_dict(member))
+        old_data = deepcopy(
+            MemberService._member_to_dict(member)
+        )
+
         previous_stage = member.registration_stage
 
         member = serializer.save()
 
-        new_data = model_to_dict(member)
+        new_data = MemberService._member_to_dict(member)
 
         MemberService._create_audit_log(
             member=member,
@@ -121,7 +177,7 @@ class MemberService:
         Delete member after recording an audit log.
         """
 
-        old_data = model_to_dict(member)
+        old_data = MemberService._member_to_dict(member)
 
         MemberService._create_audit_log(
             member=member,
@@ -151,12 +207,16 @@ class MemberService:
         if previous_stage == stage:
             return member
 
-        old_data = model_to_dict(member)
+        old_data = MemberService._member_to_dict(member)
 
         member.registration_stage = stage
-        member.save(update_fields=["registration_stage"])
+        member.save(
+            update_fields=[
+                "registration_stage"
+            ]
+        )
 
-        new_data = model_to_dict(member)
+        new_data = MemberService._member_to_dict(member)
 
         if stage == Member.RegistrationStage.APPROVED:
             action = MemberAudit.Action.APPROVE
@@ -184,7 +244,7 @@ class MemberService:
         )
 
         return member
-    
+
     @staticmethod
     def _validate_conversion(member):
         """
@@ -238,17 +298,21 @@ class MemberService:
         Activate member.
         """
 
-        old_data = deepcopy(model_to_dict(member))
+        old_data = deepcopy(
+            MemberService._member_to_dict(member)
+        )
 
         member.status = Member.MemberStatus.ACTIVE
-        member.save(update_fields=["status"])
+        member.save(
+            update_fields=["status"]
+        )
 
         MemberService._create_audit_log(
             member=member,
             action=MemberAudit.Action.UPDATE,
             user=user,
             old_data=old_data,
-            new_data=model_to_dict(member),
+            new_data=MemberService._member_to_dict(member),
         )
 
         return member
@@ -260,17 +324,21 @@ class MemberService:
         Deactivate member.
         """
 
-        old_data = deepcopy(model_to_dict(member))
+        old_data = deepcopy(
+            MemberService._member_to_dict(member)
+        )
 
         member.status = Member.MemberStatus.INACTIVE
-        member.save(update_fields=["status"])
+        member.save(
+            update_fields=["status"]
+        )
 
         MemberService._create_audit_log(
             member=member,
             action=MemberAudit.Action.UPDATE,
             user=user,
             old_data=old_data,
-            new_data=model_to_dict(member),
+            new_data=MemberService._member_to_dict(member),
         )
 
         return member
@@ -288,17 +356,21 @@ class MemberService:
             code="NORMAL"
         )
 
-        old_data = deepcopy(model_to_dict(member))
+        old_data = deepcopy(
+            MemberService._member_to_dict(member)
+        )
 
         member.category = normal_category
-        member.save(update_fields=["category"])
+        member.save(
+            update_fields=["category"]
+        )
 
         MemberService._create_audit_log(
             member=member,
             action=MemberAudit.Action.CONVERT,
             user=user,
             old_data=old_data,
-            new_data=model_to_dict(member),
+            new_data=MemberService._member_to_dict(member),
         )
 
         return member

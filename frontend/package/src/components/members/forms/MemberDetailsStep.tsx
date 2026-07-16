@@ -116,26 +116,37 @@ export default function MemberDetailsStep({
     try {
       const payload = new FormData();
 
-      Object.entries(form).forEach(
-        ([key, value]) => {
-          if (
-            value === null ||
-            value === ""
-          ) {
-            return;
-          }
+      // Explicitly append each field
+      payload.append("first_name", form.first_name);
+      payload.append("other_names", form.other_names);
+      payload.append("national_id", form.national_id);
+      payload.append("phone_number", form.phone_number);
 
-          if (value instanceof File) {
-            payload.append(key, value);
-            return;
-          }
+      if (form.email) {
+        payload.append("email", form.email);
+      }
 
-          payload.append(
-            key,
-            String(value)
-          );
-        }
-      );
+      if (form.physical_address) {
+        payload.append("physical_address", form.physical_address);
+      }
+
+      if (form.occupation) {
+        payload.append("occupation", form.occupation);
+      }
+
+      if (form.kra_pin) {
+        payload.append("kra_pin", form.kra_pin);
+      }
+
+      payload.append("category", String(form.category));
+
+      if (form.passport_photo instanceof File) {
+        payload.append(
+          "passport_photo",
+          form.passport_photo,
+          form.passport_photo.name
+        );
+      }
 
       let savedMember: Member;
 

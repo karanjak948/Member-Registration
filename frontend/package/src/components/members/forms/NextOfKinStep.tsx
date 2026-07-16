@@ -41,11 +41,13 @@ export default function NextOfKinStep({
   const [error, setError] = useState("");
 
   const [form, setForm] = useState({
-    full_name: "",
+    first_name: "",
+    other_names: "",
     relationship: "",
+    national_id: "",
     phone_number: "",
-    email: "",
     physical_address: "",
+    is_primary: true,
   });
 
   function handleChange(
@@ -68,20 +70,22 @@ export default function NextOfKinStep({
         "/next-of-kin/",
         {
           member: memberId,
-          ...form,
+          first_name: form.first_name,
+          other_names: form.other_names,
+          relationship: form.relationship,
+          national_id: form.national_id,
+          phone_number: form.phone_number,
+          physical_address: form.physical_address,
+          is_primary: form.is_primary,
         }
       );
 
       onComplete(response.data);
     } catch (err: any) {
+      console.error(err.response?.data);
+
       if (err.response?.data) {
-        if (typeof err.response.data === "string") {
-          setError(err.response.data);
-        } else if (err.response.data.detail) {
-          setError(err.response.data.detail);
-        } else {
-          setError("Please correct the highlighted errors.");
-        }
+        setError(JSON.stringify(err.response.data, null, 2));
       } else {
         setError("Failed to save next of kin.");
       }
@@ -93,18 +97,29 @@ export default function NextOfKinStep({
   return (
     <Box>
       <Grid container spacing={3}>
-        <Grid size={{ xs: 12 }}>
+        <Grid size={{ xs: 12, md: 6 }}>
           <TextField
             fullWidth
             required
-            label="Full Name"
-            name="full_name"
-            value={form.full_name}
+            label="First Name"
+            name="first_name"
+            value={form.first_name}
             onChange={handleChange}
           />
         </Grid>
 
         <Grid size={{ xs: 12, md: 6 }}>
+          <TextField
+            fullWidth
+            required
+            label="Other Names"
+            name="other_names"
+            value={form.other_names}
+            onChange={handleChange}
+          />
+        </Grid>
+
+        <Grid size={{ xs: 12 }}>
           <TextField
             fullWidth
             required
@@ -115,13 +130,12 @@ export default function NextOfKinStep({
           />
         </Grid>
 
-        <Grid size={{ xs: 12, md: 6 }}>
+        <Grid size={{ xs: 12 }}>
           <TextField
             fullWidth
-            required
-            label="Phone Number"
-            name="phone_number"
-            value={form.phone_number}
+            label="National ID"
+            name="national_id"
+            value={form.national_id}
             onChange={handleChange}
           />
         </Grid>
@@ -129,10 +143,10 @@ export default function NextOfKinStep({
         <Grid size={{ xs: 12 }}>
           <TextField
             fullWidth
-            label="Email"
-            name="email"
-            type="email"
-            value={form.email}
+            required
+            label="Phone Number"
+            name="phone_number"
+            value={form.phone_number}
             onChange={handleChange}
           />
         </Grid>
@@ -155,7 +169,9 @@ export default function NextOfKinStep({
           severity="error"
           sx={{ mt: 3 }}
         >
-          {error}
+          <pre style={{ margin: 0, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+            {error}
+          </pre>
         </Alert>
       )}
 

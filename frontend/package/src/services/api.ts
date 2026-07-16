@@ -3,9 +3,6 @@ import { getSession, signOut } from "next-auth/react";
 
 const api = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL,
-  headers: {
-    "Content-Type": "application/json",
-  },
 });
 
 api.interceptors.request.use(
@@ -17,6 +14,14 @@ api.interceptors.request.use(
         "Authorization",
         `Bearer ${session.accessToken}`
       );
+    }
+
+    // Let Axios/browser determine the correct Content-Type.
+    // If we're sending FormData, it will automatically use:
+    // multipart/form-data; boundary=...
+    // Otherwise, it will use application/json as appropriate.
+    if (config.data instanceof FormData) {
+      config.headers.delete("Content-Type");
     }
 
     return config;
