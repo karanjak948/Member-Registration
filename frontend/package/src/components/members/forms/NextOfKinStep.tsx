@@ -11,43 +11,52 @@ import {
   TextField,
 } from "@mui/material";
 
-import api from "@/services/api";
+import {
+  useAppDispatch,
+  useAppSelector,
+} from "@/store/hooks";
 
-export interface NextOfKin {
-  id: number;
-  member: number;
-  full_name: string;
-  relationship: string;
-  phone_number: string;
-  email: string;
-  physical_address: string;
-}
+import {
+  setNextOfKin,
+} from "@/store/registration/registrationSlice";
 
 interface NextOfKinStepProps {
-  memberId: number;
-
   onBack: () => void;
-
-  onComplete: (nextOfKin: NextOfKin) => void;
+  onComplete: () => void;
 }
 
 export default function NextOfKinStep({
-  memberId,
   onBack,
   onComplete,
 }: NextOfKinStepProps) {
-  const [loading, setLoading] = useState(false);
+  const dispatch = useAppDispatch();
 
-  const [error, setError] = useState("");
+  const existingNextOfKin = useAppSelector(
+    (state) => state.registration.nextOfKin
+  );
+
+  const [loading, setLoading] =
+    useState(false);
+
+  const [error, setError] =
+    useState("");
 
   const [form, setForm] = useState({
-    first_name: "",
-    other_names: "",
-    relationship: "",
-    national_id: "",
-    phone_number: "",
-    physical_address: "",
-    is_primary: true,
+    first_name:
+      existingNextOfKin?.first_name ?? "",
+    other_names:
+      existingNextOfKin?.other_names ?? "",
+    relationship:
+      existingNextOfKin?.relationship ?? "",
+    national_id:
+      existingNextOfKin?.national_id ?? "",
+    phone_number:
+      existingNextOfKin?.phone_number ?? "",
+    physical_address:
+      existingNextOfKin?.physical_address ??
+      "",
+    is_primary:
+      existingNextOfKin?.is_primary ?? true,
   });
 
   function handleChange(
@@ -62,33 +71,45 @@ export default function NextOfKinStep({
   }
 
   async function handleSubmit() {
-    setLoading(true);
+    if (!form.first_name.trim()) {
+      setError("First name is required.");
+      return;
+    }
+
+    if (!form.relationship.trim()) {
+      setError("Relationship is required.");
+      return;
+    }
+
+    if (!form.phone_number.trim()) {
+      setError("Phone number is required.");
+      return;
+    }
+
     setError("");
+    setLoading(true);
 
     try {
-      const response = await api.post<NextOfKin>(
-        "/next-of-kin/",
-        {
-          member: memberId,
-          first_name: form.first_name,
-          other_names: form.other_names,
-          relationship: form.relationship,
-          national_id: form.national_id,
-          phone_number: form.phone_number,
-          physical_address: form.physical_address,
-          is_primary: form.is_primary,
-        }
+      dispatch(
+        setNextOfKin({
+          first_name:
+            form.first_name.trim(),
+          other_names:
+            form.other_names.trim(),
+          relationship:
+            form.relationship.trim(),
+          national_id:
+            form.national_id.trim(),
+          phone_number:
+            form.phone_number.trim(),
+          physical_address:
+            form.physical_address.trim(),
+          is_primary:
+            form.is_primary,
+        })
       );
 
-      onComplete(response.data);
-    } catch (err: any) {
-      console.error(err.response?.data);
-
-      if (err.response?.data) {
-        setError(JSON.stringify(err.response.data, null, 2));
-      } else {
-        setError("Failed to save next of kin.");
-      }
+      onComplete();
     } finally {
       setLoading(false);
     }
@@ -96,8 +117,16 @@ export default function NextOfKinStep({
 
   return (
     <Box>
-      <Grid container spacing={3}>
-        <Grid size={{ xs: 12, md: 6 }}>
+      <Grid
+        container
+        spacing={3}
+      >
+        <Grid
+          size={{
+            xs: 12,
+            md: 6,
+          }}
+        >
           <TextField
             fullWidth
             required
@@ -108,10 +137,14 @@ export default function NextOfKinStep({
           />
         </Grid>
 
-        <Grid size={{ xs: 12, md: 6 }}>
+        <Grid
+          size={{
+            xs: 12,
+            md: 6,
+          }}
+        >
           <TextField
             fullWidth
-            required
             label="Other Names"
             name="other_names"
             value={form.other_names}
@@ -119,7 +152,9 @@ export default function NextOfKinStep({
           />
         </Grid>
 
-        <Grid size={{ xs: 12 }}>
+        <Grid
+          size={{ xs: 12 }}
+        >
           <TextField
             fullWidth
             required
@@ -130,7 +165,9 @@ export default function NextOfKinStep({
           />
         </Grid>
 
-        <Grid size={{ xs: 12 }}>
+        <Grid
+          size={{ xs: 12 }}
+        >
           <TextField
             fullWidth
             label="National ID"
@@ -140,7 +177,9 @@ export default function NextOfKinStep({
           />
         </Grid>
 
-        <Grid size={{ xs: 12 }}>
+        <Grid
+          size={{ xs: 12 }}
+        >
           <TextField
             fullWidth
             required
@@ -151,14 +190,18 @@ export default function NextOfKinStep({
           />
         </Grid>
 
-        <Grid size={{ xs: 12 }}>
+        <Grid
+          size={{ xs: 12 }}
+        >
           <TextField
             fullWidth
             multiline
             minRows={3}
             label="Physical Address"
             name="physical_address"
-            value={form.physical_address}
+            value={
+              form.physical_address
+            }
             onChange={handleChange}
           />
         </Grid>
@@ -169,9 +212,7 @@ export default function NextOfKinStep({
           severity="error"
           sx={{ mt: 3 }}
         >
-          <pre style={{ margin: 0, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
-            {error}
-          </pre>
+          {error}
         </Alert>
       )}
 

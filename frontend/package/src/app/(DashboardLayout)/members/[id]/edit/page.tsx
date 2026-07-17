@@ -6,6 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 
 import {
   Alert,
+  Box,
   Card,
   CardContent,
   CircularProgress,
@@ -15,46 +16,56 @@ import {
 
 import memberService from "@/services/member.service";
 
-import MemberDetailsStep from "@/components/members/forms/MemberDetailsStep";
+import { Member } from "@/interfaces/member";
+
+import EditMemberForm from "@/components/members/forms/EditMemberForm";
 
 export default function EditMemberPage() {
   const params = useParams();
 
   const router = useRouter();
 
-  const [member, setMember] = useState<any>(null);
+  const [member, setMember] = useState<Member | null>(null);
 
   const [loading, setLoading] = useState(true);
 
   const [error, setError] = useState("");
 
   useEffect(() => {
-    loadMember();
-  }, []);
+    async function fetchMember() {
+      try {
+        const data = await memberService.getById(
+          Number(params.id)
+        );
 
-  async function loadMember() {
-    try {
-      const data = await memberService.getById(
-        Number(params.id)
-      );
-
-      setMember(data);
-    } catch {
-      setError("Unable to load member.");
-    } finally {
-      setLoading(false);
+        setMember(data);
+      } catch {
+        setError("Unable to load member.");
+      } finally {
+        setLoading(false);
+      }
     }
-  }
+
+    fetchMember();
+  }, [params.id]);
 
   if (loading) {
-    return <CircularProgress />;
+    return (
+      <Container maxWidth="lg">
+        <Box display="flex" justifyContent="center" py={10}>
+          <CircularProgress />
+        </Box>
+      </Container>
+    );
   }
 
   if (error) {
     return (
-      <Alert severity="error">
-        {error}
-      </Alert>
+      <Container maxWidth="lg">
+        <Alert severity="error">
+          {error}
+        </Alert>
+      </Container>
     );
   }
 
@@ -69,17 +80,17 @@ export default function EditMemberPage() {
 
       <Card>
         <CardContent>
-          <MemberDetailsStep
-            mode="edit"
-            memberId={member.id}
-            data={member}
-            onBack={() => router.back()}
-            onNext={() => {
-              router.push(
-                `/members/${member.id}`
-              );
-            }}
-          />
+          {member && (
+            <EditMemberForm
+              member={member}
+              onBack={() => router.back()}
+              onSuccess={(updatedMember) => {
+                router.push(
+                  `/members/${updatedMember.id}`
+                );
+              }}
+            />
+          )}
         </CardContent>
       </Card>
     </Container>

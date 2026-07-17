@@ -11,125 +11,141 @@ import {
   TextField,
 } from "@mui/material";
 
-import api from "@/services/api";
+import {
+  useAppDispatch,
+  useAppSelector,
+} from "@/store/hooks";
 
-export interface Vehicle {
-  id: number;
-  member: number;
-
-  registration_number: string;
-  make: string;
-  model: string;
-
-  year: number | null;
-  color: string;
-  engine_number: string;
-  chassis_number: string;
-
-  created_at?: string;
-  updated_at?: string;
-}
+import {
+  setVehicle,
+} from "@/store/registration/registrationSlice";
 
 interface VehicleStepProps {
-  memberId: number;
-
   onBack: () => void;
-
-  onComplete: (vehicle: Vehicle) => void;
+  onComplete: () => void;
 }
 
 export default function VehicleStep({
-  memberId,
   onBack,
   onComplete,
 }: VehicleStepProps) {
-  const [loading, setLoading] = useState(false);
+  const dispatch = useAppDispatch();
 
-  const [error, setError] = useState("");
+  const existingVehicle = useAppSelector(
+    (state) => state.registration.vehicle
+  );
+
+  const [loading, setLoading] =
+    useState(false);
+
+  const [error, setError] =
+    useState("");
 
   const [form, setForm] = useState({
-    registration_number: "",
-    make: "",
-    model: "",
-    year: "",
-    color: "",
-    engine_number: "",
-    chassis_number: "",
+    registration_number:
+      existingVehicle?.registration_number ??
+      "",
+    make: existingVehicle?.make ?? "",
+    model: existingVehicle?.model ?? "",
+    year:
+      existingVehicle?.year?.toString() ??
+      "",
+    color: existingVehicle?.color ?? "",
+    engine_number:
+      existingVehicle?.engine_number ?? "",
+    chassis_number:
+      existingVehicle?.chassis_number ?? "",
   });
 
-  const handleChange = (
+  function handleChange(
     e: React.ChangeEvent<HTMLInputElement>
-  ) => {
+  ) {
+    const { name, value } = e.target;
+
     setForm((prev) => ({
       ...prev,
-      [e.target.name]: e.target.value,
+      [name]: value,
     }));
-  };
+  }
 
-  const handleSubmit = async () => {
-    setLoading(true);
+  async function handleSubmit() {
+    if (
+      !form.registration_number.trim()
+    ) {
+      setError(
+        "Registration number is required."
+      );
+      return;
+    }
+
+    if (!form.make.trim()) {
+      setError("Make is required.");
+      return;
+    }
+
+    if (!form.model.trim()) {
+      setError("Model is required.");
+      return;
+    }
+
     setError("");
+    setLoading(true);
 
     try {
-      const response = await api.post<Vehicle>(
-        "/vehicles/",
-        {
-          member: memberId,
-
-          registration_number: form.registration_number,
-          make: form.make,
-          model: form.model,
-
+      dispatch(
+        setVehicle({
+          registration_number:
+            form.registration_number.trim(),
+          make: form.make.trim(),
+          model: form.model.trim(),
           year:
             form.year === ""
               ? null
               : Number(form.year),
-
-          color: form.color,
-          engine_number: form.engine_number,
-          chassis_number: form.chassis_number,
-        }
+          color: form.color.trim(),
+          engine_number:
+            form.engine_number.trim(),
+          chassis_number:
+            form.chassis_number.trim(),
+        })
       );
 
-      onComplete(response.data);
-    } catch (err: any) {
-      console.error(err.response?.data);
-
-      if (err.response?.data) {
-        const data = err.response.data;
-
-        if (typeof data === "string") {
-          setError(data);
-        } else if (data.detail) {
-          setError(data.detail);
-        } else {
-          setError(
-            JSON.stringify(data, null, 2)
-          );
-        }
-      } else {
-        setError("Failed to save vehicle.");
-      }
+      onComplete();
     } finally {
       setLoading(false);
     }
-  };
+  }
 
   return (
     <Box>
-      <Grid container spacing={3}>
-        <Grid size={{ xs: 12, md: 6 }}>
+      <Grid
+        container
+        spacing={3}
+      >
+        <Grid
+          size={{
+            xs: 12,
+            md: 6,
+          }}
+        >
           <TextField
             fullWidth
             required
             label="Registration Number"
             name="registration_number"
-            value={form.registration_number}
+            value={
+              form.registration_number
+            }
             onChange={handleChange}
           />
         </Grid>
 
-        <Grid size={{ xs: 12, md: 6 }}>
+        <Grid
+          size={{
+            xs: 12,
+            md: 6,
+          }}
+        >
           <TextField
             fullWidth
             required
@@ -140,7 +156,12 @@ export default function VehicleStep({
           />
         </Grid>
 
-        <Grid size={{ xs: 12, md: 6 }}>
+        <Grid
+          size={{
+            xs: 12,
+            md: 6,
+          }}
+        >
           <TextField
             fullWidth
             required
@@ -151,18 +172,28 @@ export default function VehicleStep({
           />
         </Grid>
 
-        <Grid size={{ xs: 12, md: 6 }}>
+        <Grid
+          size={{
+            xs: 12,
+            md: 6,
+          }}
+        >
           <TextField
             fullWidth
+            type="number"
             label="Year"
             name="year"
-            type="number"
             value={form.year}
             onChange={handleChange}
           />
         </Grid>
 
-        <Grid size={{ xs: 12, md: 6 }}>
+        <Grid
+          size={{
+            xs: 12,
+            md: 6,
+          }}
+        >
           <TextField
             fullWidth
             label="Color"
@@ -172,32 +203,47 @@ export default function VehicleStep({
           />
         </Grid>
 
-        <Grid size={{ xs: 12, md: 6 }}>
+        <Grid
+          size={{
+            xs: 12,
+            md: 6,
+          }}
+        >
           <TextField
             fullWidth
             label="Engine Number"
             name="engine_number"
-            value={form.engine_number}
+            value={
+              form.engine_number
+            }
             onChange={handleChange}
           />
         </Grid>
 
-        <Grid size={{ xs: 12, md: 6 }}>
+        <Grid
+          size={{
+            xs: 12,
+            md: 6,
+          }}
+        >
           <TextField
             fullWidth
             label="Chassis Number"
             name="chassis_number"
-            value={form.chassis_number}
+            value={
+              form.chassis_number
+            }
             onChange={handleChange}
           />
         </Grid>
       </Grid>
 
       {error && (
-        <Alert severity="error" sx={{ mt: 3 }}>
-          <pre style={{ margin: 0, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
-            {error}
-          </pre>
+        <Alert
+          severity="error"
+          sx={{ mt: 3 }}
+        >
+          {error}
         </Alert>
       )}
 

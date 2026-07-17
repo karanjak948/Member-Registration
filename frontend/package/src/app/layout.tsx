@@ -8,6 +8,8 @@ import { ThemeProvider } from "@mui/material/styles";
 import { baselightTheme } from "@/utils/theme/DefaultColors";
 import Providers from "./providers";
 
+import StoreProvider from "@/store/provider";
+
 interface RootLayoutProps {
   children: React.ReactNode;
 }
@@ -18,12 +20,14 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        <Providers>
-          <ThemeProvider theme={baselightTheme}>
-            <CssBaseline />
-            {children}
-          </ThemeProvider>
-        </Providers>
+        <StoreProvider>
+          <Providers>
+            <ThemeProvider theme={baselightTheme}>
+              <CssBaseline />
+              {children}
+            </ThemeProvider>
+          </Providers>
+        </StoreProvider>
       </body>
     </html>
   );

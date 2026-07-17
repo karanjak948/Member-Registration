@@ -6,16 +6,21 @@ import {
   Alert,
   Box,
   Button,
+  Card,
+  CardContent,
   CircularProgress,
   Grid,
+  IconButton,
   MenuItem,
+  Stack,
   TextField,
+  Typography,
 } from "@mui/material";
 
-import api from "@/services/api";
-import memberService from "@/services/member.service";
+import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
+import PhotoCameraOutlinedIcon from "@mui/icons-material/PhotoCameraOutlined";
 
-import { Member } from "@/interfaces/member";
+import api from "@/services/api";
 
 import {
   validateMember,
@@ -28,21 +33,38 @@ interface MemberCategory {
   code: string;
 }
 
-interface MemberDetailsStepProps {
-  member?: Member | null;
-
-  mode?: "create" | "edit";
-
-  memberId?: number;
-
-  onComplete: (member: Member) => void;
+export interface MemberFormData {
+  first_name: string;
+  other_names: string;
+  national_id: string;
+  phone_number: string;
+  email: string;
+  physical_address: string;
+  occupation: string;
+  kra_pin: string;
+  category: number | "";
+  passport_photo: File | string | null;
 }
 
+interface MemberDetailsStepProps {
+  initialValues?: Partial<MemberFormData>;
+  onChange?: (data: MemberFormData) => void;
+  onComplete: (data: MemberFormData) => void;
+  submitLabel?: string;
+  showBackButton?: boolean;
+  onBack?: () => void;
+}
+
+// Constant empty object to prevent infinite loop
+const EMPTY_MEMBER: Partial<MemberFormData> = {};
+
 export default function MemberDetailsStep({
-  member,
-  mode = "create",
-  memberId,
+  initialValues = EMPTY_MEMBER,
+  onChange,
   onComplete,
+  submitLabel = "Next",
+  showBackButton = false,
+  onBack,
 }: MemberDetailsStepProps) {
   const [loading, setLoading] = useState(false);
 
@@ -53,28 +75,75 @@ export default function MemberDetailsStep({
   const [errors, setErrors] =
     useState<ValidationErrors>({});
 
-  const [form, setForm] = useState({
-    first_name: member?.first_name ?? "",
-    other_names: member?.other_names ?? "",
-    national_id: member?.national_id ?? "",
-    phone_number: member?.phone_number ?? "",
-    email: member?.email ?? "",
+  const [form, setForm] = useState<MemberFormData>({
+    first_name: initialValues.first_name ?? "",
+    other_names: initialValues.other_names ?? "",
+    national_id: initialValues.national_id ?? "",
+    phone_number: initialValues.phone_number ?? "",
+    email: initialValues.email ?? "",
     physical_address:
-      (member as any)?.physical_address ?? "",
-    occupation:
-      (member as any)?.occupation ?? "",
-    kra_pin:
-      (member as any)?.kra_pin ?? "",
-    category:
-      (member as any)?.category?.id ??
-      (member as any)?.category ??
-      "",
-    passport_photo: null as File | null,
+      initialValues.physical_address ?? "",
+    occupation: initialValues.occupation ?? "",
+    kra_pin: initialValues.kra_pin ?? "",
+    category: initialValues.category ?? "",
+    passport_photo:
+      initialValues.passport_photo ?? null,
   });
+
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
 
   useEffect(() => {
     loadCategories();
   }, []);
+
+  // Update form when initialValues changes - with individual dependencies
+  useEffect(() => {
+    setForm({
+      first_name: initialValues.first_name ?? "",
+      other_names: initialValues.other_names ?? "",
+      national_id: initialValues.national_id ?? "",
+      phone_number:
+        initialValues.phone_number ?? "",
+      email: initialValues.email ?? "",
+      physical_address:
+        initialValues.physical_address ?? "",
+      occupation:
+        initialValues.occupation ?? "",
+      kra_pin: initialValues.kra_pin ?? "",
+      category: initialValues.category ?? "",
+      passport_photo:
+        initialValues.passport_photo ?? null,
+    });
+  }, [
+    initialValues.first_name,
+    initialValues.other_names,
+    initialValues.national_id,
+    initialValues.phone_number,
+    initialValues.email,
+    initialValues.physical_address,
+    initialValues.occupation,
+    initialValues.kra_pin,
+    initialValues.category,
+    initialValues.passport_photo,
+  ]);
+
+  // Generate preview for passport photo
+  useEffect(() => {
+    if (!form.passport_photo) {
+      setPhotoPreview(null);
+      return;
+    }
+
+    if (form.passport_photo instanceof File) {
+      const url = URL.createObjectURL(form.passport_photo);
+      setPhotoPreview(url);
+      return () => URL.revokeObjectURL(url);
+    }
+
+    if (typeof form.passport_photo === "string") {
+      setPhotoPreview(form.passport_photo);
+    }
+  }, [form.passport_photo]);
 
   async function loadCategories() {
     try {
@@ -88,16 +157,39 @@ export default function MemberDetailsStep({
     }
   }
 
+  function updateForm(
+    values: Partial<MemberFormData>
+  ) {
+    setForm((prev) => {
+      const newForm = {
+        ...prev,
+        ...values,
+      };
+
+      onChange?.(newForm);
+
+      return newForm;
+    });
+  }
+
   function handleChange(
     e: React.ChangeEvent<HTMLInputElement>
   ) {
-    setForm((prev) => ({
-      ...prev,
-      [e.target.name]: e.target.value,
-    }));
+    const { name, value } = e.target;
+
+    updateForm({
+      [name]:
+        name === "category"
+          ? value === ""
+            ? ""
+            : Number(value)
+          : value,
+    } as Partial<MemberFormData>);
   }
 
   async function handleSubmit() {
+    if (loading) return;
+
     const validationErrors =
       validateMember(form);
 
@@ -109,63 +201,14 @@ export default function MemberDetailsStep({
     }
 
     setErrors({});
-
     setLoading(true);
     setError("");
 
     try {
-      const payload = new FormData();
-
-      // Explicitly append each field
-      payload.append("first_name", form.first_name);
-      payload.append("other_names", form.other_names);
-      payload.append("national_id", form.national_id);
-      payload.append("phone_number", form.phone_number);
-
-      if (form.email) {
-        payload.append("email", form.email);
-      }
-
-      if (form.physical_address) {
-        payload.append("physical_address", form.physical_address);
-      }
-
-      if (form.occupation) {
-        payload.append("occupation", form.occupation);
-      }
-
-      if (form.kra_pin) {
-        payload.append("kra_pin", form.kra_pin);
-      }
-
-      payload.append("category", String(form.category));
-
-      if (form.passport_photo instanceof File) {
-        payload.append(
-          "passport_photo",
-          form.passport_photo,
-          form.passport_photo.name
-        );
-      }
-
-      let savedMember: Member;
-
-      if (mode === "create") {
-        savedMember =
-          await memberService.create(payload);
-      } else {
-        savedMember =
-          await memberService.update(
-            memberId!,
-            payload
-          );
-      }
-
-      onComplete(savedMember);
-    } catch (err: any) {
+      await onComplete(form);
+    } catch {
       setError(
-        err?.response?.data?.detail ??
-          "Unable to save member."
+        "Unable to continue."
       );
     } finally {
       setLoading(false);
@@ -289,30 +332,113 @@ export default function MemberDetailsStep({
           </TextField>
         </Grid>
 
+        {/* Passport Photo Upload */}
         <Grid size={{ xs: 12 }}>
-          <Button
-            component="label"
-            variant="outlined"
+          <Typography
+            variant="subtitle2"
+            sx={{ mb: 1 }}
           >
-            Upload Passport Photo
+            Passport Photo
+          </Typography>
 
-            <input
-              hidden
-              type="file"
-              accept="image/*"
-              onChange={(e) => {
-                const file =
-                  e.target.files?.[0];
+          <Card variant="outlined">
+            <CardContent>
+              <Stack
+                spacing={2}
+                alignItems="center"
+              >
+                {photoPreview ? (
+                  <Box
+                    component="img"
+                    src={photoPreview}
+                    alt="Passport Preview"
+                    sx={{
+                      width: 170,
+                      height: 200,
+                      objectFit: "cover",
+                      borderRadius: 2,
+                      border: "1px solid",
+                      borderColor: "divider",
+                    }}
+                  />
+                ) : (
+                  <Box
+                    sx={{
+                      width: 170,
+                      height: 200,
+                      border: "2px dashed",
+                      borderColor: "divider",
+                      borderRadius: 2,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <Typography
+                      variant="body2"
+                      color="text.secondary"
+                    >
+                      No Photo Selected
+                    </Typography>
+                  </Box>
+                )}
 
-                if (!file) return;
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
+                >
+                  {form.passport_photo instanceof File
+                    ? form.passport_photo.name
+                    : typeof form.passport_photo === "string"
+                    ? "Current Passport Photo"
+                    : "No file selected"}
+                </Typography>
 
-                setForm((prev) => ({
-                  ...prev,
-                  passport_photo: file,
-                }));
-              }}
-            />
-          </Button>
+                <Stack
+                  direction="row"
+                  spacing={2}
+                >
+                  <Button
+                    component="label"
+                    variant="contained"
+                    startIcon={<PhotoCameraOutlinedIcon />}
+                  >
+                    {photoPreview
+                      ? "Replace Photo"
+                      : "Upload Photo"}
+
+                    <input
+                      hidden
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+
+                        if (!file) return;
+
+                        updateForm({
+                          passport_photo: file,
+                        });
+                      }}
+                    />
+                  </Button>
+
+                  {photoPreview && (
+                    <IconButton
+                      color="error"
+                      onClick={() => {
+                        updateForm({
+                          passport_photo: null,
+                        });
+                      }}
+                    >
+                      <DeleteOutlineIcon />
+                    </IconButton>
+                  )}
+                </Stack>
+              </Stack>
+            </CardContent>
+          </Card>
         </Grid>
       </Grid>
 
@@ -328,8 +454,22 @@ export default function MemberDetailsStep({
       <Box
         mt={4}
         display="flex"
-        justifyContent="flex-end"
+        justifyContent={
+          showBackButton
+            ? "space-between"
+            : "flex-end"
+        }
       >
+        {showBackButton && (
+          <Button
+            variant="outlined"
+            onClick={onBack}
+            disabled={loading}
+          >
+            Back
+          </Button>
+        )}
+
         <Button
           variant="contained"
           disabled={loading}
@@ -341,7 +481,7 @@ export default function MemberDetailsStep({
               color="inherit"
             />
           ) : (
-            "Next"
+            submitLabel
           )}
         </Button>
       </Box>

@@ -11,48 +11,50 @@ import {
   TextField,
 } from "@mui/material";
 
-import api from "@/services/api";
+import {
+  useAppDispatch,
+  useAppSelector,
+} from "@/store/hooks";
 
-export interface Guarantor {
-  id: number;
-
-  member: number;
-  guarantor_member: number | null;
-
-  first_name: string;
-  other_names: string;
-  phone_number: string;
-  national_id: string;
-  relationship: string;
-
-  created_at?: string;
-  updated_at?: string;
-}
+import {
+  setGuarantor,
+} from "@/store/registration/registrationSlice";
 
 interface GuarantorStepProps {
-  memberId: number;
-
   onBack: () => void;
-
-  onComplete: (guarantor: Guarantor) => void;
+  onComplete: () => void;
 }
 
 export default function GuarantorStep({
-  memberId,
   onBack,
   onComplete,
 }: GuarantorStepProps) {
-  const [loading, setLoading] = useState(false);
+  const dispatch = useAppDispatch();
 
-  const [error, setError] = useState("");
+  const existingGuarantor = useAppSelector(
+    (state) => state.registration.guarantor
+  );
+
+  const [loading, setLoading] =
+    useState(false);
+
+  const [error, setError] =
+    useState("");
 
   const [form, setForm] = useState({
-    first_name: "",
-    other_names: "",
-    national_id: "",
-    phone_number: "",
-    relationship: "",
-    guarantor_member: "",
+    first_name:
+      existingGuarantor?.first_name ?? "",
+    other_names:
+      existingGuarantor?.other_names ?? "",
+    national_id:
+      existingGuarantor?.national_id ?? "",
+    phone_number:
+      existingGuarantor?.phone_number ?? "",
+    relationship:
+      existingGuarantor?.relationship ?? "",
+    guarantor_member:
+      existingGuarantor?.guarantor_member?.toString() ??
+      "",
   });
 
   function handleChange(
@@ -67,48 +69,47 @@ export default function GuarantorStep({
   }
 
   async function handleSubmit() {
-    setLoading(true);
+    if (!form.first_name.trim()) {
+      setError("First name is required.");
+      return;
+    }
+
+    if (!form.national_id.trim()) {
+      setError("National ID is required.");
+      return;
+    }
+
+    if (!form.phone_number.trim()) {
+      setError("Phone number is required.");
+      return;
+    }
+
     setError("");
+    setLoading(true);
 
     try {
-      const response = await api.post<Guarantor>(
-        "/guarantors/",
-        {
-          member: memberId,
-
-          first_name: form.first_name,
-          other_names: form.other_names,
-
-          national_id: form.national_id,
-          phone_number: form.phone_number,
-          relationship: form.relationship,
-
+      dispatch(
+        setGuarantor({
+          first_name:
+            form.first_name.trim(),
+          other_names:
+            form.other_names.trim(),
+          national_id:
+            form.national_id.trim(),
+          phone_number:
+            form.phone_number.trim(),
+          relationship:
+            form.relationship.trim(),
           guarantor_member:
             form.guarantor_member === ""
               ? null
-              : Number(form.guarantor_member),
-        }
+              : Number(
+                  form.guarantor_member
+                ),
+        })
       );
 
-      onComplete(response.data);
-    } catch (err: any) {
-      console.error(err.response?.data);
-
-      if (err.response?.data) {
-        if (typeof err.response.data === "string") {
-          setError(err.response.data);
-        } else if (err.response.data.detail) {
-          setError(err.response.data.detail);
-        } else {
-          setError(
-            Object.values(err.response.data)
-              .flat()
-              .join(" ")
-          );
-        }
-      } else {
-        setError("Failed to save guarantor.");
-      }
+      onComplete();
     } finally {
       setLoading(false);
     }
@@ -116,8 +117,16 @@ export default function GuarantorStep({
 
   return (
     <Box>
-      <Grid container spacing={3}>
-        <Grid size={{ xs: 12, md: 6 }}>
+      <Grid
+        container
+        spacing={3}
+      >
+        <Grid
+          size={{
+            xs: 12,
+            md: 6,
+          }}
+        >
           <TextField
             fullWidth
             required
@@ -128,10 +137,14 @@ export default function GuarantorStep({
           />
         </Grid>
 
-        <Grid size={{ xs: 12, md: 6 }}>
+        <Grid
+          size={{
+            xs: 12,
+            md: 6,
+          }}
+        >
           <TextField
             fullWidth
-            required
             label="Other Names"
             name="other_names"
             value={form.other_names}
@@ -139,7 +152,12 @@ export default function GuarantorStep({
           />
         </Grid>
 
-        <Grid size={{ xs: 12, md: 6 }}>
+        <Grid
+          size={{
+            xs: 12,
+            md: 6,
+          }}
+        >
           <TextField
             fullWidth
             required
@@ -150,7 +168,12 @@ export default function GuarantorStep({
           />
         </Grid>
 
-        <Grid size={{ xs: 12, md: 6 }}>
+        <Grid
+          size={{
+            xs: 12,
+            md: 6,
+          }}
+        >
           <TextField
             fullWidth
             required
@@ -161,7 +184,9 @@ export default function GuarantorStep({
           />
         </Grid>
 
-        <Grid size={{ xs: 12 }}>
+        <Grid
+          size={{ xs: 12 }}
+        >
           <TextField
             fullWidth
             label="Relationship"
@@ -171,13 +196,17 @@ export default function GuarantorStep({
           />
         </Grid>
 
-        <Grid size={{ xs: 12 }}>
+        <Grid
+          size={{ xs: 12 }}
+        >
           <TextField
             fullWidth
-            label="Guarantor Member ID (optional)"
-            name="guarantor_member"
             type="number"
-            value={form.guarantor_member}
+            label="Guarantor Member ID (Optional)"
+            name="guarantor_member"
+            value={
+              form.guarantor_member
+            }
             onChange={handleChange}
           />
         </Grid>
@@ -188,9 +217,7 @@ export default function GuarantorStep({
           severity="error"
           sx={{ mt: 3 }}
         >
-          <pre style={{ margin: 0, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
-            {error}
-          </pre>
+          {error}
         </Alert>
       )}
 
