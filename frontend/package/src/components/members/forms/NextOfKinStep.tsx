@@ -11,57 +11,44 @@ import {
   TextField,
 } from "@mui/material";
 
-import {
-  useAppDispatch,
-  useAppSelector,
-} from "@/store/hooks";
+import { useAppDispatch, useAppSelector } from "@/store/hooks";
 
-import {
-  setNextOfKin,
-} from "@/store/registration/registrationSlice";
+import { setNextOfKin } from "@/store/registration/registrationSlice";
 
 interface NextOfKinStepProps {
+  required?: boolean;
   onBack: () => void;
   onComplete: () => void;
+  onSkip?: () => void;
 }
 
 export default function NextOfKinStep({
+  required = true,
   onBack,
   onComplete,
+  onSkip,
 }: NextOfKinStepProps) {
   const dispatch = useAppDispatch();
 
   const existingNextOfKin = useAppSelector(
-    (state) => state.registration.nextOfKin
+    (state) => state.registration.nextOfKin,
   );
 
-  const [loading, setLoading] =
-    useState(false);
+  const [loading, setLoading] = useState(false);
 
-  const [error, setError] =
-    useState("");
+  const [error, setError] = useState("");
 
   const [form, setForm] = useState({
-    first_name:
-      existingNextOfKin?.first_name ?? "",
-    other_names:
-      existingNextOfKin?.other_names ?? "",
-    relationship:
-      existingNextOfKin?.relationship ?? "",
-    national_id:
-      existingNextOfKin?.national_id ?? "",
-    phone_number:
-      existingNextOfKin?.phone_number ?? "",
-    physical_address:
-      existingNextOfKin?.physical_address ??
-      "",
-    is_primary:
-      existingNextOfKin?.is_primary ?? true,
+    first_name: existingNextOfKin?.first_name ?? "",
+    other_names: existingNextOfKin?.other_names ?? "",
+    relationship: existingNextOfKin?.relationship ?? "",
+    national_id: existingNextOfKin?.national_id ?? "",
+    phone_number: existingNextOfKin?.phone_number ?? "",
+    physical_address: existingNextOfKin?.physical_address ?? "",
+    is_primary: existingNextOfKin?.is_primary ?? true,
   });
 
-  function handleChange(
-    e: React.ChangeEvent<HTMLInputElement>
-  ) {
+  function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
     const { name, value } = e.target;
 
     setForm((prev) => ({
@@ -71,19 +58,36 @@ export default function NextOfKinStep({
   }
 
   async function handleSubmit() {
-    if (!form.first_name.trim()) {
-      setError("First name is required.");
+    const hasData =
+      form.first_name.trim() !== "" ||
+      form.other_names.trim() !== "" ||
+      form.relationship.trim() !== "" ||
+      form.national_id.trim() !== "" ||
+      form.phone_number.trim() !== "" ||
+      form.physical_address.trim() !== "";
+
+    // Optional step and nothing entered.
+    // Simply continue without saving.
+    if (!required && !hasData) {
+      onComplete();
       return;
     }
 
-    if (!form.relationship.trim()) {
-      setError("Relationship is required.");
-      return;
-    }
+    if (required) {
+      if (!form.first_name.trim()) {
+        setError("First name is required.");
+        return;
+      }
 
-    if (!form.phone_number.trim()) {
-      setError("Phone number is required.");
-      return;
+      if (!form.relationship.trim()) {
+        setError("Relationship is required.");
+        return;
+      }
+
+      if (!form.phone_number.trim()) {
+        setError("Phone number is required.");
+        return;
+      }
     }
 
     setError("");
@@ -92,21 +96,14 @@ export default function NextOfKinStep({
     try {
       dispatch(
         setNextOfKin({
-          first_name:
-            form.first_name.trim(),
-          other_names:
-            form.other_names.trim(),
-          relationship:
-            form.relationship.trim(),
-          national_id:
-            form.national_id.trim(),
-          phone_number:
-            form.phone_number.trim(),
-          physical_address:
-            form.physical_address.trim(),
-          is_primary:
-            form.is_primary,
-        })
+          first_name: form.first_name.trim(),
+          other_names: form.other_names.trim(),
+          relationship: form.relationship.trim(),
+          national_id: form.national_id.trim(),
+          phone_number: form.phone_number.trim(),
+          physical_address: form.physical_address.trim(),
+          is_primary: form.is_primary,
+        }),
       );
 
       onComplete();
@@ -117,19 +114,11 @@ export default function NextOfKinStep({
 
   return (
     <Box>
-      <Grid
-        container
-        spacing={3}
-      >
-        <Grid
-          size={{
-            xs: 12,
-            md: 6,
-          }}
-        >
+      <Grid container spacing={3}>
+        <Grid size={{ xs: 12, md: 6 }}>
           <TextField
             fullWidth
-            required
+            required={required}
             label="First Name"
             name="first_name"
             value={form.first_name}
@@ -137,12 +126,7 @@ export default function NextOfKinStep({
           />
         </Grid>
 
-        <Grid
-          size={{
-            xs: 12,
-            md: 6,
-          }}
-        >
+        <Grid size={{ xs: 12, md: 6 }}>
           <TextField
             fullWidth
             label="Other Names"
@@ -152,12 +136,10 @@ export default function NextOfKinStep({
           />
         </Grid>
 
-        <Grid
-          size={{ xs: 12 }}
-        >
+        <Grid size={{ xs: 12 }}>
           <TextField
             fullWidth
-            required
+            required={required}
             label="Relationship"
             name="relationship"
             value={form.relationship}
@@ -165,9 +147,7 @@ export default function NextOfKinStep({
           />
         </Grid>
 
-        <Grid
-          size={{ xs: 12 }}
-        >
+        <Grid size={{ xs: 12 }}>
           <TextField
             fullWidth
             label="National ID"
@@ -177,12 +157,10 @@ export default function NextOfKinStep({
           />
         </Grid>
 
-        <Grid
-          size={{ xs: 12 }}
-        >
+        <Grid size={{ xs: 12 }}>
           <TextField
             fullWidth
-            required
+            required={required}
             label="Phone Number"
             name="phone_number"
             value={form.phone_number}
@@ -190,59 +168,47 @@ export default function NextOfKinStep({
           />
         </Grid>
 
-        <Grid
-          size={{ xs: 12 }}
-        >
+        <Grid size={{ xs: 12 }}>
           <TextField
             fullWidth
             multiline
             minRows={3}
             label="Physical Address"
             name="physical_address"
-            value={
-              form.physical_address
-            }
+            value={form.physical_address}
             onChange={handleChange}
           />
         </Grid>
       </Grid>
 
       {error && (
-        <Alert
-          severity="error"
-          sx={{ mt: 3 }}
-        >
+        <Alert severity="error" sx={{ mt: 3 }}>
           {error}
         </Alert>
       )}
 
-      <Box
-        mt={4}
-        display="flex"
-        justifyContent="space-between"
-      >
-        <Button
-          variant="outlined"
-          onClick={onBack}
-          disabled={loading}
-        >
+      <Box mt={4} display="flex" justifyContent="space-between">
+        <Button variant="outlined" onClick={onBack} disabled={loading}>
           Back
         </Button>
 
-        <Button
-          variant="contained"
-          onClick={handleSubmit}
-          disabled={loading}
-        >
-          {loading ? (
-            <CircularProgress
-              size={22}
-              color="inherit"
-            />
-          ) : (
-            "Next"
+        <Box display="flex" gap={2}>
+          {!required && (
+            <Button variant="text" onClick={onSkip} disabled={loading}>
+              Skip
+            </Button>
           )}
-        </Button>
+
+          <Button variant="contained" onClick={handleSubmit} disabled={loading}>
+            {loading ? (
+              <CircularProgress size={22} color="inherit" />
+            ) : required ? (
+              "Next"
+            ) : (
+              "Save & Continue"
+            )}
+          </Button>
+        </Box>
       </Box>
     </Box>
   );

@@ -11,55 +11,43 @@ import {
   TextField,
 } from "@mui/material";
 
-import {
-  useAppDispatch,
-  useAppSelector,
-} from "@/store/hooks";
+import { useAppDispatch, useAppSelector } from "@/store/hooks";
 
-import {
-  setGuarantor,
-} from "@/store/registration/registrationSlice";
+import { setGuarantor } from "@/store/registration/registrationSlice";
 
 interface GuarantorStepProps {
+  required?: boolean;
   onBack: () => void;
   onComplete: () => void;
+  onSkip?: () => void;
 }
 
 export default function GuarantorStep({
+  required = true,
   onBack,
   onComplete,
+  onSkip,
 }: GuarantorStepProps) {
   const dispatch = useAppDispatch();
 
   const existingGuarantor = useAppSelector(
-    (state) => state.registration.guarantor
+    (state) => state.registration.guarantor,
   );
 
-  const [loading, setLoading] =
-    useState(false);
+  const [loading, setLoading] = useState(false);
 
-  const [error, setError] =
-    useState("");
+  const [error, setError] = useState("");
 
   const [form, setForm] = useState({
-    first_name:
-      existingGuarantor?.first_name ?? "",
-    other_names:
-      existingGuarantor?.other_names ?? "",
-    national_id:
-      existingGuarantor?.national_id ?? "",
-    phone_number:
-      existingGuarantor?.phone_number ?? "",
-    relationship:
-      existingGuarantor?.relationship ?? "",
-    guarantor_member:
-      existingGuarantor?.guarantor_member?.toString() ??
-      "",
+    first_name: existingGuarantor?.first_name ?? "",
+    other_names: existingGuarantor?.other_names ?? "",
+    national_id: existingGuarantor?.national_id ?? "",
+    phone_number: existingGuarantor?.phone_number ?? "",
+    relationship: existingGuarantor?.relationship ?? "",
+    guarantor_member: existingGuarantor?.guarantor_member?.toString() ?? "",
   });
 
-  function handleChange(
-    e: React.ChangeEvent<HTMLInputElement>
-  ) {
+  function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
     const { name, value } = e.target;
 
     setForm((prev) => ({
@@ -69,19 +57,21 @@ export default function GuarantorStep({
   }
 
   async function handleSubmit() {
-    if (!form.first_name.trim()) {
-      setError("First name is required.");
-      return;
-    }
+    if (required) {
+      if (!form.first_name.trim()) {
+        setError("First name is required.");
+        return;
+      }
 
-    if (!form.national_id.trim()) {
-      setError("National ID is required.");
-      return;
-    }
+      if (!form.national_id.trim()) {
+        setError("National ID is required.");
+        return;
+      }
 
-    if (!form.phone_number.trim()) {
-      setError("Phone number is required.");
-      return;
+      if (!form.phone_number.trim()) {
+        setError("Phone number is required.");
+        return;
+      }
     }
 
     setError("");
@@ -90,23 +80,14 @@ export default function GuarantorStep({
     try {
       dispatch(
         setGuarantor({
-          first_name:
-            form.first_name.trim(),
-          other_names:
-            form.other_names.trim(),
-          national_id:
-            form.national_id.trim(),
-          phone_number:
-            form.phone_number.trim(),
-          relationship:
-            form.relationship.trim(),
+          first_name: form.first_name.trim(),
+          other_names: form.other_names.trim(),
+          national_id: form.national_id.trim(),
+          phone_number: form.phone_number.trim(),
+          relationship: form.relationship.trim(),
           guarantor_member:
-            form.guarantor_member === ""
-              ? null
-              : Number(
-                  form.guarantor_member
-                ),
-        })
+            form.guarantor_member === "" ? null : Number(form.guarantor_member),
+        }),
       );
 
       onComplete();
@@ -117,19 +98,11 @@ export default function GuarantorStep({
 
   return (
     <Box>
-      <Grid
-        container
-        spacing={3}
-      >
-        <Grid
-          size={{
-            xs: 12,
-            md: 6,
-          }}
-        >
+      <Grid container spacing={3}>
+        <Grid size={{ xs: 12, md: 6 }}>
           <TextField
             fullWidth
-            required
+            required={required}
             label="First Name"
             name="first_name"
             value={form.first_name}
@@ -137,12 +110,7 @@ export default function GuarantorStep({
           />
         </Grid>
 
-        <Grid
-          size={{
-            xs: 12,
-            md: 6,
-          }}
-        >
+        <Grid size={{ xs: 12, md: 6 }}>
           <TextField
             fullWidth
             label="Other Names"
@@ -152,15 +120,10 @@ export default function GuarantorStep({
           />
         </Grid>
 
-        <Grid
-          size={{
-            xs: 12,
-            md: 6,
-          }}
-        >
+        <Grid size={{ xs: 12, md: 6 }}>
           <TextField
             fullWidth
-            required
+            required={required}
             label="National ID"
             name="national_id"
             value={form.national_id}
@@ -168,15 +131,10 @@ export default function GuarantorStep({
           />
         </Grid>
 
-        <Grid
-          size={{
-            xs: 12,
-            md: 6,
-          }}
-        >
+        <Grid size={{ xs: 12, md: 6 }}>
           <TextField
             fullWidth
-            required
+            required={required}
             label="Phone Number"
             name="phone_number"
             value={form.phone_number}
@@ -184,9 +142,7 @@ export default function GuarantorStep({
           />
         </Grid>
 
-        <Grid
-          size={{ xs: 12 }}
-        >
+        <Grid size={{ xs: 12 }}>
           <TextField
             fullWidth
             label="Relationship"
@@ -196,58 +152,46 @@ export default function GuarantorStep({
           />
         </Grid>
 
-        <Grid
-          size={{ xs: 12 }}
-        >
+        <Grid size={{ xs: 12 }}>
           <TextField
             fullWidth
             type="number"
             label="Guarantor Member ID (Optional)"
             name="guarantor_member"
-            value={
-              form.guarantor_member
-            }
+            value={form.guarantor_member}
             onChange={handleChange}
           />
         </Grid>
       </Grid>
 
       {error && (
-        <Alert
-          severity="error"
-          sx={{ mt: 3 }}
-        >
+        <Alert severity="error" sx={{ mt: 3 }}>
           {error}
         </Alert>
       )}
 
-      <Box
-        mt={4}
-        display="flex"
-        justifyContent="space-between"
-      >
-        <Button
-          variant="outlined"
-          onClick={onBack}
-          disabled={loading}
-        >
+      <Box mt={4} display="flex" justifyContent="space-between">
+        <Button variant="outlined" onClick={onBack} disabled={loading}>
           Back
         </Button>
 
-        <Button
-          variant="contained"
-          onClick={handleSubmit}
-          disabled={loading}
-        >
-          {loading ? (
-            <CircularProgress
-              size={22}
-              color="inherit"
-            />
-          ) : (
-            "Next"
+        <Box display="flex" gap={2}>
+          {!required && (
+            <Button variant="text" onClick={onSkip} disabled={loading}>
+              Skip
+            </Button>
           )}
-        </Button>
+
+          <Button variant="contained" onClick={handleSubmit} disabled={loading}>
+            {loading ? (
+              <CircularProgress size={22} color="inherit" />
+            ) : required ? (
+              "Next"
+            ) : (
+              "Save & Continue"
+            )}
+          </Button>
+        </Box>
       </Box>
     </Box>
   );

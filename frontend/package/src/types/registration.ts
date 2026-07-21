@@ -1,3 +1,9 @@
+export interface RegistrationCategoryState {
+  id: number;
+  name: string;
+  code: string;
+}
+
 export interface MemberState {
   first_name: string;
   other_names: string;
@@ -7,7 +13,20 @@ export interface MemberState {
   physical_address: string;
   occupation: string;
   kra_pin: string;
+
+  /*
+   * Foreign-key value submitted to Django.
+   */
   category: number | "";
+
+  /*
+   * Category metadata used by the registration workflow.
+   *
+   * This avoids fragile logic based on database IDs or
+   * display names.
+   */
+  category_details: RegistrationCategoryState | null;
+
   passport_photo: File | null;
 }
 
@@ -42,8 +61,12 @@ export interface GuarantorState {
 
 export interface RegistrationState {
   currentStep: number;
+
   member: MemberState;
+
   nextOfKin: NextOfKinState;
+
   vehicle: VehicleState;
+
   guarantor: GuarantorState;
 }

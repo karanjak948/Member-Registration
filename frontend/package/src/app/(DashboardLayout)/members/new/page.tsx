@@ -1,8 +1,9 @@
 "use client";
 
-import { ReactNode, useMemo, useState } from "react";
+import { ReactNode, useEffect, useMemo, useState } from "react";
 
 import {
+  Alert,
   Box,
   Card,
   CardContent,
@@ -14,19 +15,28 @@ import {
   Typography,
 } from "@mui/material";
 
-import MemberDetailsStep from "@/components/members/forms/MemberDetailsStep";
+import MemberDetailsStep, {
+  MemberFormData,
+} from "@/components/members/forms/MemberDetailsStep";
+
 import NextOfKinStep from "@/components/members/forms/NextOfKinStep";
 import VehicleStep from "@/components/members/forms/VehicleStep";
 import GuarantorStep from "@/components/members/forms/GuarantorStep";
 import ReviewStep from "@/components/members/forms/ReviewStep";
 
-/*
- * Each registration step has a stable key.
- *
- * We use keys instead of hardcoded numeric positions
- * because the number and order of steps will vary
- * according to the selected member category.
- */
+import { useAppDispatch, useAppSelector } from "@/store/hooks";
+
+import {
+  replaceMember,
+  setCurrentStep,
+} from "@/store/registration/registrationSlice";
+
+import type { MemberState } from "@/types/registration";
+
+/* =========================================================
+   TYPES
+========================================================= */
+
 type RegistrationStepKey =
   | "member"
   | "nextOfKin"
@@ -36,102 +46,264 @@ type RegistrationStepKey =
 
 interface RegistrationStepDefinition {
   key: RegistrationStepKey;
+
   label: string;
 }
 
-/*
- * Phase 3A foundation:
- *
- * This is currently the full Normal Member workflow.
- *
- * Once we inspect the Redux registration slice,
- * this array will be generated dynamically from
- * the selected member category.
- */
-const DEFAULT_REGISTRATION_STEPS: RegistrationStepDefinition[] = [
+/* =========================================================
+   WORKFLOW DEFINITIONS
+========================================================= */
+
+const REGISTRATION_STEPS: RegistrationStepDefinition[] = [
   {
     key: "member",
     label: "Member Details",
   },
+
   {
     key: "nextOfKin",
     label: "Next of Kin",
   },
+
   {
     key: "vehicle",
     label: "Vehicle",
   },
+
   {
     key: "guarantor",
     label: "Guarantor",
   },
+
   {
     key: "review",
     label: "Review",
   },
 ];
 
+/*
+ * Stable category codes.
+ *
+ * These MUST correspond to MemberCategory.code values
+ * seeded/configured in Django.
+ *
+ * Never implement workflow rules using database IDs.
+ */
+const NORMAL_CATEGORY_CODE = "NORMAL";
+
+/* =========================================================
+   PAGE
+========================================================= */
+
 export default function RegisterMemberPage() {
-  const [activeStep, setActiveStep] = useState(0);
+  const dispatch = useAppDispatch();
+
+  const { currentStep: storedCurrentStep, member } = useAppSelector(
+    (state) => state.registration,
+  );
+
+  /* =======================================================
+     CATEGORY WORKFLOW
+  ======================================================= */
+
+  const categoryCode =
+    member.category_details?.code?.trim().toUpperCase() ?? "";
 
   /*
-   * This will become category-driven after
-   * we inspect the Redux registration slice.
+   * Normal Members require the complete registration
+   * workflow.
    *
-   * For now, keeping the existing full workflow
-   * ensures we do not break registration while
-   * refactoring the navigation architecture.
+   * Special and Other Members can use the same workflow,
+   * but related-data steps will become optional/skippable.
    */
-  const steps = useMemo(() => DEFAULT_REGISTRATION_STEPS, []);
+  const isNormalMember = categoryCode === NORMAL_CATEGORY_CODE;
 
-  /*
-   * Protect against an invalid activeStep if
-   * the step list changes dynamically later.
-   */
-  const safeActiveStep = Math.min(activeStep, Math.max(steps.length - 1, 0));
+  const hasSelectedCategory =
+    member.category !== "" && member.category_details !== null;
+
+  /* =======================================================
+     STEPS
+  ======================================================= */
+
+  const steps = useMemo(() => REGISTRATION_STEPS, []);
+
+  const [activeStep, setActiveStep] = useState(() => {
+    if (
+      typeof storedCurrentStep === "number" &&
+      Number.isFinite(storedCurrentStep)
+    ) {
+      return storedCurrentStep;
+    }
+
+    return 0;
+  });
+
+  const safeActiveStep = Math.min(
+    Math.max(activeStep, 0),
+    Math.max(steps.length - 1, 0),
+  );
 
   const currentStep = steps[safeActiveStep];
 
-  /*
-   * Generic navigation functions.
-   *
-   * No registration component needs to know
-   * that Next of Kin is "step 1" or Review
-   * is "step 4".
-   *
-   * This is essential for category-based
-   * conditional workflows.
-   */
+  /* =======================================================
+     SYNCHRONIZE STEP
+  ======================================================= */
+
+  useEffect(() => {
+    if (storedCurrentStep !== safeActiveStep) {
+      dispatch(setCurrentStep(safeActiveStep));
+    }
+  }, [dispatch, safeActiveStep, storedCurrentStep]);
+
+  /* =======================================================
+     NAVIGATION
+  ======================================================= */
+
+  function goToStep(nextStep: number) {
+    const normalizedStep = Math.min(
+      Math.max(nextStep, 0),
+
+      Math.max(steps.length - 1, 0),
+    );
+
+    dispatch(setCurrentStep(normalizedStep));
+
+    setActiveStep(normalizedStep);
+  }
+
   function handleNext() {
-    setActiveStep((current) => Math.min(current + 1, steps.length - 1));
+    goToStep(safeActiveStep + 1);
   }
 
   function handleBack() {
-    setActiveStep((current) => Math.max(current - 1, 0));
+    goToStep(safeActiveStep - 1);
   }
 
-  /*
-   * Render the current registration component
-   * using the stable step key instead of
-   * hardcoded numeric indexes.
-   */
+  /* =======================================================
+     MEMBER DETAILS
+  ======================================================= */
+
+  function handleMemberComplete(data: MemberFormData) {
+    /*
+     * Step 1 is always mandatory for every category.
+     *
+     * Store both:
+     *
+     * category        -> Django FK
+     * category_details -> frontend workflow metadata
+     */
+    dispatch(replaceMember(data as MemberState));
+
+    handleNext();
+  }
+
+  /* =======================================================
+     STEP REQUIREMENT
+  ======================================================= */
+
+  function isStepRequired(key: RegistrationStepKey): boolean {
+    /*
+     * Member Details and Review always participate in
+     * registration.
+     */
+    if (key === "member" || key === "review") {
+      return true;
+    }
+
+    /*
+     * Normal Member:
+     *
+     * Next of Kin
+     * Vehicle
+     * Guarantor
+     *
+     * are required.
+     */
+    return isNormalMember;
+  }
+
+  /* =======================================================
+     STEP UI
+  ======================================================= */
+
   function renderCurrentStep(): ReactNode {
     if (!currentStep) {
       return null;
     }
 
+    const required = isStepRequired(currentStep.key);
+
     switch (currentStep.key) {
+      /* ---------------------------------------------------
+         MEMBER
+      --------------------------------------------------- */
+
       case "member":
-        return <MemberDetailsStep onComplete={handleNext} />;
+        return (
+          <MemberDetailsStep
+            initialValues={member}
+            onComplete={handleMemberComplete}
+            submitLabel="Next"
+          />
+        );
+
+      /* ---------------------------------------------------
+         NEXT OF KIN
+      --------------------------------------------------- */
 
       case "nextOfKin":
-        return <NextOfKinStep onBack={handleBack} onComplete={handleNext} />;
+        return (
+          <Box>
+            {!required && <OptionalStepNotice label="Next of Kin" />}
+
+            <NextOfKinStep
+              required={required}
+              onBack={handleBack}
+              onComplete={handleNext}
+              onSkip={handleNext}
+            />
+          </Box>
+        );
+
+      /* ---------------------------------------------------
+         VEHICLE
+      --------------------------------------------------- */
 
       case "vehicle":
-        return <VehicleStep onBack={handleBack} onComplete={handleNext} />;
+        return (
+          <Box>
+            {!required && <OptionalStepNotice label="Vehicle" />}
+
+            <VehicleStep
+              required={required}
+              onBack={handleBack}
+              onComplete={handleNext}
+              onSkip={handleNext}
+            />
+          </Box>
+        );
+
+      /* ---------------------------------------------------
+         GUARANTOR
+      --------------------------------------------------- */
 
       case "guarantor":
-        return <GuarantorStep onBack={handleBack} onComplete={handleNext} />;
+        return (
+          <Box>
+            {!required && <OptionalStepNotice label="Guarantor" />}
+
+            <GuarantorStep
+              required={required}
+              onBack={handleBack}
+              onComplete={handleNext}
+              onSkip={handleNext}
+            />
+          </Box>
+        );
+
+      /* ---------------------------------------------------
+         REVIEW
+      --------------------------------------------------- */
 
       case "review":
         return <ReviewStep onBack={handleBack} />;
@@ -141,11 +313,21 @@ export default function RegisterMemberPage() {
     }
   }
 
+  /* =======================================================
+     UI
+  ======================================================= */
+
   return (
-    <Container maxWidth="xl">
-      {/* =========================
-          PAGE HEADER
-      ========================== */}
+    <Container
+      maxWidth="xl"
+      sx={{
+        py: {
+          xs: 2,
+          md: 3,
+        },
+      }}
+    >
+      {/* HEADER */}
 
       <Box
         sx={{
@@ -155,15 +337,19 @@ export default function RegisterMemberPage() {
         <Box
           sx={{
             display: "flex",
+
             alignItems: {
               xs: "flex-start",
               sm: "center",
             },
+
             justifyContent: "space-between",
+
             flexDirection: {
               xs: "column",
               sm: "row",
             },
+
             gap: 1.5,
           }}
         >
@@ -184,49 +370,77 @@ export default function RegisterMemberPage() {
             </Typography>
           </Box>
 
-          <Chip
-            label="Data Capture Pending"
-            color="warning"
-            variant="outlined"
-            size="small"
-          />
+          <Box
+            sx={{
+              display: "flex",
+
+              gap: 1,
+
+              flexWrap: "wrap",
+
+              justifyContent: {
+                xs: "flex-start",
+                sm: "flex-end",
+              },
+            }}
+          >
+            {hasSelectedCategory && (
+              <Chip
+                label={member.category_details?.name ?? "Selected Category"}
+                variant="outlined"
+                size="small"
+              />
+            )}
+
+            <Chip
+              label="Data Capture Pending"
+              color="warning"
+              variant="outlined"
+              size="small"
+            />
+          </Box>
         </Box>
       </Box>
 
-      {/* =========================
-          REGISTRATION CARD
-      ========================== */}
+      {/* WIZARD */}
 
       <Card
         elevation={0}
         sx={{
           border: "1px solid",
+
           borderColor: "divider",
+
           borderRadius: 3,
+
+          overflow: "visible",
         }}
       >
         <CardContent
           sx={{
             p: {
               xs: 2,
+              sm: 2.5,
               md: 3,
             },
 
             "&:last-child": {
               pb: {
                 xs: 2,
+                sm: 2.5,
                 md: 3,
               },
             },
           }}
         >
-          {/* =========================
-              DYNAMIC STEPPER
-          ========================== */}
+          {/* STEPPER */}
 
           <Box
             sx={{
               overflowX: "auto",
+
+              overflowY: "hidden",
+
               pb: 1,
             }}
           >
@@ -235,18 +449,35 @@ export default function RegisterMemberPage() {
               alternativeLabel
               sx={{
                 mb: 4,
-                minWidth: steps.length > 3 ? 650 : "auto",
+
+                minWidth: 650,
               }}
             >
-              {steps.map((step) => (
-                <Step key={step.key}>
-                  <StepLabel>{step.label}</StepLabel>
-                </Step>
-              ))}
+              {steps.map((step, index) => {
+                const required = isStepRequired(step.key);
+
+                return (
+                  <Step key={step.key} completed={index < safeActiveStep}>
+                    <StepLabel
+                      optional={
+                        hasSelectedCategory &&
+                        !required &&
+                        step.key !== "review" ? (
+                          <Typography variant="caption" color="text.secondary">
+                            Optional
+                          </Typography>
+                        ) : undefined
+                      }
+                    >
+                      {step.label}
+                    </StepLabel>
+                  </Step>
+                );
+              })}
             </Stepper>
           </Box>
 
-          {/* Current-step context */}
+          {/* STEP CONTEXT */}
 
           <Box
             sx={{
@@ -257,18 +488,54 @@ export default function RegisterMemberPage() {
               Step {safeActiveStep + 1} of {steps.length}
             </Typography>
 
-            <Typography variant="h5" fontWeight={700}>
-              {currentStep?.label}
-            </Typography>
+            <Box
+              sx={{
+                display: "flex",
+
+                alignItems: "center",
+
+                gap: 1,
+
+                mt: 0.25,
+
+                flexWrap: "wrap",
+              }}
+            >
+              <Typography variant="h5" fontWeight={700}>
+                {currentStep?.label}
+              </Typography>
+
+              {currentStep &&
+                hasSelectedCategory &&
+                !isStepRequired(currentStep.key) && (
+                  <Chip label="Optional" size="small" variant="outlined" />
+                )}
+            </Box>
           </Box>
 
-          {/* =========================
-              ACTIVE FORM
-          ========================== */}
+          {/* ACTIVE FORM */}
 
           <Box>{renderCurrentStep()}</Box>
         </CardContent>
       </Card>
     </Container>
+  );
+}
+
+/* =========================================================
+   OPTIONAL STEP NOTICE
+========================================================= */
+
+function OptionalStepNotice({ label }: { label: string }) {
+  return (
+    <Alert
+      severity="info"
+      sx={{
+        mb: 3,
+      }}
+    >
+      {label} information is optional for this member category. Complete it when
+      applicable, or skip this step and continue with registration.
+    </Alert>
   );
 }

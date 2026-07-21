@@ -1,4 +1,7 @@
-import { createSlice, PayloadAction } from "@reduxjs/toolkit";
+import {
+  createSlice,
+  PayloadAction,
+} from "@reduxjs/toolkit";
 
 import type {
   RegistrationState,
@@ -8,51 +11,79 @@ import type {
   GuarantorState,
 } from "@/types/registration";
 
-const initialState: RegistrationState = {
+/* =========================================================
+   INITIAL STATE FACTORIES
+========================================================= */
+
+const createInitialMemberState = (): MemberState => ({
+  first_name: "",
+  other_names: "",
+  national_id: "",
+  phone_number: "",
+  email: "",
+  physical_address: "",
+  occupation: "",
+  kra_pin: "",
+
+  category: "",
+
+  /*
+   * Workflow metadata.
+   *
+   * Populated when Member Details is completed.
+   */
+  category_details: null,
+
+  passport_photo: null,
+});
+
+const createInitialNextOfKinState = (): NextOfKinState => ({
+  first_name: "",
+  other_names: "",
+  relationship: "",
+  national_id: "",
+  phone_number: "",
+  physical_address: "",
+  is_primary: true,
+});
+
+const createInitialVehicleState = (): VehicleState => ({
+  registration_number: "",
+  make: "",
+  model: "",
+  year: null,
+  color: "",
+  engine_number: "",
+  chassis_number: "",
+});
+
+const createInitialGuarantorState = (): GuarantorState => ({
+  first_name: "",
+  other_names: "",
+  national_id: "",
+  phone_number: "",
+  relationship: "",
+  guarantor_member: null,
+});
+
+const createInitialState = (): RegistrationState => ({
   currentStep: 0,
 
-  member: {
-    first_name: "",
-    other_names: "",
-    national_id: "",
-    phone_number: "",
-    email: "",
-    physical_address: "",
-    occupation: "",
-    kra_pin: "",
-    category: "",
-    passport_photo: null,
-  },
+  member: createInitialMemberState(),
 
-  nextOfKin: {
-    first_name: "",
-    other_names: "",
-    relationship: "",
-    national_id: "",
-    phone_number: "",
-    physical_address: "",
-    is_primary: true,
-  },
+  nextOfKin: createInitialNextOfKinState(),
 
-  vehicle: {
-    registration_number: "",
-    make: "",
-    model: "",
-    year: null,
-    color: "",
-    engine_number: "",
-    chassis_number: "",
-  },
+  vehicle: createInitialVehicleState(),
 
-  guarantor: {
-    first_name: "",
-    other_names: "",
-    national_id: "",
-    phone_number: "",
-    relationship: "",
-    guarantor_member: null,
-  },
-};
+  guarantor: createInitialGuarantorState(),
+});
+
+const initialState: RegistrationState =
+  createInitialState();
+
+/* =========================================================
+   SLICE
+========================================================= */
 
 const registrationSlice = createSlice({
   name: "registration",
@@ -60,69 +91,150 @@ const registrationSlice = createSlice({
   initialState,
 
   reducers: {
-    setCurrentStep(state, action: PayloadAction<number>) {
+    /* =====================================================
+       WIZARD
+    ===================================================== */
+
+    setCurrentStep(
+      state,
+      action: PayloadAction<number>,
+    ) {
       state.currentStep = action.payload;
     },
 
+    /* =====================================================
+       MEMBER
+    ===================================================== */
+
     setMember(
       state,
-      action: PayloadAction<Partial<MemberState>>
+      action: PayloadAction<Partial<MemberState>>,
     ) {
-      state.member = {
-        ...state.member,
-        ...action.payload,
-      };
+      Object.assign(
+        state.member,
+        action.payload,
+      );
     },
+
+    replaceMember(
+      state,
+      action: PayloadAction<MemberState>,
+    ) {
+      state.member = action.payload;
+    },
+
+    clearMember(state) {
+      state.member =
+        createInitialMemberState();
+    },
+
+    /* =====================================================
+       NEXT OF KIN
+    ===================================================== */
 
     setNextOfKin(
       state,
-      action: PayloadAction<Partial<NextOfKinState>>
+      action: PayloadAction<Partial<NextOfKinState>>,
     ) {
-      state.nextOfKin = {
-        ...state.nextOfKin,
-        ...action.payload,
-      };
+      Object.assign(
+        state.nextOfKin,
+        action.payload,
+      );
     },
+
+    replaceNextOfKin(
+      state,
+      action: PayloadAction<NextOfKinState>,
+    ) {
+      state.nextOfKin = action.payload;
+    },
+
+    clearNextOfKin(state) {
+      state.nextOfKin =
+        createInitialNextOfKinState();
+    },
+
+    /* =====================================================
+       VEHICLE
+    ===================================================== */
 
     setVehicle(
       state,
-      action: PayloadAction<Partial<VehicleState>>
+      action: PayloadAction<Partial<VehicleState>>,
     ) {
-      state.vehicle = {
-        ...state.vehicle,
-        ...action.payload,
-      };
+      Object.assign(
+        state.vehicle,
+        action.payload,
+      );
     },
+
+    replaceVehicle(
+      state,
+      action: PayloadAction<VehicleState>,
+    ) {
+      state.vehicle = action.payload;
+    },
+
+    clearVehicle(state) {
+      state.vehicle =
+        createInitialVehicleState();
+    },
+
+    /* =====================================================
+       GUARANTOR
+    ===================================================== */
 
     setGuarantor(
       state,
-      action: PayloadAction<Partial<GuarantorState>>
+      action: PayloadAction<Partial<GuarantorState>>,
     ) {
-      state.guarantor = {
-        ...state.guarantor,
-        ...action.payload,
-      };
+      Object.assign(
+        state.guarantor,
+        action.payload,
+      );
     },
 
+    replaceGuarantor(
+      state,
+      action: PayloadAction<GuarantorState>,
+    ) {
+      state.guarantor = action.payload;
+    },
+
+    clearGuarantor(state) {
+      state.guarantor =
+        createInitialGuarantorState();
+    },
+
+    /* =====================================================
+       RESET
+    ===================================================== */
+
     resetRegistration() {
-      // Return a fresh copy of initialState with all nested objects
-      return {
-        ...initialState,
-        member: { ...initialState.member },
-        nextOfKin: { ...initialState.nextOfKin },
-        vehicle: { ...initialState.vehicle },
-        guarantor: { ...initialState.guarantor },
-      };
+      return createInitialState();
     },
   },
 });
 
 export const {
   setCurrentStep,
+
   setMember,
+  replaceMember,
+  clearMember,
+
   setNextOfKin,
+  replaceNextOfKin,
+  clearNextOfKin,
+
   setVehicle,
+  replaceVehicle,
+  clearVehicle,
+
   setGuarantor,
+  replaceGuarantor,
+  clearGuarantor,
+
   resetRegistration,
 } = registrationSlice.actions;
 
