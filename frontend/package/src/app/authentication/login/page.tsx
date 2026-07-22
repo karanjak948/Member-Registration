@@ -1,26 +1,41 @@
 "use client";
+
 import Link from "next/link";
-import { Grid, Box, Card, Stack, Typography } from "@mui/material";
-// components
+
+import { Box, Card, Grid, Stack, Typography } from "@mui/material";
+
 import PageContainer from "@/app/(DashboardLayout)/components/container/PageContainer";
+
 import Logo from "@/app/(DashboardLayout)/layout/shared/logo/Logo";
+
 import AuthLogin from "../auth/AuthLogin";
 
-const Login2 = () => {
+export default function LoginPage() {
   return (
-    <PageContainer title="Login" description="this is Login page">
+    <PageContainer
+      title="Sign In"
+      description="Sign in to the Member Registration System."
+    >
       <Box
         sx={{
           position: "relative",
+
+          minHeight: "100vh",
+
           "&:before": {
             content: '""',
+
             background: "radial-gradient(#d2f1df, #d3d7fa, #bad8f4)",
+
             backgroundSize: "400% 400%",
+
             animation: "gradient 15s ease infinite",
+
             position: "absolute",
-            height: "100%",
-            width: "100%",
-            opacity: "0.3",
+
+            inset: 0,
+
+            opacity: 0.3,
           },
         }}
       >
@@ -28,7 +43,9 @@ const Login2 = () => {
           container
           spacing={0}
           justifyContent="center"
-          sx={{ height: "100vh" }}
+          sx={{
+            minHeight: "100vh",
+          }}
         >
           <Grid
             display="flex"
@@ -38,24 +55,42 @@ const Login2 = () => {
               xs: 12,
               sm: 12,
               lg: 4,
-              xl: 3
-            }}>
+              xl: 3,
+            }}
+            sx={{
+              px: 2,
+              py: 4,
+            }}
+          >
             <Card
               elevation={9}
-              sx={{ p: 4, zIndex: 1, width: "100%", maxWidth: "500px" }}
+              sx={{
+                p: {
+                  xs: 3,
+                  sm: 4,
+                },
+
+                zIndex: 1,
+
+                width: "100%",
+
+                maxWidth: "500px",
+              }}
             >
               <Box display="flex" alignItems="center" justifyContent="center">
                 <Logo />
               </Box>
+
               <AuthLogin
                 subtext={
                   <Typography
                     variant="subtitle1"
                     textAlign="center"
-                    color="textSecondary"
-                    mb={1}
+                    color="text.secondary"
+                    mb={3}
+                    mt={1}
                   >
-                    Your Social Campaigns
+                    Sign in to continue to the Member Registration System
                   </Typography>
                 }
                 subtitle={
@@ -63,21 +98,22 @@ const Login2 = () => {
                     direction="row"
                     spacing={1}
                     justifyContent="center"
+                    alignItems="center"
+                    flexWrap="wrap"
                     mt={3}
                   >
-                    <Typography
-                      color="textSecondary"
-                      variant="h6"
-                      fontWeight="500"
-                    >
-                      New to Modernize?
+                    <Typography color="text.secondary" variant="body2">
+                      Don&apos;t have an account?
                     </Typography>
+
                     <Typography
                       component={Link}
                       href="/authentication/register"
-                      fontWeight="500"
+                      variant="body2"
+                      fontWeight={600}
                       sx={{
                         textDecoration: "none",
+
                         color: "primary.main",
                       }}
                     >
@@ -92,5 +128,4 @@ const Login2 = () => {
       </Box>
     </PageContainer>
   );
-};
-export default Login2;
+}

@@ -5,7 +5,7 @@ from ..models import Vehicle
 
 class VehicleSerializer(serializers.ModelSerializer):
     """
-    Serializer for vehicles.
+    Serializer for vehicles with ownership validation.
     """
 
     member_number = serializers.CharField(
@@ -24,3 +24,22 @@ class VehicleSerializer(serializers.ModelSerializer):
             "updated_at",
             "member_number",
         )
+
+    def validate_member(self, member):
+        request = self.context.get("request")
+
+        if (
+            request is None
+            or not request.user.is_authenticated
+        ):
+            raise serializers.ValidationError(
+                "Authentication is required."
+            )
+
+        if member.created_by_id != request.user.id:
+            raise serializers.ValidationError(
+                "The selected member does not "
+                "belong to your account."
+            )
+
+        return member

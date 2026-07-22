@@ -1,5 +1,5 @@
 export interface Organization {
-  id: number;
+  id: number | null;
 
   name: string;
 
@@ -11,11 +11,13 @@ export interface Organization {
 
   physical_address: string;
 
-  website?: string;
+  website: string;
 
-  logo?: string | null;
+  logo: string | null;
 
-  created_at?: string;
+  created_at: string | null;
 
-  updated_at?: string;
+  updated_at: string | null;
+
+  is_configured?: boolean;
 }

@@ -1,16 +1,23 @@
 "use client";
 
-import React, { useState, ChangeEvent } from "react";
+import React, { useState } from "react";
+
 import {
   Alert,
   Box,
-  Typography,
-  FormGroup,
-  FormControlLabel,
   Button,
-  Stack,
   Checkbox,
+  FormControlLabel,
+  FormGroup,
+  IconButton,
+  InputAdornment,
+  Stack,
+  Typography,
 } from "@mui/material";
+
+import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
+import VisibilityOffOutlinedIcon from "@mui/icons-material/VisibilityOffOutlined";
+
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { signIn } from "next-auth/react";
@@ -27,76 +34,101 @@ const AuthLogin = ({ title, subtitle, subtext }: LoginType) => {
   const router = useRouter();
 
   const [username, setUsername] = useState("");
+
   const [password, setPassword] = useState("");
+
+  const [showPassword, setShowPassword] = useState(false);
 
   const [loading, setLoading] = useState(false);
 
   const [error, setError] = useState("");
 
-  const handleLogin = async (
-    e: React.FormEvent<HTMLFormElement>
-  ) => {
-    e.preventDefault();
+  async function handleLogin(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (loading) {
+      return;
+    }
+
+    const normalizedUsername = username.trim();
+
+    if (!normalizedUsername) {
+      setError("Username is required.");
+      return;
+    }
+
+    if (!password) {
+      setError("Password is required.");
+      return;
+    }
 
     setLoading(true);
     setError("");
 
-    const result = await signIn("credentials", {
-      username,
-      password,
-      redirect: false,
-    });
+    try {
+      const result = await signIn("credentials", {
+        username: normalizedUsername,
+        password,
+        redirect: false,
+      });
 
-    setLoading(false);
+      if (!result) {
+        setError("Unable to sign in. Please try again.");
+        return;
+      }
 
-    if (!result) {
-      setError("Unable to login.");
-      return;
+      if (result.error) {
+        setError("Invalid username or password.");
+        return;
+      }
+
+      router.push("/");
+      router.refresh();
+    } catch (err) {
+      console.error("Login failed:", err);
+
+      setError("Unable to sign in. Please try again.");
+    } finally {
+      setLoading(false);
     }
-
-    if (result.error) {
-      setError("Invalid username or password.");
-      return;
-    }
-
-    router.push("/");
-    router.refresh();
-  };
+  }
 
   return (
     <>
       {title && (
-        <Typography
-          fontWeight={700}
-          variant="h2"
-          mb={1}
-        >
+        <Typography fontWeight={700} variant="h2" mb={1}>
           {title}
         </Typography>
       )}
 
       {subtext}
 
-      <Box
-        component="form"
-        onSubmit={handleLogin}
-      >
+      <Box component="form" onSubmit={handleLogin} noValidate>
         <Stack spacing={3}>
           <Box>
             <Typography
               variant="subtitle1"
               fontWeight={600}
               mb="5px"
+              component="label"
+              htmlFor="username"
             >
               Username
             </Typography>
 
             <CustomTextField
+              id="username"
               fullWidth
+              autoComplete="username"
               value={username}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                setUsername(e.target.value)
-              }
+              disabled={loading}
+              onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
+                setUsername(event.target.value);
+
+                if (error) {
+                  setError("");
+                }
+              }}
             />
           </Box>
 
@@ -105,30 +137,57 @@ const AuthLogin = ({ title, subtitle, subtext }: LoginType) => {
               variant="subtitle1"
               fontWeight={600}
               mb="5px"
+              component="label"
+              htmlFor="password"
             >
               Password
             </Typography>
 
             <CustomTextField
+              id="password"
               fullWidth
-              type="password"
+              type={showPassword ? "text" : "password"}
+              autoComplete="current-password"
               value={password}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                setPassword(e.target.value)
-              }
+              disabled={loading}
+              onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
+                setPassword(event.target.value);
+
+                if (error) {
+                  setError("");
+                }
+              }}
+              InputProps={{
+                endAdornment: (
+                  <InputAdornment position="end">
+                    <IconButton
+                      type="button"
+                      edge="end"
+                      aria-label={
+                        showPassword ? "Hide password" : "Show password"
+                      }
+                      onClick={() => setShowPassword((previous) => !previous)}
+                      disabled={loading}
+                    >
+                      {showPassword ? (
+                        <VisibilityOffOutlinedIcon />
+                      ) : (
+                        <VisibilityOutlinedIcon />
+                      )}
+                    </IconButton>
+                  </InputAdornment>
+                ),
+              }}
             />
           </Box>
 
-          {error && (
-            <Alert severity="error">
-              {error}
-            </Alert>
-          )}
+          {error && <Alert severity="error">{error}</Alert>}
 
           <Stack
             direction="row"
             justifyContent="space-between"
             alignItems="center"
+            spacing={2}
           >
             <FormGroup>
               <FormControlLabel
@@ -139,9 +198,11 @@ const AuthLogin = ({ title, subtitle, subtext }: LoginType) => {
 
             <Typography
               component={Link}
-              href="/"
+              href="/authentication/forgot-password"
               color="primary"
-              sx={{ textDecoration: "none" }}
+              sx={{
+                textDecoration: "none",
+              }}
             >
               Forgot Password?
             </Typography>

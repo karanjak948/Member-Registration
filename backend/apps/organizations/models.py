@@ -1,12 +1,20 @@
-from django.core.exceptions import ValidationError
+from django.conf import settings
 from django.db import models
 
 
 class Organization(models.Model):
     """
-    Singleton model representing the organization using the system.
-    Only one Organization record should ever exist.
+    Organization/workspace owned by an application user.
+
+    Each user has at most one organization. Organization
+    data is isolated from every other user's workspace.
     """
+
+    owner = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="organization",
+    )
 
     name = models.CharField(
         max_length=200,
@@ -30,7 +38,7 @@ class Organization(models.Model):
     )
 
     logo = models.ImageField(
-        upload_to="organization/",
+        upload_to="organizations/logos/",
         blank=True,
         null=True,
     )
@@ -45,23 +53,8 @@ class Organization(models.Model):
 
     class Meta:
         verbose_name = "Organization"
-        verbose_name_plural = "Organization"
-
-    def clean(self):
-        """
-        Prevent creation of more than one organization.
-        """
-        if (
-            not self.pk
-            and Organization.objects.exists()
-        ):
-            raise ValidationError(
-                "Only one organization can exist."
-            )
-
-    def save(self, *args, **kwargs):
-        self.full_clean()
-        super().save(*args, **kwargs)
+        verbose_name_plural = "Organizations"
+        ordering = ["name"]
 
     def __str__(self):
-        return self.name
+        return f"{self.name} ({self.owner})"

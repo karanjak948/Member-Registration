@@ -6,6 +6,9 @@ from ..models import Member
 class MemberSerializer(serializers.ModelSerializer):
     """
     Serializer for members.
+
+    Ownership and workflow-controlled fields are assigned
+    by the backend and cannot be changed directly by clients.
     """
 
     category_name = serializers.CharField(
@@ -46,7 +49,16 @@ class MemberSerializer(serializers.ModelSerializer):
         read_only_fields = (
             "id",
             "membership_number",
+
+            # Ownership is controlled exclusively by Django.
+            "created_by",
             "created_by_username",
+
+            # Workflow fields must not be arbitrarily assigned
+            # by the frontend.
+            "status",
+            "registration_stage",
+
             "created_at",
             "updated_at",
         )

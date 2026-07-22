@@ -3,10 +3,14 @@ from rest_framework import serializers
 from .models import Organization
 
 
-class OrganizationSerializer(serializers.ModelSerializer):
+class OrganizationSerializer(
+    serializers.ModelSerializer
+):
     """
-    Serializer for the singleton Organization model.
-    Used for retrieving and updating the organization profile.
+    Serializer for a user-owned organization/workspace.
+
+    Ownership is assigned exclusively by the backend and
+    cannot be supplied or changed by API clients.
     """
 
     class Meta:
@@ -27,6 +31,7 @@ class OrganizationSerializer(serializers.ModelSerializer):
 
         read_only_fields = (
             "id",
+            "logo",
             "created_at",
             "updated_at",
         )
@@ -49,6 +54,20 @@ class OrganizationSerializer(serializers.ModelSerializer):
                 "Organization code is required."
             )
 
+        queryset = Organization.objects.filter(
+            code__iexact=value
+        )
+
+        if self.instance is not None:
+            queryset = queryset.exclude(
+                pk=self.instance.pk
+            )
+
+        if queryset.exists():
+            raise serializers.ValidationError(
+                "This organization code is already in use."
+            )
+
         return value
 
     def validate_email(self, value):
@@ -66,6 +85,7 @@ class OrganizationSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         """
-        Place for future cross-field validation.
+        Ownership is intentionally absent from writable
+        serializer fields and is assigned server-side.
         """
         return attrs

@@ -3,35 +3,49 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from ..models import Member
-from ..permissions import IsAdminOrReadOnly
+from ..permissions import IsAuthenticatedUser
 from ..serializers import MemberSerializer
 from ..services import MemberService
 
 
 class MemberViewSet(viewsets.ModelViewSet):
     """
-    CRUD operations for members.
-    Business logic is delegated to MemberService.
-    """
+    CRUD operations for members owned by the
+    authenticated user.
 
-    queryset = (
-        Member.objects
-        .select_related(
-            "category",
-            "created_by",
-        )
-        .all()
-    )
+    All collection and detail operations are scoped through
+    created_by. A user cannot retrieve another user's member
+    by guessing its primary key.
+    """
 
     serializer_class = MemberSerializer
 
     permission_classes = [
-        IsAdminOrReadOnly,
+        IsAuthenticatedUser,
     ]
+
+    def get_queryset(self):
+        user = self.request.user
+
+        if not user.is_authenticated:
+            return Member.objects.none()
+
+        return (
+            Member.objects
+            .select_related(
+                "category",
+                "created_by",
+            )
+            .filter(
+                created_by=user,
+            )
+        )
 
     def perform_create(self, serializer):
         """
-        Create a member through the service layer.
+        Ownership is assigned server-side.
+
+        The client must never choose created_by.
         """
         MemberService.create_member(
             serializer=serializer,
@@ -40,7 +54,8 @@ class MemberViewSet(viewsets.ModelViewSet):
 
     def perform_update(self, serializer):
         """
-        Update a member through the service layer.
+        get_queryset() guarantees that only an owned
+        member can reach this method.
         """
         MemberService.update_member(
             serializer=serializer,
@@ -48,9 +63,6 @@ class MemberViewSet(viewsets.ModelViewSet):
         )
 
     def perform_destroy(self, instance):
-        """
-        Delete a member through the service layer.
-        """
         MemberService.delete_member(
             member=instance,
             user=self.request.user,
@@ -67,13 +79,14 @@ class MemberViewSet(viewsets.ModelViewSet):
         MemberService.approve_member(
             member=member,
             user=request.user,
-            remarks=request.data.get("remarks", ""),
+            remarks=request.data.get(
+                "remarks",
+                "",
+            ),
         )
 
-        serializer = self.get_serializer(member)
-
         return Response(
-            serializer.data,
+            self.get_serializer(member).data,
             status=status.HTTP_200_OK,
         )
 
@@ -88,13 +101,14 @@ class MemberViewSet(viewsets.ModelViewSet):
         MemberService.reject_member(
             member=member,
             user=request.user,
-            remarks=request.data.get("remarks", ""),
+            remarks=request.data.get(
+                "remarks",
+                "",
+            ),
         )
 
-        serializer = self.get_serializer(member)
-
         return Response(
-            serializer.data,
+            self.get_serializer(member).data,
             status=status.HTTP_200_OK,
         )
 
@@ -111,10 +125,8 @@ class MemberViewSet(viewsets.ModelViewSet):
             user=request.user,
         )
 
-        serializer = self.get_serializer(member)
-
         return Response(
-            serializer.data,
+            self.get_serializer(member).data,
             status=status.HTTP_200_OK,
         )
 
@@ -131,10 +143,8 @@ class MemberViewSet(viewsets.ModelViewSet):
             user=request.user,
         )
 
-        serializer = self.get_serializer(member)
-
         return Response(
-            serializer.data,
+            self.get_serializer(member).data,
             status=status.HTTP_200_OK,
         )
 
@@ -151,9 +161,7 @@ class MemberViewSet(viewsets.ModelViewSet):
             user=request.user,
         )
 
-        serializer = self.get_serializer(member)
-
         return Response(
-            serializer.data,
+            self.get_serializer(member).data,
             status=status.HTTP_200_OK,
         )

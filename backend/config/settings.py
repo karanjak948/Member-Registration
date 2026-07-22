@@ -170,6 +170,24 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
+
+# ============================================================
+# EMAIL / PASSWORD RESET
+# ============================================================
+
+# Development only:
+# Print outgoing emails to the Django terminal instead of
+# connecting to an external SMTP server.
+EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+
+DEFAULT_FROM_EMAIL = (
+    "Member Registration System <noreply@memberregistration.local>"
+)
+
+# Must match the URL where the Next.js frontend is running.
+FRONTEND_URL = "http://localhost:3000"
+
+
 STATIC_URL = 'static/'
 
 STATICFILES_DIRS = [
