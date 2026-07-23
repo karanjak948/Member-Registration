@@ -24,32 +24,31 @@ import DeleteCategoryDialog from "@/components/settings/DeleteCategoryDialog";
 
 export default function CategoriesPage() {
   const [categories, setCategories] = useState<MemberCategory[]>([]);
-
   const [loading, setLoading] = useState(true);
-
   const [error, setError] = useState("");
-
   const [search, setSearch] = useState("");
 
   const [dialogOpen, setDialogOpen] = useState(false);
-
   const [deleteOpen, setDeleteOpen] = useState(false);
 
   const [selectedCategory, setSelectedCategory] =
     useState<MemberCategory | null>(null);
 
   useEffect(() => {
-    loadCategories();
+    void loadCategories();
   }, []);
 
   async function loadCategories() {
     try {
       setLoading(true);
+      setError("");
 
       const data = await categoryService.getAll();
 
       setCategories(data);
-    } catch {
+    } catch (err) {
+      console.error("Failed to load categories:", err);
+
       setError("Failed to load categories.");
     } finally {
       setLoading(false);
@@ -57,25 +56,23 @@ export default function CategoriesPage() {
   }
 
   const filteredCategories = useMemo(() => {
-    const value = search.toLowerCase();
+    const value = search.trim().toLowerCase();
 
     return categories.filter(
       (category) =>
-        category.name
-          .toLowerCase()
-          .includes(value) ||
-        category.code
-          .toLowerCase()
-          .includes(value)
+        category.name.toLowerCase().includes(value) ||
+        category.code.toLowerCase().includes(value),
     );
   }, [categories, search]);
 
   if (loading) {
     return (
       <Box
-        display="flex"
-        justifyContent="center"
-        py={8}
+        sx={{
+          display: "flex",
+          justifyContent: "center",
+          py: 8,
+        }}
       >
         <CircularProgress />
       </Box>
@@ -88,7 +85,7 @@ export default function CategoriesPage() {
         direction="row"
         justifyContent="space-between"
         alignItems="center"
-        mb={3}
+        sx={{ mb: 3 }}
       >
         <Typography variant="h4">
           Member Categories
@@ -110,9 +107,9 @@ export default function CategoriesPage() {
         fullWidth
         placeholder="Search categories..."
         value={search}
-        onChange={(e) =>
-          setSearch(e.target.value)
-        }
+        onChange={(event) => {
+          setSearch(event.target.value);
+        }}
         sx={{ mb: 3 }}
       />
 

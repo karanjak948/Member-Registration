@@ -1,14 +1,19 @@
-import { NextAuthOptions } from "next-auth";
+import type { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
-
-import api from "./api";
-
 import axios from "axios";
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
+
+if (!API_BASE_URL) {
+  throw new Error(
+    "NEXT_PUBLIC_API_URL is not configured."
+  );
+}
 
 async function refreshAccessToken(token: any) {
   try {
     const response = await axios.post(
-      `${process.env.NEXT_PUBLIC_API_URL}/auth/refresh/`,
+      `${API_BASE_URL}/auth/refresh/`,
       {
         refresh_token: token.refreshToken,
       }
@@ -18,16 +23,26 @@ async function refreshAccessToken(token: any) {
 
     return {
       ...token,
+
       accessToken: refreshed.access_token,
+
       refreshToken:
-        refreshed.refresh_token ?? token.refreshToken,
+        refreshed.refresh_token ??
+        token.refreshToken,
+
       expiresIn: refreshed.expires_in,
+
       accessTokenExpires:
-        Date.now() + refreshed.expires_in * 1000,
+        Date.now() +
+        refreshed.expires_in * 1000,
+
       error: undefined,
     };
   } catch (error) {
-    console.error(error);
+    console.error(
+      "Failed to refresh access token:",
+      error
+    );
 
     return {
       ...token,
@@ -58,25 +73,42 @@ export const authOptions: NextAuthOptions = {
       },
 
       async authorize(credentials) {
-        if (!credentials) {
+        if (
+          !credentials?.username ||
+          !credentials?.password
+        ) {
           return null;
         }
 
         try {
-          // Login
-          const loginResponse = await api.post("/auth/login/", {
-            username: credentials.username,
-            password: credentials.password,
-          });
+          /*
+           * IMPORTANT:
+           *
+           * This is server-side NextAuth code.
+           * Do not use src/lib/api.ts or
+           * src/services/api.ts here because those
+           * modules depend on next-auth/react.
+           */
+
+          const loginResponse = await axios.post(
+            `${API_BASE_URL}/auth/login/`,
+            {
+              username: credentials.username,
+              password: credentials.password,
+            }
+          );
 
           const tokens = loginResponse.data;
 
-          // Current user
-          const meResponse = await api.get("/auth/me/", {
-            headers: {
-              Authorization: `Bearer ${tokens.access_token}`,
-            },
-          });
+          const meResponse = await axios.get(
+            `${API_BASE_URL}/auth/me/`,
+            {
+              headers: {
+                Authorization:
+                  `Bearer ${tokens.access_token}`,
+              },
+            }
+          );
 
           const user = meResponse.data;
 
@@ -92,16 +124,33 @@ export const authOptions: NextAuthOptions = {
             isStaff: user.is_staff,
             isSuperuser: user.is_superuser,
 
-            accessToken: tokens.access_token,
-            refreshToken: tokens.refresh_token,
+            accessToken:
+              tokens.access_token,
 
-            expiresIn: tokens.expires_in,
+            refreshToken:
+              tokens.refresh_token,
+
+            expiresIn:
+              tokens.expires_in,
 
             accessTokenExpires:
-              Date.now() + tokens.expires_in * 1000,
+              Date.now() +
+              tokens.expires_in * 1000,
           };
         } catch (error) {
-          console.error("Login failed:", error);
+          if (axios.isAxiosError(error)) {
+            console.error(
+              "Login failed:",
+              error.response?.status,
+              error.response?.data
+            );
+          } else {
+            console.error(
+              "Login failed:",
+              error
+            );
+          }
+
           return null;
         }
       },
@@ -110,23 +159,38 @@ export const authOptions: NextAuthOptions = {
 
   callbacks: {
     async jwt({ token, user }) {
-      // Initial login
+      /*
+       * Initial login.
+       */
       if (user) {
         token.id = user.id;
 
-        token.username = user.username;
-        token.email = user.email;
+        token.username =
+          user.username;
 
-        token.firstName = user.firstName;
-        token.lastName = user.lastName;
+        token.email =
+          user.email;
 
-        token.isStaff = user.isStaff;
-        token.isSuperuser = user.isSuperuser;
+        token.firstName =
+          user.firstName;
 
-        token.accessToken = user.accessToken;
-        token.refreshToken = user.refreshToken;
+        token.lastName =
+          user.lastName;
 
-        token.expiresIn = user.expiresIn;
+        token.isStaff =
+          user.isStaff;
+
+        token.isSuperuser =
+          user.isSuperuser;
+
+        token.accessToken =
+          user.accessToken;
+
+        token.refreshToken =
+          user.refreshToken;
+
+        token.expiresIn =
+          user.expiresIn;
 
         token.accessTokenExpires =
           user.accessTokenExpires;
@@ -134,40 +198,60 @@ export const authOptions: NextAuthOptions = {
         return token;
       }
 
-      /**
-       * Refresh the token 30 seconds before it expires.
-       * This prevents multiple simultaneous refresh requests.
+      /*
+       * Refresh the access token 30 seconds
+       * before expiration.
        */
+      const accessTokenExpires =
+        token.accessTokenExpires as
+          | number
+          | undefined;
+
+      /*
+       * Defensive guard for sessions created
+       * before accessTokenExpires existed.
+       */
+      if (!accessTokenExpires) {
+        return token;
+      }
+
       const shouldRefresh =
         Date.now() >=
-        ((token.accessTokenExpires as number) - 30000);
+        accessTokenExpires - 30_000;
 
       if (!shouldRefresh) {
         return token;
       }
 
-      console.log("Refreshing OAuth access token...");
-
-      return await refreshAccessToken(token);
+      return refreshAccessToken(token);
     },
 
-    async session({ session, token }) {
-      session.user.id = token.id as string;
+    async session({
+      session,
+      token,
+    }) {
+      if (session.user) {
+        session.user.id =
+          token.id as string;
 
-      session.user.username = token.username as string;
-      session.user.email = token.email as string;
+        session.user.username =
+          token.username as string;
 
-      session.user.firstName =
-        token.firstName as string;
+        session.user.email =
+          token.email as string;
 
-      session.user.lastName =
-        token.lastName as string;
+        session.user.firstName =
+          token.firstName as string;
 
-      session.user.isStaff =
-        token.isStaff as boolean;
+        session.user.lastName =
+          token.lastName as string;
 
-      session.user.isSuperuser =
-        token.isSuperuser as boolean;
+        session.user.isStaff =
+          token.isStaff as boolean;
+
+        session.user.isSuperuser =
+          token.isSuperuser as boolean;
+      }
 
       session.accessToken =
         token.accessToken as string;
@@ -182,15 +266,19 @@ export const authOptions: NextAuthOptions = {
         token.accessTokenExpires as number;
 
       session.error =
-        token.error as string | undefined;
+        token.error as
+          | string
+          | undefined;
 
       return session;
     },
   },
 
   pages: {
-    signIn: "/authentication/login",
+    signIn:
+      "/authentication/login",
   },
 
-  secret: process.env.NEXTAUTH_SECRET,
+  secret:
+    process.env.NEXTAUTH_SECRET,
 };

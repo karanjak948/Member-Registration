@@ -21,6 +21,7 @@ const initialState: RegistrationState = {
     occupation: "",
     kra_pin: "",
     category: "",
+    category_details: null,
     passport_photo: null,
   },
 

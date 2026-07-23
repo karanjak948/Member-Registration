@@ -5,12 +5,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 
-import {
-  styled,
-  Container,
-  Box,
-  CircularProgress,
-} from "@mui/material";
+import { styled, Container, Box, CircularProgress } from "@mui/material";
 
 import Header from "@/app/(DashboardLayout)/layout/header/Header";
 import Sidebar from "@/app/(DashboardLayout)/layout/sidebar/Sidebar";
@@ -34,19 +29,14 @@ interface Props {
   children: React.ReactNode;
 }
 
-export default function RootLayout({
-  children,
-}: Props) {
+export default function RootLayout({ children }: Props) {
   const router = useRouter();
 
   const { status } = useSession();
 
   const [isSidebarOpen] = useState(true);
 
-  const [
-    isMobileSidebarOpen,
-    setMobileSidebarOpen,
-  ] = useState(false);
+  const [isMobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -76,17 +66,11 @@ export default function RootLayout({
       <Sidebar
         isSidebarOpen={isSidebarOpen}
         isMobileSidebarOpen={isMobileSidebarOpen}
-        onSidebarClose={() =>
-          setMobileSidebarOpen(false)
-        }
+        onSidebarClose={() => setMobileSidebarOpen(false)}
       />
 
       <PageWrapper className="page-wrapper">
-        <Header
-          toggleMobileSidebar={() =>
-            setMobileSidebarOpen(true)
-          }
-        />
+        <Header toggleMobileSidebar={() => setMobileSidebarOpen(true)} />
 
         <Container
           sx={{
@@ -96,8 +80,7 @@ export default function RootLayout({
         >
           <Box
             sx={{
-              minHeight:
-                "calc(100vh - 170px)",
+              minHeight: "calc(100vh - 170px)",
             }}
           >
             {children}

@@ -1,58 +1,56 @@
 import axios from "axios";
-import { getSession, signOut } from "next-auth/react";
+import {
+  getSession,
+  signOut,
+} from "next-auth/react";
 
 const api = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL,
-  headers: {
-    "Content-Type": "application/json",
-  },
+  baseURL:
+    process.env.NEXT_PUBLIC_API_URL,
 });
-
-// Log once when the application starts
-console.log("API Base URL:", process.env.NEXT_PUBLIC_API_URL);
-
-/*
-|--------------------------------------------------------------------------
-| Request Interceptor
-|--------------------------------------------------------------------------
-|
-| Automatically attach the latest OAuth access token from NextAuth.
-|
-*/
 
 api.interceptors.request.use(
   async (config) => {
-    const session = await getSession();
+    const session =
+      await getSession();
 
     if (session?.accessToken) {
-      config.headers.Authorization = `Bearer ${session.accessToken}`;
+      config.headers.set(
+        "Authorization",
+        `Bearer ${session.accessToken}`
+      );
     }
 
-    const requestUrl = `${config.baseURL ?? ""}${config.url ?? ""}`;
-
-    console.log("Request URL:", requestUrl);
+    /*
+     * Let Axios/browser generate the correct
+     * multipart boundary for FormData.
+     */
+    if (
+      typeof FormData !== "undefined" &&
+      config.data instanceof FormData
+    ) {
+      config.headers.delete(
+        "Content-Type"
+      );
+    }
 
     return config;
   },
-  (error) => Promise.reject(error)
-);
 
-/*
-|--------------------------------------------------------------------------
-| Response Interceptor
-|--------------------------------------------------------------------------
-|
-| If the user's session has expired, redirect to login.
-|
-*/
+  (error) =>
+    Promise.reject(error)
+);
 
 api.interceptors.response.use(
   (response) => response,
 
   async (error) => {
-    if (error.response?.status === 401) {
+    if (
+      error.response?.status === 401
+    ) {
       await signOut({
-        callbackUrl: "/authentication/login",
+        callbackUrl:
+          "/authentication/login",
       });
     }
 

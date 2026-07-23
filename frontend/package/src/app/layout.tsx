@@ -1,17 +1,11 @@
-"use client";
-
 import "./global.css";
 
-import CssBaseline from "@mui/material/CssBaseline";
-import { ThemeProvider } from "@mui/material/styles";
+import type { ReactNode } from "react";
 
-import { baselightTheme } from "@/utils/theme/DefaultColors";
 import Providers from "./providers";
 
-import StoreProvider from "@/store/provider";
-
 interface RootLayoutProps {
-  children: React.ReactNode;
+  children: ReactNode;
 }
 
 export default function RootLayout({
@@ -20,14 +14,9 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        <StoreProvider>
-          <Providers>
-            <ThemeProvider theme={baselightTheme}>
-              <CssBaseline />
-              {children}
-            </ThemeProvider>
-          </Providers>
-        </StoreProvider>
+        <Providers>
+          {children}
+        </Providers>
       </body>
     </html>
   );
