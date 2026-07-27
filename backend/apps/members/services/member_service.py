@@ -16,16 +16,29 @@ from apps.members.models import (
 class MemberService:
     """
     Central business logic for Member operations.
+
+    Members belong to organizations.
+
+    created_by is retained strictly as creator attribution
+    and must not be used as the business-data ownership
+    boundary.
     """
 
     @staticmethod
     def _member_to_dict(member):
         """
-        Convert a Member instance into a JSON-safe dictionary
-        suitable for audit logging.
+        Convert a Member instance into a JSON-safe
+        dictionary suitable for audit logging.
         """
 
         data = model_to_dict(member)
+
+        # Organization ownership
+        data["organization"] = (
+            member.organization.id
+            if member.organization
+            else None
+        )
 
         # Foreign Keys
         data["category"] = (
@@ -60,10 +73,12 @@ class MemberService:
             else None
         )
 
-        # Convert any remaining non-JSON objects
+        # Convert any remaining non-JSON-safe date objects.
         for key, value in data.items():
-
-            if isinstance(value, (datetime, date)):
+            if isinstance(
+                value,
+                (datetime, date),
+            ):
                 data[key] = value.isoformat()
 
         return data
@@ -112,13 +127,23 @@ class MemberService:
 
     @staticmethod
     @transaction.atomic
-    def create_member(serializer, user):
+    def create_member(
+        serializer,
+        user,
+        organization,
+    ):
         """
-        Create member and audit the operation.
+        Create an organization-owned member.
+
+        organization and created_by are assigned exclusively
+        by trusted backend context.
+
+        The API client cannot select either field.
         """
 
         member = serializer.save(
-            created_by=user
+            organization=organization,
+            created_by=user,
         )
 
         MemberService._create_audit_log(
@@ -126,30 +151,48 @@ class MemberService:
             action=MemberAudit.Action.CREATE,
             user=user,
             old_data=None,
-            new_data=MemberService._member_to_dict(member),
+            new_data=MemberService._member_to_dict(
+                member
+            ),
         )
 
         return member
 
     @staticmethod
     @transaction.atomic
-    def update_member(serializer, user):
+    def update_member(
+        serializer,
+        user,
+    ):
         """
-        Update member.
-        Automatically creates audit logs and workflow history.
+        Update a member.
+
+        Organization ownership and created_by must remain
+        unchanged during normal member updates.
+
+        Automatically creates audit logs and workflow
+        history where applicable.
         """
 
         member = serializer.instance
 
         old_data = deepcopy(
-            MemberService._member_to_dict(member)
+            MemberService._member_to_dict(
+                member
+            )
         )
 
-        previous_stage = member.registration_stage
+        previous_stage = (
+            member.registration_stage
+        )
 
         member = serializer.save()
 
-        new_data = MemberService._member_to_dict(member)
+        new_data = (
+            MemberService._member_to_dict(
+                member
+            )
+        )
 
         MemberService._create_audit_log(
             member=member,
@@ -159,12 +202,16 @@ class MemberService:
             new_data=new_data,
         )
 
-        if previous_stage != member.registration_stage:
-
+        if (
+            previous_stage
+            != member.registration_stage
+        ):
             MemberService._create_workflow_history(
                 member=member,
                 previous_stage=previous_stage,
-                current_stage=member.registration_stage,
+                current_stage=(
+                    member.registration_stage
+                ),
                 user=user,
             )
 
@@ -172,12 +219,19 @@ class MemberService:
 
     @staticmethod
     @transaction.atomic
-    def delete_member(member, user):
+    def delete_member(
+        member,
+        user,
+    ):
         """
-        Delete member after recording an audit log.
+        Delete a member after recording an audit log.
         """
 
-        old_data = MemberService._member_to_dict(member)
+        old_data = (
+            MemberService._member_to_dict(
+                member
+            )
+        )
 
         MemberService._create_audit_log(
             member=member,
@@ -198,34 +252,58 @@ class MemberService:
         remarks="",
     ):
         """
-        Change member workflow stage.
+        Change a member workflow stage.
+
         Automatically creates audit and workflow records.
         """
 
-        previous_stage = member.registration_stage
+        previous_stage = (
+            member.registration_stage
+        )
 
         if previous_stage == stage:
             return member
 
-        old_data = MemberService._member_to_dict(member)
+        old_data = (
+            MemberService._member_to_dict(
+                member
+            )
+        )
 
         member.registration_stage = stage
+
         member.save(
             update_fields=[
-                "registration_stage"
+                "registration_stage",
             ]
         )
 
-        new_data = MemberService._member_to_dict(member)
+        new_data = (
+            MemberService._member_to_dict(
+                member
+            )
+        )
 
-        if stage == Member.RegistrationStage.APPROVED:
-            action = MemberAudit.Action.APPROVE
+        if (
+            stage
+            == Member.RegistrationStage.APPROVED
+        ):
+            action = (
+                MemberAudit.Action.APPROVE
+            )
 
-        elif stage == Member.RegistrationStage.REJECTED:
-            action = MemberAudit.Action.REJECT
+        elif (
+            stage
+            == Member.RegistrationStage.REJECTED
+        ):
+            action = (
+                MemberAudit.Action.REJECT
+            )
 
         else:
-            action = MemberAudit.Action.UPDATE
+            action = (
+                MemberAudit.Action.UPDATE
+            )
 
         MemberService._create_audit_log(
             member=member,
@@ -253,58 +331,102 @@ class MemberService:
         """
 
         required_fields = {
-            "first_name": member.first_name,
-            "other_names": member.other_names,
-            "national_id": member.national_id,
-            "phone_number": member.phone_number,
-            "category": member.category,
+            "first_name":
+                member.first_name,
+
+            "other_names":
+                member.other_names,
+
+            "national_id":
+                member.national_id,
+
+            "phone_number":
+                member.phone_number,
+
+            "category":
+                member.category,
         }
 
         missing = [
             field
-            for field, value in required_fields.items()
+            for field, value
+            in required_fields.items()
             if not value
         ]
 
         if missing:
             raise ValidationError(
-                f"Cannot convert member. Missing fields: {', '.join(missing)}"
+                "Cannot convert member. "
+                "Missing fields: "
+                f"{', '.join(missing)}"
             )
 
     @staticmethod
     @transaction.atomic
-    def approve_member(member, user, remarks=""):
-        return MemberService.change_registration_stage(
-            member=member,
-            stage=Member.RegistrationStage.APPROVED,
-            user=user,
-            remarks=remarks,
+    def approve_member(
+        member,
+        user,
+        remarks="",
+    ):
+        return (
+            MemberService
+            .change_registration_stage(
+                member=member,
+                stage=(
+                    Member
+                    .RegistrationStage
+                    .APPROVED
+                ),
+                user=user,
+                remarks=remarks,
+            )
         )
 
     @staticmethod
     @transaction.atomic
-    def reject_member(member, user, remarks=""):
-        return MemberService.change_registration_stage(
-            member=member,
-            stage=Member.RegistrationStage.REJECTED,
-            user=user,
-            remarks=remarks,
+    def reject_member(
+        member,
+        user,
+        remarks="",
+    ):
+        return (
+            MemberService
+            .change_registration_stage(
+                member=member,
+                stage=(
+                    Member
+                    .RegistrationStage
+                    .REJECTED
+                ),
+                user=user,
+                remarks=remarks,
+            )
         )
 
     @staticmethod
     @transaction.atomic
-    def activate_member(member, user):
+    def activate_member(
+        member,
+        user,
+    ):
         """
         Activate member.
         """
 
         old_data = deepcopy(
-            MemberService._member_to_dict(member)
+            MemberService._member_to_dict(
+                member
+            )
         )
 
-        member.status = Member.MemberStatus.ACTIVE
+        member.status = (
+            Member.MemberStatus.ACTIVE
+        )
+
         member.save(
-            update_fields=["status"]
+            update_fields=[
+                "status",
+            ]
         )
 
         MemberService._create_audit_log(
@@ -312,25 +434,38 @@ class MemberService:
             action=MemberAudit.Action.UPDATE,
             user=user,
             old_data=old_data,
-            new_data=MemberService._member_to_dict(member),
+            new_data=(
+                MemberService
+                ._member_to_dict(member)
+            ),
         )
 
         return member
 
     @staticmethod
     @transaction.atomic
-    def deactivate_member(member, user):
+    def deactivate_member(
+        member,
+        user,
+    ):
         """
         Deactivate member.
         """
 
         old_data = deepcopy(
-            MemberService._member_to_dict(member)
+            MemberService._member_to_dict(
+                member
+            )
         )
 
-        member.status = Member.MemberStatus.INACTIVE
+        member.status = (
+            Member.MemberStatus.INACTIVE
+        )
+
         member.save(
-            update_fields=["status"]
+            update_fields=[
+                "status",
+            ]
         )
 
         MemberService._create_audit_log(
@@ -338,31 +473,48 @@ class MemberService:
             action=MemberAudit.Action.UPDATE,
             user=user,
             old_data=old_data,
-            new_data=MemberService._member_to_dict(member),
+            new_data=(
+                MemberService
+                ._member_to_dict(member)
+            ),
         )
 
         return member
 
     @staticmethod
     @transaction.atomic
-    def convert_member(member, user):
+    def convert_member(
+        member,
+        user,
+    ):
         """
         Convert an Other Member into a Normal Member.
+
+        The member remains inside the same organization.
         """
 
-        MemberService._validate_conversion(member)
+        MemberService._validate_conversion(
+            member
+        )
 
-        normal_category = MemberCategory.objects.get(
-            code="NORMAL"
+        normal_category = (
+            MemberCategory.objects.get(
+                code="NORMAL"
+            )
         )
 
         old_data = deepcopy(
-            MemberService._member_to_dict(member)
+            MemberService._member_to_dict(
+                member
+            )
         )
 
         member.category = normal_category
+
         member.save(
-            update_fields=["category"]
+            update_fields=[
+                "category",
+            ]
         )
 
         MemberService._create_audit_log(
@@ -370,7 +522,10 @@ class MemberService:
             action=MemberAudit.Action.CONVERT,
             user=user,
             old_data=old_data,
-            new_data=MemberService._member_to_dict(member),
+            new_data=(
+                MemberService
+                ._member_to_dict(member)
+            ),
         )
 
         return member

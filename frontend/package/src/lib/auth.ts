@@ -5,9 +5,7 @@ import axios from "axios";
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
 
 if (!API_BASE_URL) {
-  throw new Error(
-    "NEXT_PUBLIC_API_URL is not configured."
-  );
+  throw new Error("NEXT_PUBLIC_API_URL is not configured.");
 }
 
 async function refreshAccessToken(token: any) {
@@ -85,9 +83,8 @@ export const authOptions: NextAuthOptions = {
            * IMPORTANT:
            *
            * This is server-side NextAuth code.
-           * Do not use src/lib/api.ts or
-           * src/services/api.ts here because those
-           * modules depend on next-auth/react.
+           * Do not use src/services/api.ts here because
+           * it depends on next-auth/react.
            */
 
           const loginResponse = await axios.post(
@@ -104,8 +101,7 @@ export const authOptions: NextAuthOptions = {
             `${API_BASE_URL}/auth/me/`,
             {
               headers: {
-                Authorization:
-                  `Bearer ${tokens.access_token}`,
+                Authorization: `Bearer ${tokens.access_token}`,
               },
             }
           );
@@ -124,14 +120,28 @@ export const authOptions: NextAuthOptions = {
             isStaff: user.is_staff,
             isSuperuser: user.is_superuser,
 
-            accessToken:
-              tokens.access_token,
+            /*
+             * RBAC Information
+             */
+            organization: user.organization,
 
-            refreshToken:
-              tokens.refresh_token,
+            role: {
+              id: user.role.id,
+              name: user.role.name,
+              description: user.role.description,
+              isSystemRole: user.role.is_system_role,
+            },
 
-            expiresIn:
-              tokens.expires_in,
+            permissions: user.permissions ?? [],
+
+            /*
+             * Tokens
+             */
+            accessToken: tokens.access_token,
+
+            refreshToken: tokens.refresh_token,
+
+            expiresIn: tokens.expires_in,
 
             accessTokenExpires:
               Date.now() +
@@ -183,6 +193,21 @@ export const authOptions: NextAuthOptions = {
         token.isSuperuser =
           user.isSuperuser;
 
+        /*
+         * RBAC
+         */
+        token.organization =
+          user.organization;
+
+        token.role =
+          user.role;
+
+        token.permissions =
+          user.permissions;
+
+        /*
+         * Tokens
+         */
         token.accessToken =
           user.accessToken;
 
@@ -199,18 +224,14 @@ export const authOptions: NextAuthOptions = {
       }
 
       /*
-       * Refresh the access token 30 seconds
-       * before expiration.
+       * Refresh the access token
+       * 30 seconds before expiration.
        */
       const accessTokenExpires =
         token.accessTokenExpires as
           | number
           | undefined;
 
-      /*
-       * Defensive guard for sessions created
-       * before accessTokenExpires existed.
-       */
       if (!accessTokenExpires) {
         return token;
       }
@@ -251,6 +272,18 @@ export const authOptions: NextAuthOptions = {
 
         session.user.isSuperuser =
           token.isSuperuser as boolean;
+
+        /*
+         * RBAC
+         */
+        session.user.organization =
+          token.organization as any;
+
+        session.user.role =
+          token.role as any;
+
+        session.user.permissions =
+          (token.permissions as string[]) ?? [];
       }
 
       session.accessToken =

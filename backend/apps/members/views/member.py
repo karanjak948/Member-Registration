@@ -3,66 +3,114 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from ..models import Member
-from ..permissions import IsAuthenticatedUser
+from ..permissions import (
+    HasMemberPermission,
+    get_user_organization_membership,
+)
 from ..serializers import MemberSerializer
 from ..services import MemberService
 
 
 class MemberViewSet(viewsets.ModelViewSet):
     """
-    CRUD operations for members owned by the
-    authenticated user.
+    Organization-scoped CRUD and workflow operations
+    for members.
 
-    All collection and detail operations are scoped through
-    created_by. A user cannot retrieve another user's member
-    by guessing its primary key.
+    Business-data ownership belongs to the organization.
+
+    created_by records which application user originally
+    created the member, but it does not determine visibility
+    or authorization.
+
+    Access is controlled through organization membership
+    and role-based permissions.
     """
 
     serializer_class = MemberSerializer
 
     permission_classes = [
-        IsAuthenticatedUser,
+        HasMemberPermission,
     ]
 
-    def get_queryset(self):
-        user = self.request.user
+    def get_membership(self):
+        """
+        Resolve and cache the authenticated user's active
+        organization membership for this request.
+        """
 
-        if not user.is_authenticated:
+        if not hasattr(
+            self,
+            "_organization_membership",
+        ):
+            self._organization_membership = (
+                get_user_organization_membership(
+                    self.request.user
+                )
+            )
+
+        return self._organization_membership
+
+    def get_queryset(self):
+        """
+        Return only members belonging to the authenticated
+        user's organization.
+
+        This prevents cross-organization access even when
+        a user guesses another member's primary key.
+        """
+
+        membership = self.get_membership()
+
+        if membership is None:
             return Member.objects.none()
 
         return (
             Member.objects
             .select_related(
+                "organization",
                 "category",
                 "created_by",
             )
             .filter(
-                created_by=user,
+                organization=membership.organization,
             )
         )
 
     def perform_create(self, serializer):
         """
-        Ownership is assigned server-side.
+        Assign organization and creator exclusively on the
+        server.
 
-        The client must never choose created_by.
+        Clients must never choose either ownership field.
         """
+
+        membership = self.get_membership()
+
         MemberService.create_member(
             serializer=serializer,
             user=self.request.user,
+            organization=membership.organization,
         )
 
     def perform_update(self, serializer):
         """
-        get_queryset() guarantees that only an owned
-        member can reach this method.
+        get_queryset() guarantees that only a member from
+        the current organization can reach this method.
         """
+
         MemberService.update_member(
             serializer=serializer,
             user=self.request.user,
         )
 
     def perform_destroy(self, instance):
+        """
+        Delete an organization-scoped member.
+
+        Authorization has already been enforced by
+        HasMemberPermission and get_queryset().
+        """
+
         MemberService.delete_member(
             member=instance,
             user=self.request.user,

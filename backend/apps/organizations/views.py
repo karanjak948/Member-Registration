@@ -8,8 +8,37 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .models import Organization
-from .serializers import OrganizationSerializer
+from django.db.models.deletion import ProtectedError
+
+from rest_framework import (
+    generics,
+    status,
+)
+
+from .models import (
+    Organization,
+    OrganizationUser,
+    Permission,
+    Role,
+)
+
+from .permissions import (
+    HasRBACPermission,
+    IsOrganizationMember,
+)
+
+from .serializers import (
+    OrganizationSerializer,
+    OrganizationUserCreateSerializer,
+    OrganizationUserSerializer,
+    OrganizationUserUpdateSerializer,
+    PermissionSerializer,
+    RoleSerializer,
+)
+
+from .services import OrganizationAccessService
+
+from rest_framework.exceptions import PermissionDenied
 
 
 class OrganizationAPIView(APIView):
@@ -316,5 +345,455 @@ class OrganizationLogoUploadView(APIView):
                 "detail":
                     "Logo removed successfully."
             },
+            status=status.HTTP_200_OK,
+        )
+
+
+# ============================================================
+# PERMISSIONS
+# ============================================================
+
+class PermissionListAPIView(
+    generics.ListAPIView
+):
+    """
+    List the system permission catalogue.
+
+    Any authenticated organization member may inspect the
+    available permissions. Permission definitions themselves
+    are system-controlled and cannot be modified here.
+    """
+
+    serializer_class = PermissionSerializer
+
+    permission_classes = [
+        IsAuthenticated,
+        IsOrganizationMember,
+    ]
+
+    queryset = Permission.objects.all().order_by(
+        "name"
+    )
+
+
+# ============================================================
+# ROLES
+# ============================================================
+
+class RoleListCreateAPIView(
+    generics.ListCreateAPIView
+):
+    """
+    List and create roles belonging exclusively to the
+    authenticated user's organization.
+    """
+
+    serializer_class = RoleSerializer
+
+    permission_classes = [
+        IsAuthenticated,
+        HasRBACPermission,
+    ]
+
+    required_permission = "manage_roles"
+
+    def get_queryset(self):
+        organization = (
+            OrganizationAccessService
+            .get_organization(
+                self.request.user
+            )
+        )
+
+        if organization is None:
+            return Role.objects.none()
+
+        return (
+            Role.objects
+            .filter(
+                organization=organization
+            )
+            .prefetch_related(
+                "permissions"
+            )
+            .order_by(
+                "name"
+            )
+        )
+
+
+class RoleDetailAPIView(
+    generics.RetrieveUpdateDestroyAPIView
+):
+    """
+    Retrieve, update, or delete an organization role.
+
+    System roles such as Owner are protected against
+    modification and deletion.
+    """
+
+    serializer_class = RoleSerializer
+
+    permission_classes = [
+        IsAuthenticated,
+        HasRBACPermission,
+    ]
+
+    required_permission = "manage_roles"
+
+    def get_queryset(self):
+        organization = (
+            OrganizationAccessService
+            .get_organization(
+                self.request.user
+            )
+        )
+
+        if organization is None:
+            return Role.objects.none()
+
+        return (
+            Role.objects
+            .filter(
+                organization=organization
+            )
+            .prefetch_related(
+                "permissions"
+            )
+        )
+
+    def update(
+        self,
+        request,
+        *args,
+        **kwargs,
+    ):
+        role = self.get_object()
+
+        if role.is_system_role:
+            return Response(
+                {
+                    "detail": (
+                        "System roles cannot be modified."
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        return super().update(
+            request,
+            *args,
+            **kwargs,
+        )
+
+    def partial_update(
+        self,
+        request,
+        *args,
+        **kwargs,
+    ):
+        role = self.get_object()
+
+        if role.is_system_role:
+            return Response(
+                {
+                    "detail": (
+                        "System roles cannot be modified."
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        return super().partial_update(
+            request,
+            *args,
+            **kwargs,
+        )
+
+    def destroy(
+        self,
+        request,
+        *args,
+        **kwargs,
+    ):
+        role = self.get_object()
+
+        if role.is_system_role:
+            return Response(
+                {
+                    "detail": (
+                        "System roles cannot be deleted."
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            role.delete()
+
+        except ProtectedError:
+            return Response(
+                {
+                    "detail": (
+                        "This role cannot be deleted because "
+                        "one or more users are assigned to it. "
+                        "Reassign those users first."
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        return Response(
+            status=status.HTTP_204_NO_CONTENT
+        )
+
+
+# ============================================================
+# ORGANIZATION USERS
+# ============================================================
+
+class OrganizationUserListCreateView(APIView):
+    """
+    List organization users or create a new user with an
+    assigned organization role.
+    """
+
+    permission_classes = [
+        IsAuthenticated,
+    ]
+
+    def get_organization(self, user):
+        organization = (
+            OrganizationAccessService
+            .get_organization(user)
+        )
+
+        if organization is None:
+            raise PermissionDenied(
+                "You do not belong to an organization."
+            )
+
+        return organization
+
+    def check_manage_users(self, user):
+        if not (
+            OrganizationAccessService
+            .has_permission(
+                user,
+                "manage_users",
+            )
+        ):
+            raise PermissionDenied(
+                "You do not have permission to manage users."
+            )
+
+    def get(self, request):
+        self.check_manage_users(
+            request.user
+        )
+
+        organization = self.get_organization(
+            request.user
+        )
+
+        memberships = (
+            OrganizationUser.objects
+            .filter(
+                organization=organization
+            )
+            .select_related(
+                "user",
+                "role",
+            )
+            .prefetch_related(
+                "role__permissions"
+            )
+            .order_by(
+                "user__username"
+            )
+        )
+
+        serializer = OrganizationUserSerializer(
+            memberships,
+            many=True,
+        )
+
+        return Response(
+            serializer.data,
+            status=status.HTTP_200_OK,
+        )
+
+    def post(self, request):
+        self.check_manage_users(
+            request.user
+        )
+
+        organization = self.get_organization(
+            request.user
+        )
+
+        serializer = OrganizationUserCreateSerializer(
+            data=request.data,
+            context={
+                "request": request,
+                "organization": organization,
+            },
+        )
+
+        serializer.is_valid(
+            raise_exception=True
+        )
+
+        membership = serializer.save()
+
+        output = OrganizationUserSerializer(
+            membership
+        )
+
+        return Response(
+            output.data,
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class OrganizationUserDetailView(APIView):
+    """
+    Retrieve or update a user belonging to the current
+    organization.
+
+    Organization scoping prevents cross-tenant access.
+    """
+
+    permission_classes = [
+        IsAuthenticated,
+    ]
+
+    def check_manage_users(self, user):
+        if not (
+            OrganizationAccessService
+            .has_permission(
+                user,
+                "manage_users",
+            )
+        ):
+            raise PermissionDenied(
+                "You do not have permission to manage users."
+            )
+
+    def get_object(self, request, pk):
+        organization = (
+            OrganizationAccessService
+            .get_organization(
+                request.user
+            )
+        )
+
+        if organization is None:
+            return None
+
+        return (
+            OrganizationUser.objects
+            .filter(
+                pk=pk,
+                organization=organization,
+            )
+            .select_related(
+                "user",
+                "role",
+            )
+            .prefetch_related(
+                "role__permissions"
+            )
+            .first()
+        )
+
+    def get(self, request, pk):
+        self.check_manage_users(
+            request.user
+        )
+
+        membership = self.get_object(
+            request,
+            pk,
+        )
+
+        if membership is None:
+            return Response(
+                {
+                    "detail":
+                        "Organization user not found."
+                },
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        serializer = OrganizationUserSerializer(
+            membership
+        )
+
+        return Response(
+            serializer.data
+        )
+
+    def patch(self, request, pk):
+        self.check_manage_users(
+            request.user
+        )
+
+        membership = self.get_object(
+            request,
+            pk,
+        )
+
+        if membership is None:
+            return Response(
+                {
+                    "detail":
+                        "Organization user not found."
+                },
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        # Protect the organization owner from accidental
+        # deactivation or role reassignment.
+        if (
+            membership.user_id
+            == membership.organization.owner_id
+            and (
+                "role_id" in request.data
+                or request.data.get("is_active") is False
+            )
+        ):
+            return Response(
+                {
+                    "detail": (
+                        "The organization owner's role "
+                        "or active membership cannot be "
+                        "changed here."
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        serializer = OrganizationUserUpdateSerializer(
+            membership,
+            data=request.data,
+            partial=True,
+            context={
+                "request": request,
+            },
+        )
+
+        serializer.is_valid(
+            raise_exception=True
+        )
+
+        membership = serializer.save()
+
+        output = OrganizationUserSerializer(
+            membership
+        )
+
+        return Response(
+            output.data,
             status=status.HTTP_200_OK,
         )

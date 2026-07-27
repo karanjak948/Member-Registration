@@ -33,6 +33,7 @@ from .models import (
 )
 from .serializers import (
     ChangePasswordSerializer,
+    CurrentUserSerializer,
     ForgotPasswordSerializer,
     LoginSerializer,
     RegisterSerializer,
@@ -169,8 +170,13 @@ class RegisterView(APIView):
 
 class CurrentUserView(APIView):
     """
-    Retrieve or update the authenticated
-    user's profile.
+    Retrieve or update the authenticated user's profile.
+
+    GET returns the complete authenticated identity,
+    including organization, role, and effective permissions.
+
+    PATCH remains restricted to editable profile fields.
+    Authorization assignments cannot be modified here.
     """
 
     permission_classes = [
@@ -184,7 +190,7 @@ class CurrentUserView(APIView):
     ]
 
     def get(self, request):
-        serializer = UserSerializer(
+        serializer = CurrentUserSerializer(
             request.user,
             context={
                 "request": request
@@ -192,7 +198,8 @@ class CurrentUserView(APIView):
         )
 
         return Response(
-            serializer.data
+            serializer.data,
+            status=status.HTTP_200_OK,
         )
 
     def patch(self, request):
@@ -211,8 +218,15 @@ class CurrentUserView(APIView):
 
         serializer.save()
 
+        response_serializer = CurrentUserSerializer(
+            request.user,
+            context={
+                "request": request
+            },
+        )
+
         return Response(
-            serializer.data,
+            response_serializer.data,
             status=status.HTTP_200_OK,
         )
 

@@ -4,6 +4,7 @@ from django.contrib.auth.password_validation import (
 from rest_framework import serializers
 
 from .models import User
+from apps.organizations.models import OrganizationUser
 
 
 class LoginSerializer(serializers.Serializer):
@@ -49,6 +50,121 @@ class UserSerializer(serializers.ModelSerializer):
             "is_staff",
             "is_superuser",
         ]
+
+
+class CurrentUserSerializer(serializers.ModelSerializer):
+    """
+    Read serializer for the authenticated user's complete
+    application identity and authorization context.
+
+    This exposes:
+    - User profile information
+    - Organization
+    - Assigned role
+    - Effective permission codes
+
+    Authorization remains enforced by the backend.
+    The frontend may use this information only to control
+    navigation and user-interface visibility.
+    """
+
+    organization = serializers.SerializerMethodField()
+    role = serializers.SerializerMethodField()
+    permissions = serializers.SerializerMethodField()
+
+    class Meta:
+        model = User
+
+        fields = [
+            "id",
+            "username",
+            "email",
+            "first_name",
+            "last_name",
+            "profile_photo",
+            "is_staff",
+            "is_superuser",
+            "organization",
+            "role",
+            "permissions",
+        ]
+
+        read_only_fields = fields
+
+    def get_membership(self, obj):
+        """
+        Resolve the user's active organization membership.
+
+        The current data model permits memberships through
+        OrganizationUser. The first active membership is used
+        because the application currently operates with one
+        active organization context per user.
+        """
+
+        if hasattr(self, "_membership_cache"):
+            return self._membership_cache
+
+        membership = (
+            OrganizationUser.objects
+            .select_related(
+                "organization",
+                "role",
+            )
+            .prefetch_related(
+                "role__permissions",
+            )
+            .filter(
+                user=obj,
+                is_active=True,
+            )
+            .first()
+        )
+
+        self._membership_cache = membership
+
+        return membership
+
+    def get_organization(self, obj):
+        membership = self.get_membership(obj)
+
+        if membership is None:
+            return None
+
+        organization = membership.organization
+
+        return {
+            "id": organization.id,
+            "name": organization.name,
+            "code": organization.code,
+        }
+
+    def get_role(self, obj):
+        membership = self.get_membership(obj)
+
+        if membership is None:
+            return None
+
+        role = membership.role
+
+        return {
+            "id": role.id,
+            "name": role.name,
+            "description": role.description,
+            "is_system_role": role.is_system_role,
+        }
+
+    def get_permissions(self, obj):
+        membership = self.get_membership(obj)
+
+        if membership is None:
+            return []
+
+        return sorted(
+            membership.role.permissions.values_list(
+                "code",
+                flat=True,
+            )
+        )
 
 
 class RegisterSerializer(serializers.ModelSerializer):

@@ -1,6 +1,6 @@
 const Loading = () =>{
     return(
-        <div>Dash Loading</div>
+        <div>DashBoard Loading</div>
     )
 }
 

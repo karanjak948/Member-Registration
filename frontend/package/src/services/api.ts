@@ -1,8 +1,12 @@
 import axios from "axios";
-import { getSession, signOut } from "next-auth/react";
+import {
+  getSession,
+  signOut,
+} from "next-auth/react";
 
 const api = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL,
+  baseURL:
+    process.env.NEXT_PUBLIC_API_URL,
 });
 
 api.interceptors.request.use(
@@ -16,28 +20,44 @@ api.interceptors.request.use(
       );
     }
 
-    // Let Axios/browser determine the correct Content-Type.
-    // If we're sending FormData, it will automatically use:
-    // multipart/form-data; boundary=...
-    // Otherwise, it will use application/json as appropriate.
-    if (config.data instanceof FormData) {
-      config.headers.delete("Content-Type");
+    /*
+     * Let the browser generate the multipart
+     * Content-Type and boundary for FormData.
+     */
+    if (
+      typeof FormData !== "undefined" &&
+      config.data instanceof FormData
+    ) {
+      config.headers.delete(
+        "Content-Type"
+      );
     }
 
     return config;
   },
-  (error) => Promise.reject(error)
+
+  (error) =>
+    Promise.reject(error)
 );
 
 api.interceptors.response.use(
   (response) => response,
 
   async (error) => {
-    if (error.response?.status === 401) {
-      console.warn("Authentication expired.");
-
+    /*
+     * 401 means authentication has failed or
+     * the session/token is no longer valid.
+     *
+     * 403 is deliberately not handled here.
+     * It represents an authenticated user who
+     * lacks the required RBAC permission.
+     */
+    if (
+      error.response?.status === 401
+    ) {
       await signOut({
-        callbackUrl: "/authentication/login",
+        callbackUrl:
+          "/authentication/login",
       });
     }
 

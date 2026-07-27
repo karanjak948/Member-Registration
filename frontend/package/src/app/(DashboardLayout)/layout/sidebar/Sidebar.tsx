@@ -1,8 +1,6 @@
 import { useMediaQuery, Box, Drawer } from "@mui/material";
 import SidebarItems from "./SidebarItems";
 
-
-
 interface ItemType {
   isMobileSidebarOpen: boolean;
   onSidebarClose: (event: React.MouseEvent<HTMLElement>) => void;
@@ -20,16 +18,14 @@ const MSidebar = ({
 
   // Custom CSS for short scrollbar
   const scrollbarStyles = {
-    '&::-webkit-scrollbar': {
-      width: '7px',
-
+    "&::-webkit-scrollbar": {
+      width: "7px",
     },
-    '&::-webkit-scrollbar-thumb': {
-      backgroundColor: '#eff2f7',
-      borderRadius: '15px',
+    "&::-webkit-scrollbar-thumb": {
+      backgroundColor: "#eff2f7",
+      borderRadius: "15px",
     },
   };
-
 
   if (lgUp) {
     return (
@@ -53,7 +49,7 @@ const MSidebar = ({
                 ...scrollbarStyles,
                 width: sidebarWidth,
               },
-            }
+            },
           }}
         >
           {/* ------------------------------------------- */}
@@ -64,7 +60,6 @@ const MSidebar = ({
               height: "100%",
             }}
           >
-
             <Box>
               {/* ------------------------------------------- */}
               {/* Sidebar Items */}
@@ -73,7 +68,7 @@ const MSidebar = ({
             </Box>
           </Box>
         </Drawer>
-      </Box >
+      </Box>
     );
   }
 
@@ -83,14 +78,13 @@ const MSidebar = ({
       open={isMobileSidebarOpen}
       onClose={onSidebarClose}
       variant="temporary"
-
       slotProps={{
         paper: {
           sx: {
             boxShadow: (theme) => theme.shadows[8],
             ...scrollbarStyles,
           },
-        }
+        },
       }}
     >
       {/* ------------------------------------------- */}
@@ -110,8 +104,3 @@ const MSidebar = ({
 };
 
 export default MSidebar;
-
-
-
-
-
