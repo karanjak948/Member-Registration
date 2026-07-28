@@ -9,6 +9,7 @@ import { Avatar, Box, Chip, Paper, Stack, Typography } from "@mui/material";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import VisibilityIcon from "@mui/icons-material/Visibility";
+import LockIcon from "@mui/icons-material/Lock";
 
 import { usePermissions } from "@/hooks/usePermissions";
 
@@ -16,6 +17,8 @@ import { UserDataGridProps } from "@/types/user-components";
 import { OrganizationUser } from "@/types/user";
 import ViewUserDialog from "./ViewUserDialog";
 import UserDialog from "./UserDialog";
+import ActivateUserDialog from "./ActivateUserDialog";
+import userService from "@/services/user.service";
 
 export default function UserDataGrid({
   users,
@@ -31,6 +34,40 @@ export default function UserDataGrid({
 
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<OrganizationUser | null>(null);
+
+  const [activateDialogOpen, setActivateDialogOpen] = useState(false);
+  const [statusLoading, setStatusLoading] = useState(false);
+
+  const handleUserStatus = async () => {
+    if (!selectedUser) return;
+
+    // Frontend guard: prevent deactivation of Owner account
+    if (
+      selectedUser?.role?.is_system_role &&
+      selectedUser?.role?.name === "Owner"
+    ) {
+      return;
+    }
+
+    try {
+      setStatusLoading(true);
+
+      if (selectedUser.is_active) {
+        await userService.deactivateUser(selectedUser.id);
+      } else {
+        await userService.activateUser(selectedUser.id);
+      }
+
+      setActivateDialogOpen(false);
+      setSelectedUser(null);
+
+      await onRefresh();
+    } catch (error) {
+      console.error("Failed to update user status:", error);
+    } finally {
+      setStatusLoading(false);
+    }
+  };
 
   const columns = useMemo<GridColDef[]>(
     () => [
@@ -132,7 +169,13 @@ export default function UserDataGrid({
             return [];
           }
 
-          return [
+          const isProtectedUser =
+            row.role?.is_system_role && row.role?.name === "Owner";
+
+          const actions: React.ReactElement[] = [];
+
+          // View
+          actions.push(
             <GridActionsCellItem
               key="view"
               icon={<VisibilityIcon />}
@@ -142,8 +185,11 @@ export default function UserDataGrid({
                 setSelectedUser(row);
                 setViewDialogOpen(true);
               }}
-            />,
+            />
+          );
 
+          // Edit
+          actions.push(
             <GridActionsCellItem
               key="edit"
               icon={<EditIcon />}
@@ -153,20 +199,37 @@ export default function UserDataGrid({
                 setEditingUser(row);
                 setEditDialogOpen(true);
               }}
-            />,
+            />
+          );
 
-            <GridActionsCellItem
-              key="status"
-              icon={<DeleteIcon />}
-              label={row.is_active ? "Deactivate" : "Activate"}
-              showInMenu
-              onClick={async () => {
-                console.log(row.id);
+          // Status (Activate/Deactivate) or Owner Protection
+          if (!isProtectedUser) {
+            actions.push(
+              <GridActionsCellItem
+                key="status"
+                icon={<DeleteIcon />}
+                label={row.is_active ? "Deactivate" : "Activate"}
+                showInMenu
+                onClick={() => {
+                  setSelectedUser(row);
+                  setActivateDialogOpen(true);
+                }}
+              />
+            );
+          } else {
+            actions.push(
+              <GridActionsCellItem
+                key="owner"
+                icon={<LockIcon />}
+                label="Owner Account"
+                disabled
+                showInMenu
+                onClick={() => {}}
+              />
+            );
+          }
 
-                await onRefresh();
-              }}
-            />,
-          ];
+          return actions;
         },
       },
     ],
@@ -261,6 +324,17 @@ export default function UserDataGrid({
           setEditingUser(null);
           await onRefresh();
         }}
+      />
+
+      <ActivateUserDialog
+        open={activateDialogOpen}
+        user={selectedUser}
+        loading={statusLoading}
+        onClose={() => {
+          setActivateDialogOpen(false);
+          setSelectedUser(null);
+        }}
+        onConfirm={handleUserStatus}
       />
     </>
   );

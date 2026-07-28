@@ -372,7 +372,8 @@ class PermissionListAPIView(
     ]
 
     queryset = Permission.objects.all().order_by(
-        "name"
+        "module",
+        "name",
     )
 
 
@@ -397,13 +398,13 @@ class RoleListCreateAPIView(
 
     required_permission = "manage_roles"
 
-    def get_queryset(self):
-        organization = (
-            OrganizationAccessService
-            .get_organization(
-                self.request.user
-            )
+    def get_organization(self):
+        return OrganizationAccessService.get_organization(
+            self.request.user
         )
+
+    def get_queryset(self):
+        organization = self.get_organization()
 
         if organization is None:
             return Role.objects.none()
@@ -416,10 +417,15 @@ class RoleListCreateAPIView(
             .prefetch_related(
                 "permissions"
             )
-            .order_by(
-                "name"
-            )
+            .order_by("name")
         )
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+
+        context["organization"] = self.get_organization()
+
+        return context
 
 
 class RoleDetailAPIView(
@@ -441,13 +447,20 @@ class RoleDetailAPIView(
 
     required_permission = "manage_roles"
 
-    def get_queryset(self):
-        organization = (
-            OrganizationAccessService
-            .get_organization(
-                self.request.user
-            )
+    def get_organization(self):
+        return OrganizationAccessService.get_organization(
+            self.request.user
         )
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+
+        context["organization"] = self.get_organization()
+
+        return context
+
+    def get_queryset(self):
+        organization = self.get_organization()
 
         if organization is None:
             return Role.objects.none()

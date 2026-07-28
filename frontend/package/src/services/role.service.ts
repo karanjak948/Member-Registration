@@ -5,6 +5,7 @@ import {
   CreateRoleRequest,
   UpdateRoleRequest,
 } from "@/types/role";
+import { Permission } from "@/types/role";
 
 /**
  * Organization Role Service
@@ -76,6 +77,20 @@ class RoleService {
     await api.delete(
       `/roles/${id}/`
     );
+  }
+
+  /**
+   * Get all permissions.
+   */
+  async getPermissions(): Promise<Permission[]> {
+    const response = await api.get("/permissions/");
+
+    // Handle both array and paginated responses
+    const data = Array.isArray(response.data)
+      ? response.data
+      : (response.data?.results ?? []);
+
+    return data as Permission[];
   }
 }
 

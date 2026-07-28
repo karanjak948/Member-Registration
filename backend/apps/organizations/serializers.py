@@ -120,6 +120,7 @@ class PermissionSerializer(
             "id",
             "code",
             "name",
+            "module",
             "description",
         )
 

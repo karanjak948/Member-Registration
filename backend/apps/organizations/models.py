@@ -65,14 +65,8 @@ class Permission(models.Model):
     """
     Global catalog of application capabilities.
 
-    Examples:
-    - view_members
-    - create_members
-    - approve_members
-    - manage_users
-
-    Permissions are global definitions. Roles determine
-    which permissions are granted inside an organization.
+    Permissions are grouped by module to support
+    professional RBAC administration UIs.
     """
 
     code = models.CharField(
@@ -82,6 +76,11 @@ class Permission(models.Model):
 
     name = models.CharField(
         max_length=150,
+    )
+
+    module = models.CharField(
+        max_length=50,
+        db_index=True,
     )
 
     description = models.TextField(
@@ -97,10 +96,13 @@ class Permission(models.Model):
     )
 
     class Meta:
-        ordering = ["name"]
+        ordering = [
+            "module",
+            "name",
+        ]
 
     def __str__(self):
-        return self.name
+        return f"{self.module} - {self.name}"
 
 
 class Role(models.Model):

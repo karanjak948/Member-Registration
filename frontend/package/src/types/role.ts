@@ -9,6 +9,16 @@ export interface Permission {
 
   name: string;
 
+  /**
+   * Permission category/module.
+   *
+   * Examples:
+   * - Members
+   * - Roles
+   * - Users
+   */
+  module: string;
+
   description: string;
 }
 
