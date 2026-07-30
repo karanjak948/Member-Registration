@@ -2,12 +2,24 @@ import api from "@/services/api";
 
 import { Member } from "@/interfaces/member";
 
+/**
+ * Organization Member Service
+ *
+ * Encapsulates all API interactions related to
+ * organization member management and workflow.
+ */
 class MemberService {
+  /**
+   * Get all members.
+   */
   async getAll(): Promise<Member[]> {
     const { data } = await api.get<Member[]>("/members/");
     return data;
   }
 
+  /**
+   * Get one member.
+   */
   async getById(id: number): Promise<Member> {
     const { data } = await api.get<Member>(
       `/members/${id}/`
@@ -16,6 +28,9 @@ class MemberService {
     return data;
   }
 
+  /**
+   * Create member.
+   */
   async create(member: FormData): Promise<Member> {
     try {
       const { data } = await api.post<Member>(
@@ -33,6 +48,9 @@ class MemberService {
     }
   }
 
+  /**
+   * Update member.
+   */
   async update(
     id: number,
     member: FormData
@@ -53,10 +71,20 @@ class MemberService {
     }
   }
 
+  /**
+   * Delete member.
+   */
   async delete(id: number): Promise<void> {
     await api.delete(`/members/${id}/`);
   }
 
+  // ==========================================================
+  // MEMBER WORKFLOW
+  // ==========================================================
+
+  /**
+   * Approve member.
+   */
   async approve(
     id: number,
     remarks = ""
@@ -69,6 +97,9 @@ class MemberService {
     return data;
   }
 
+  /**
+   * Reject member.
+   */
   async reject(
     id: number,
     remarks = ""
@@ -81,7 +112,12 @@ class MemberService {
     return data;
   }
 
-  async activate(id: number): Promise<Member> {
+  /**
+   * Activate member.
+   */
+  async activate(
+    id: number
+  ): Promise<Member> {
     const { data } = await api.post<Member>(
       `/members/${id}/activate/`
     );
@@ -89,7 +125,12 @@ class MemberService {
     return data;
   }
 
-  async deactivate(id: number): Promise<Member> {
+  /**
+   * Deactivate member.
+   */
+  async deactivate(
+    id: number
+  ): Promise<Member> {
     const { data } = await api.post<Member>(
       `/members/${id}/deactivate/`
     );
@@ -97,9 +138,17 @@ class MemberService {
     return data;
   }
 
-  async convert(id: number): Promise<Member> {
+  /**
+   * Complete registration.
+   *
+   * Moves a member from APPROVED to ACTIVE registration stage
+   * and sets status to ACTIVE.
+   */
+  async completeRegistration(
+    id: number
+  ): Promise<Member> {
     const { data } = await api.post<Member>(
-      `/members/${id}/convert/`
+      `/members/${id}/complete-registration/`
     );
 
     return data;

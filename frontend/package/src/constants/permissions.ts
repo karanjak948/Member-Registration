@@ -5,13 +5,15 @@ export const PERMISSIONS = {
   DELETE_MEMBERS: "delete_members",
 
   APPROVE_MEMBERS: "approve_members",
+  REJECT_MEMBERS: "reject_members",
 
   ACTIVATE_MEMBERS: "activate_members",
   DEACTIVATE_MEMBERS: "deactivate_members",
+
+  COMPLETE_REGISTRATION: "complete_registration_members",
 
   MANAGE_USERS: "manage_users",
   MANAGE_ROLES: "manage_roles",
 } as const;
 
-export type Permission =
-  (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
+export type Permission = typeof PERMISSIONS[keyof typeof PERMISSIONS];

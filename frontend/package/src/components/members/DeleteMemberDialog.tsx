@@ -1,17 +1,22 @@
 "use client";
 
-import { useState } from "react";
-
 import {
+  Alert,
+  Box,
   Button,
   Dialog,
   DialogActions,
   DialogContent,
-  DialogContentText,
   DialogTitle,
+  Divider,
+  Paper,
+  Stack,
+  Typography,
 } from "@mui/material";
 
-import memberService from "@/services/member.service";
+import { LoadingButton } from "@mui/lab";
+
+import DeleteOutlineOutlinedIcon from "@mui/icons-material/DeleteOutlineOutlined";
 
 import { Member } from "@/interfaces/member";
 
@@ -20,85 +25,135 @@ interface DeleteMemberDialogProps {
 
   member: Member | null;
 
+  loading?: boolean;
+
+  error?: string;
+
   onClose: () => void;
 
-  onDeleted: () => void | Promise<void>;
+  onDelete: () => void | Promise<void>;
 }
 
 export default function DeleteMemberDialog({
   open,
   member,
+  loading = false,
+  error,
   onClose,
-  onDeleted,
+  onDelete,
 }: DeleteMemberDialogProps) {
-
-  const [loading, setLoading] =
-    useState(false);
-
-  const handleDelete = async () => {
-
-    if (!member) return;
-
-    try {
-
-      setLoading(true);
-
-      await memberService.delete(member.id);
-
-      await onDeleted();
-
-      onClose();
-
-    } finally {
-
-      setLoading(false);
-
-    }
-
-  };
-
   return (
     <Dialog
       open={open}
-      onClose={loading ? undefined : onClose}
-      maxWidth="sm"
       fullWidth
+      maxWidth="sm"
+      onClose={loading ? undefined : onClose}
     >
       <DialogTitle>
-        Delete Member
+        <Stack
+          direction="row"
+          spacing={1.5}
+          alignItems="center"
+        >
+          <DeleteOutlineOutlinedIcon color="error" />
+
+          <Box>
+            <Typography variant="h6">
+              Delete Member
+            </Typography>
+
+            <Typography
+              variant="body2"
+              color="text.secondary"
+            >
+              Permanently delete this member
+              from the system.
+            </Typography>
+          </Box>
+        </Stack>
       </DialogTitle>
 
+      <Divider />
+
       <DialogContent>
+        <Stack spacing={3}>
+          {error && (
+            <Alert severity="error">
+              {error}
+            </Alert>
+          )}
 
-        <DialogContentText>
+          <Paper
+            variant="outlined"
+            sx={{ p: 2.5 }}
+          >
+            <Stack spacing={1.5}>
+              <Typography
+                variant="subtitle1"
+                fontWeight={600}
+              >
+                Member Information
+              </Typography>
 
-          Are you sure you want to permanently delete this member?
+              <Divider />
 
-        </DialogContentText>
+              <Box>
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                >
+                  Membership Number
+                </Typography>
 
-        {member && (
+                <Typography fontWeight={600}>
+                  {member?.membership_number}
+                </Typography>
+              </Box>
 
-          <>
-            <br />
+              <Box>
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                >
+                  Full Name
+                </Typography>
 
-            <strong>
+                <Typography fontWeight={600}>
+                  {member?.first_name}{" "}
+                  {member?.other_names}
+                </Typography>
+              </Box>
 
-              {member.membership_number}
+              <Box>
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                >
+                  Category
+                </Typography>
 
-            </strong>
+                <Typography fontWeight={600}>
+                  {member?.category_name ?? "-"}
+                </Typography>
+              </Box>
+            </Stack>
+          </Paper>
 
-            <br />
-
-            {member.first_name} {member.other_names}
-
-          </>
-
-        )}
-
+          <Alert severity="warning">
+            This action is permanent and
+            cannot be undone.
+          </Alert>
+        </Stack>
       </DialogContent>
 
-      <DialogActions>
+      <Divider />
 
+      <DialogActions
+        sx={{
+          px: 3,
+          py: 2,
+        }}
+      >
         <Button
           disabled={loading}
           onClick={onClose}
@@ -106,15 +161,19 @@ export default function DeleteMemberDialog({
           Cancel
         </Button>
 
-        <Button
+        <LoadingButton
           color="error"
           variant="contained"
-          disabled={loading}
-          onClick={handleDelete}
+          loading={loading}
+          startIcon={
+            <DeleteOutlineOutlinedIcon />
+          }
+          onClick={() =>
+            onDelete()
+          }
         >
-          {loading ? "Deleting..." : "Delete"}
-        </Button>
-
+          Delete Member
+        </LoadingButton>
       </DialogActions>
     </Dialog>
   );

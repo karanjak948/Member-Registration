@@ -13,9 +13,14 @@ class MemberAudit(models.Model):
         CREATE = "CREATE", "Create"
         UPDATE = "UPDATE", "Update"
         DELETE = "DELETE", "Delete"
-        CONVERT = "CONVERT", "Convert"
         APPROVE = "APPROVE", "Approve"
         REJECT = "REJECT", "Reject"
+        COMPLETE_REGISTRATION = (
+            "COMPLETE_REGISTRATION",
+            "Complete Registration",
+        )
+        ACTIVATE = "ACTIVATE", "Activate"
+        DEACTIVATE = "DEACTIVATE", "Deactivate"
 
     member = models.ForeignKey(
         Member,
@@ -25,7 +30,7 @@ class MemberAudit(models.Model):
     )
 
     action = models.CharField(
-        max_length=20,
+        max_length=30,
         choices=Action.choices,
         db_index=True,
     )

@@ -199,12 +199,12 @@ class MemberViewSet(viewsets.ModelViewSet):
     @action(
         detail=True,
         methods=["post"],
-        url_path="convert",
+        url_path="complete-registration",
     )
-    def convert(self, request, pk=None):
+    def complete_registration(self, request, pk=None):
         member = self.get_object()
 
-        MemberService.convert_member(
+        MemberService.complete_registration(
             member=member,
             user=request.user,
         )

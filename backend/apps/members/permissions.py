@@ -84,31 +84,28 @@ class IsAuthenticatedUser(BasePermission):
 class HasMemberPermission(BasePermission):
     """
     Organization-scoped RBAC permission for MemberViewSet.
-
-    Maps each DRF ViewSet action to the application
-    permission required to perform that operation.
     """
 
     action_permissions = {
+        # Read
         "list": "view_members",
         "retrieve": "view_members",
 
+        # CRUD
         "create": "create_members",
-
         "update": "edit_members",
         "partial_update": "edit_members",
-
         "destroy": "delete_members",
 
+        # Workflow
         "approve": "approve_members",
-        "reject": "approve_members",
+        "reject": "reject_members",
 
         "activate": "activate_members",
         "deactivate": "deactivate_members",
 
-        # Conversion modifies an existing member and
-        # currently has no dedicated RBAC capability.
-        "convert": "edit_members",
+        "complete_registration":
+            "complete_registration_members",
     }
 
     message = (
@@ -125,21 +122,10 @@ class HasMemberPermission(BasePermission):
         ):
             return False
 
-        required_permission = (
-            self.action_permissions.get(
-                getattr(
-                    view,
-                    "action",
-                    None,
-                )
-            )
+        required_permission = self.action_permissions.get(
+            getattr(view, "action", None)
         )
 
-        # Fail closed.
-        #
-        # Any new MemberViewSet action must be explicitly
-        # added to action_permissions before it becomes
-        # accessible.
         if required_permission is None:
             return False
 

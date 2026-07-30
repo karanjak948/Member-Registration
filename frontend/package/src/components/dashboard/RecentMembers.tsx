@@ -133,7 +133,7 @@ export default function RecentMembers({ members }: RecentMembersProps) {
                     </Typography>
 
                     <Typography variant="caption" color="text.secondary">
-                      {member.category?.name ?? "No Category"}
+                      {member.category_name ?? "No Category"}
                     </Typography>
                   </Box>
                 </Stack>

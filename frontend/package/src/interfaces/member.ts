@@ -3,11 +3,13 @@ export interface Member {
 
   membership_number: string;
 
-  category?: {
-    id: number;
-    name: string;
-    code: string;
-  };
+  organization: number;
+
+  organization_name: string;
+
+  category: number | null;
+
+  category_name: string;
 
   first_name: string;
 
@@ -17,15 +19,15 @@ export interface Member {
 
   phone_number: string;
 
-  email: string;
+  email: string | null;
 
-  physical_address?: string;
+  physical_address: string;
 
-  occupation?: string;
+  occupation: string;
 
-  passport_photo?: string | null;
+  passport_photo: string | null;
 
-  kra_pin?: string | null;
+  kra_pin: string | null;
 
   status:
     | "ACTIVE"
@@ -38,7 +40,9 @@ export interface Member {
     | "REJECTED"
     | "ACTIVE";
 
-  created_by?: number;
+  created_by: number;
+
+  created_by_username: string;
 
   created_at: string;
 

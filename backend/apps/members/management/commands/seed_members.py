@@ -1,19 +1,29 @@
 from django.core.management.base import BaseCommand
+from django.contrib.auth import get_user_model
 
 from apps.members.models import (
     FieldConfiguration,
     MemberCategory,
     MemberConfiguration,
 )
+from apps.organizations.models import Permission
+
+
+User = get_user_model()
 
 
 class Command(BaseCommand):
     help = (
         "Seed default member categories, "
-        "member configuration and field configuration."
+        "member configuration, field configuration, "
+        "and member permissions."
     )
 
     def handle(self, *args, **options):
+
+        # ============================================================
+        # MEMBER CATEGORIES
+        # ============================================================
 
         categories = [
             {
@@ -43,6 +53,10 @@ class Command(BaseCommand):
                 },
             )
 
+        # ============================================================
+        # MEMBER CONFIGURATION
+        # ============================================================
+
         MemberConfiguration.objects.get_or_create(
             pk=1,
             defaults={
@@ -57,6 +71,10 @@ class Command(BaseCommand):
                 "require_next_of_kin": False,
             },
         )
+
+        # ============================================================
+        # FIELD CONFIGURATION
+        # ============================================================
 
         default_fields = [
             (
@@ -140,6 +158,77 @@ class Command(BaseCommand):
                         "display_order": order,
                     },
                 )
+
+        # ============================================================
+        # MEMBER PERMISSIONS
+        # ============================================================
+
+        member_permissions = [
+            {
+                "code": "view_members",
+                "name": "View Members",
+                "module": "members",
+                "description": "Can view member profiles and details",
+            },
+            {
+                "code": "create_members",
+                "name": "Create Members",
+                "module": "members",
+                "description": "Can create new members",
+            },
+            {
+                "code": "edit_members",
+                "name": "Edit Members",
+                "module": "members",
+                "description": "Can edit member profiles",
+            },
+            {
+                "code": "delete_members",
+                "name": "Delete Members",
+                "module": "members",
+                "description": "Can delete member records",
+            },
+            {
+                "code": "approve_members",
+                "name": "Approve Members",
+                "module": "members",
+                "description": "Can approve member registrations",
+            },
+            {
+                "code": "reject_members",  # ✅ Present
+                "name": "Reject Members",
+                "module": "members",
+                "description": "Can reject member registrations",
+            },
+            {
+                "code": "activate_members",
+                "name": "Activate Members",
+                "module": "members",
+                "description": "Can activate member accounts",
+            },
+            {
+                "code": "deactivate_members",
+                "name": "Deactivate Members",
+                "module": "members",
+                "description": "Can deactivate member accounts",
+            },
+            {
+                "code": "complete_registration_members",  # ✅ Present
+                "name": "Complete Registration",
+                "module": "members",
+                "description": "Can complete member registration (APPROVED → ACTIVE)",
+            },
+        ]
+
+        for permission_data in member_permissions:
+            Permission.objects.get_or_create(
+                code=permission_data["code"],
+                defaults={
+                    "name": permission_data["name"],
+                    "module": permission_data["module"],
+                    "description": permission_data["description"],
+                },
+            )
 
         self.stdout.write(
             self.style.SUCCESS(

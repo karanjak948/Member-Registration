@@ -324,10 +324,10 @@ class MemberService:
         return member
 
     @staticmethod
-    def _validate_conversion(member):
+    def _validate_completion(member):
         """
         Ensure the member has all mandatory information
-        before conversion.
+        before completing registration.
         """
 
         required_fields = {
@@ -356,7 +356,7 @@ class MemberService:
 
         if missing:
             raise ValidationError(
-                "Cannot convert member. "
+                "Cannot complete registration. "
                 "Missing fields: "
                 f"{', '.join(missing)}"
             )
@@ -431,7 +431,7 @@ class MemberService:
 
         MemberService._create_audit_log(
             member=member,
-            action=MemberAudit.Action.UPDATE,
+            action=MemberAudit.Action.ACTIVATE,
             user=user,
             old_data=old_data,
             new_data=(
@@ -470,7 +470,7 @@ class MemberService:
 
         MemberService._create_audit_log(
             member=member,
-            action=MemberAudit.Action.UPDATE,
+            action=MemberAudit.Action.DEACTIVATE,
             user=user,
             old_data=old_data,
             new_data=(
@@ -483,24 +483,22 @@ class MemberService:
 
     @staticmethod
     @transaction.atomic
-    def convert_member(
+    def complete_registration(
         member,
         user,
     ):
         """
-        Convert an Other Member into a Normal Member.
+        Complete registration workflow.
 
-        The member remains inside the same organization.
+        This method:
+        - Validates the member has all required fields
+        - Moves registration stage from APPROVED to ACTIVE
+        - Sets member status to ACTIVE
+        - Creates audit and workflow history records
         """
 
-        MemberService._validate_conversion(
+        MemberService._validate_completion(
             member
-        )
-
-        normal_category = (
-            MemberCategory.objects.get(
-                code="NORMAL"
-            )
         )
 
         old_data = deepcopy(
@@ -509,22 +507,44 @@ class MemberService:
             )
         )
 
-        member.category = normal_category
+        # Update registration stage
+        previous_stage = member.registration_stage
+        member.registration_stage = Member.RegistrationStage.ACTIVE
+
+        # Set member status to ACTIVE
+        member.status = Member.MemberStatus.ACTIVE
 
         member.save(
             update_fields=[
-                "category",
+                "registration_stage",
+                "status",
             ]
         )
 
+        new_data = (
+            MemberService._member_to_dict(
+                member
+            )
+        )
+
+        # Create audit log
         MemberService._create_audit_log(
             member=member,
-            action=MemberAudit.Action.CONVERT,
+            action=MemberAudit.Action.COMPLETE_REGISTRATION,
             user=user,
             old_data=old_data,
-            new_data=(
-                MemberService
-                ._member_to_dict(member)
+            new_data=new_data,
+        )
+
+        # Create workflow history
+        MemberService._create_workflow_history(
+            member=member,
+            previous_stage=previous_stage,
+            current_stage=Member.RegistrationStage.ACTIVE,
+            user=user,
+            remarks=(
+                "Member registration completed "
+                "and activated."
             ),
         )
 

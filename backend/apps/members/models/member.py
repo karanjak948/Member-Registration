@@ -79,7 +79,7 @@ class Member(models.Model):
     status = models.CharField(
         max_length=20,
         choices=MemberStatus.choices,
-        default=MemberStatus.ACTIVE,
+        default=MemberStatus.INACTIVE,
         db_index=True,
     )
 
