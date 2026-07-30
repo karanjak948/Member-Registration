@@ -34,7 +34,7 @@ import { useAppDispatch, useAppSelector } from "@/store/hooks";
 
 import { resetRegistration } from "@/store/registration/registrationSlice";
 
-import memberService from "@/services/member.service";
+import registrationService from "@/services/registration.service";
 import api from "@/services/api";
 
 /* =========================================================
@@ -42,6 +42,7 @@ import api from "@/services/api";
 ========================================================= */
 
 interface ReviewStepProps {
+  mode?: "create" | "edit";
   onBack: () => void;
 }
 
@@ -143,7 +144,10 @@ function getApiErrorMessage(error: any): string {
    COMPONENT
 ========================================================= */
 
-export default function ReviewStep({ onBack }: ReviewStepProps) {
+export default function ReviewStep({
+  mode = "create",
+  onBack,
+}: ReviewStepProps) {
   const router = useRouter();
 
   const dispatch = useAppDispatch();
@@ -321,10 +325,42 @@ export default function ReviewStep({ onBack }: ReviewStepProps) {
   const hasGuarantor = Boolean(cleanString(guarantor.first_name));
 
   /* =======================================================
-     FINAL REGISTRATION
+     CREATE REGISTRATION
   ======================================================= */
 
-  async function finishRegistration() {
+  async function createRegistration() {
+    await registrationService.createRegistration(registration);
+
+    setSuccess(true);
+
+    window.setTimeout(() => {
+      dispatch(resetRegistration());
+
+      router.replace("/members");
+    }, 1200);
+  }
+
+  /* =======================================================
+     UPDATE REGISTRATION
+  ======================================================= */
+
+  async function updateRegistration() {
+    await registrationService.updateRegistration(registration);
+
+    setSuccess(true);
+
+    window.setTimeout(() => {
+      dispatch(resetRegistration());
+
+      router.replace("/members");
+    }, 1200);
+  }
+
+  /* =======================================================
+     SAVE REGISTRATION
+  ======================================================= */
+
+  async function saveRegistration() {
     /*
      * Prevent duplicate requests.
      */
@@ -364,211 +400,11 @@ export default function ReviewStep({ onBack }: ReviewStepProps) {
     setLoading(true);
 
     try {
-      /* ===============================================
-         1. CREATE PRIMARY MEMBER
-      =============================================== */
-
-      const formData = new FormData();
-
-      formData.append("first_name", cleanString(member.first_name));
-
-      formData.append("other_names", cleanString(member.other_names));
-
-      formData.append("national_id", cleanString(member.national_id));
-
-      formData.append("phone_number", cleanString(member.phone_number));
-
-      const email = cleanString(member.email);
-
-      if (email) {
-        formData.append("email", email);
+      if (mode === "edit") {
+        await updateRegistration();
+      } else {
+        await createRegistration();
       }
-
-      const physicalAddress = cleanString(member.physical_address);
-
-      if (physicalAddress) {
-        formData.append("physical_address", physicalAddress);
-      }
-
-      const occupation = cleanString(member.occupation);
-
-      if (occupation) {
-        formData.append("occupation", occupation);
-      }
-
-      const kraPin = cleanString(member.kra_pin);
-
-      if (kraPin) {
-        formData.append("kra_pin", kraPin);
-      }
-
-      formData.append("category", String(member.category));
-
-      /*
-       * Append only a real local File.
-       *
-       * A backend URL/string must not be
-       * submitted as multipart binary data.
-       */
-      if (member.passport_photo instanceof File) {
-        formData.append(
-          "passport_photo",
-          member.passport_photo,
-          member.passport_photo.name,
-        );
-      }
-
-      const createdMember = await memberService.create(formData);
-
-      if (!createdMember || !createdMember.id) {
-        throw new Error(
-          "The server did not return a valid member ID after creating the member.",
-        );
-      }
-
-      const memberId = createdMember.id;
-
-      /*
-       * Track secondary failures.
-       *
-       * The member already exists after
-       * this point, so we must NOT silently
-       * retry the entire registration.
-       */
-      const secondaryFailures: string[] = [];
-
-      /* ===============================================
-         2. CREATE NEXT OF KIN
-      =============================================== */
-
-      if (hasNextOfKin) {
-        try {
-          await api.post("/next-of-kin/", {
-            member: memberId,
-
-            first_name: cleanString(nextOfKin.first_name),
-
-            other_names: cleanString(nextOfKin.other_names),
-
-            relationship: cleanString(nextOfKin.relationship),
-
-            national_id: cleanString(nextOfKin.national_id),
-
-            phone_number: cleanString(nextOfKin.phone_number),
-
-            physical_address: cleanString(nextOfKin.physical_address),
-
-            is_primary: Boolean(nextOfKin.is_primary),
-          });
-        } catch (err) {
-          console.error("Next of Kin creation failed:", err);
-
-          secondaryFailures.push("Next of Kin");
-        }
-      }
-
-      /* ===============================================
-         3. CREATE VEHICLE
-      =============================================== */
-
-      if (hasVehicle) {
-        try {
-          await api.post("/vehicles/", {
-            member: memberId,
-
-            registration_number: cleanString(vehicle.registration_number),
-
-            make: cleanString(vehicle.make),
-
-            model: cleanString(vehicle.model),
-
-            year: vehicle.year || null,
-
-            color: cleanString(vehicle.color),
-
-            engine_number: cleanString(vehicle.engine_number),
-
-            chassis_number: cleanString(vehicle.chassis_number),
-          });
-        } catch (err) {
-          console.error("Vehicle creation failed:", err);
-
-          secondaryFailures.push("Vehicle");
-        }
-      }
-
-      /* ===============================================
-         4. CREATE GUARANTOR
-      =============================================== */
-
-      if (hasGuarantor) {
-        try {
-          const guarantorPayload: Record<string, unknown> = {
-            member: memberId,
-
-            first_name: cleanString(guarantor.first_name),
-
-            other_names: cleanString(guarantor.other_names),
-
-            national_id: cleanString(guarantor.national_id),
-
-            phone_number: cleanString(guarantor.phone_number),
-
-            relationship: cleanString(guarantor.relationship),
-          };
-
-          /*
-           * Do not send null/empty FK.
-           */
-          if (guarantor.guarantor_member) {
-            guarantorPayload.guarantor_member = guarantor.guarantor_member;
-          }
-
-          await api.post("/guarantors/", guarantorPayload);
-        } catch (err) {
-          console.error("Guarantor creation failed:", err);
-
-          secondaryFailures.push("Guarantor");
-        }
-      }
-
-      /* ===============================================
-         5. HANDLE PARTIAL SUCCESS
-      =============================================== */
-
-      if (secondaryFailures.length > 0) {
-        setWarning(
-          `The primary member was created successfully, but these related records could not be saved: ${secondaryFailures.join(
-            ", ",
-          )}. Do not click Finish Registration again because that could create a duplicate member. Open the member record and complete the missing related information there.`,
-        );
-
-        /*
-         * Keep the lock active.
-         *
-         * Primary member creation already
-         * succeeded. Re-enabling Finish would
-         * risk duplicate creation.
-         */
-        return;
-      }
-
-      /* ===============================================
-         6. COMPLETE
-      =============================================== */
-
-      setSuccess(true);
-
-      /*
-       * Give the success notification a
-       * moment to render before clearing
-       * the wizard and redirecting.
-       */
-      window.setTimeout(() => {
-        dispatch(resetRegistration());
-
-        router.replace("/members");
-      }, 1200);
     } catch (err) {
       console.error("Registration error:", err);
 
@@ -1046,7 +882,7 @@ export default function ReviewStep({ onBack }: ReviewStepProps) {
               <Button
                 variant="contained"
                 startIcon={!loading ? <SendOutlined /> : undefined}
-                onClick={finishRegistration}
+                onClick={saveRegistration}
                 disabled={loading || !memberReady || Boolean(warning)}
                 sx={{
                   minWidth: 210,
@@ -1061,8 +897,10 @@ export default function ReviewStep({ onBack }: ReviewStepProps) {
                     />
                     Submitting...
                   </>
-                ) : (
+                ) : mode === "create" ? (
                   "Finish Registration"
+                ) : (
+                  "Save Changes"
                 )}
               </Button>
             </Stack>
@@ -1087,7 +925,9 @@ export default function ReviewStep({ onBack }: ReviewStepProps) {
           variant="filled"
           icon={<CheckCircleOutline />}
         >
-          Member registration completed successfully. Redirecting to members...
+          {mode === "create"
+            ? "Member registration completed successfully. Redirecting to members..."
+            : "Member updated successfully. Redirecting to members..."}
         </Alert>
       </Snackbar>
     </>

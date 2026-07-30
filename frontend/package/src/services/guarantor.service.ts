@@ -9,11 +9,17 @@ class GuarantorService {
   }
 
   async getByMember(memberId: number): Promise<Guarantor | null> {
-    const { data } = await api.get<Guarantor[]>(
+    const { data } = await api.get(
       `/guarantors/?member=${memberId}`
     );
 
-    return data.length > 0 ? data[0] : null;
+    console.log("Guarantor API Response:", data);
+
+    const records = Array.isArray(data)
+      ? data
+      : data.results ?? [];
+
+    return records.length > 0 ? records[0] : null;
   }
 
   async create(payload: Partial<Guarantor>): Promise<Guarantor> {

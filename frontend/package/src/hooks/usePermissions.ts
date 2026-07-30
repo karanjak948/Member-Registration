@@ -5,12 +5,17 @@ import { useSession } from "next-auth/react";
 import { Permission } from "@/constants/permissions";
 
 export function usePermissions() {
-  const { data: session } = useSession();
+  const {
+    data: session,
+    status,
+  } = useSession();
 
-  const permissions = (session?.user.permissions ??
-    []) as Permission[];
+  const permissions = (
+    session?.user.permissions ?? []
+  ) as Permission[];
 
-  const role = session?.user.role;
+  const role =
+    session?.user.role;
 
   const organization =
     session?.user.organization;
@@ -21,6 +26,15 @@ export function usePermissions() {
   const isStaff =
     session?.user.isStaff ?? false;
 
+  const loading =
+    status === "loading";
+
+  /**
+   * Returns true if the current user
+   * has the specified permission.
+   *
+   * Superusers automatically pass.
+   */
   const can = (
     permission: Permission
   ): boolean => {
@@ -28,9 +42,25 @@ export function usePermissions() {
       return true;
     }
 
-    return permissions.includes(permission);
+    return permissions.includes(
+      permission
+    );
   };
 
+  /**
+   * Convenience helper.
+   */
+  const cannot = (
+    permission: Permission
+  ): boolean => {
+    return !can(permission);
+  };
+
+  /**
+   * Returns true if the user has
+   * at least one of the supplied
+   * permissions.
+   */
   const hasAny = (
     required: Permission[]
   ): boolean => {
@@ -38,11 +68,16 @@ export function usePermissions() {
       return true;
     }
 
-    return required.some((permission) =>
-      permissions.includes(permission)
+    return required.some(
+      (permission) =>
+        permissions.includes(permission)
     );
   };
 
+  /**
+   * Returns true if the user has
+   * every supplied permission.
+   */
   const hasAll = (
     required: Permission[]
   ): boolean => {
@@ -50,26 +85,68 @@ export function usePermissions() {
       return true;
     }
 
-    return required.every((permission) =>
-      permissions.includes(permission)
+    return required.every(
+      (permission) =>
+        permissions.includes(permission)
+    );
+  };
+
+  /**
+   * Returns true if the current
+   * user's role matches.
+   */
+  const hasRole = (
+    roleName: string
+  ): boolean => {
+    return (
+      role?.name === roleName
     );
   };
 
   return {
-    permissions,
+    /**
+     * Session
+     */
+    session,
 
-    role,
+    loading,
 
+    /**
+     * Organization
+     */
     organization,
 
+    /**
+     * Role
+     */
+    role,
+
+    /**
+     * Permissions
+     */
+    permissions,
+
+    /**
+     * Flags
+     */
     isStaff,
 
     isSuperuser,
 
+    /**
+     * Permission helpers
+     */
     can,
+
+    cannot,
 
     hasAny,
 
     hasAll,
+
+    /**
+     * Role helper
+     */
+    hasRole,
   };
 }

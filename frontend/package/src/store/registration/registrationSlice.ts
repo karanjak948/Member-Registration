@@ -16,6 +16,10 @@ import type {
 ========================================================= */
 
 const createInitialMemberState = (): MemberState => ({
+  id: null,
+
+  membership_number: "",
+
   first_name: "",
   other_names: "",
   national_id: "",
@@ -30,53 +34,90 @@ const createInitialMemberState = (): MemberState => ({
   /*
    * Workflow metadata.
    *
-   * Populated when Member Details is completed.
+   * Populated after selecting
+   * a member category.
    */
   category_details: null,
 
+  /*
+   * Supports:
+   * - new upload (File)
+   * - existing image URL (string)
+   */
   passport_photo: null,
+
+  /*
+   * Backend controlled.
+   */
+  status: "",
+
+  registration_stage: "",
 });
 
-const createInitialNextOfKinState = (): NextOfKinState => ({
-  first_name: "",
-  other_names: "",
-  relationship: "",
-  national_id: "",
-  phone_number: "",
-  physical_address: "",
-  is_primary: true,
-});
+const createInitialNextOfKinState =
+  (): NextOfKinState => ({
+    id: null,
 
-const createInitialVehicleState = (): VehicleState => ({
-  registration_number: "",
-  make: "",
-  model: "",
-  year: null,
-  color: "",
-  engine_number: "",
-  chassis_number: "",
-});
+    member: null,
 
-const createInitialGuarantorState = (): GuarantorState => ({
-  first_name: "",
-  other_names: "",
-  national_id: "",
-  phone_number: "",
-  relationship: "",
-  guarantor_member: null,
-});
+    first_name: "",
+    other_names: "",
+    relationship: "",
+    national_id: "",
+    phone_number: "",
+    physical_address: "",
 
-const createInitialState = (): RegistrationState => ({
-  currentStep: 0,
+    is_primary: true,
+  });
 
-  member: createInitialMemberState(),
+const createInitialVehicleState =
+  (): VehicleState => ({
+    id: null,
 
-  nextOfKin: createInitialNextOfKinState(),
+    member: null,
 
-  vehicle: createInitialVehicleState(),
+    registration_number: "",
+    make: "",
+    model: "",
 
-  guarantor: createInitialGuarantorState(),
-});
+    year: null,
+
+    color: "",
+
+    engine_number: "",
+    chassis_number: "",
+  });
+
+const createInitialGuarantorState =
+  (): GuarantorState => ({
+    id: null,
+
+    member: null,
+
+    first_name: "",
+    other_names: "",
+
+    national_id: "",
+
+    phone_number: "",
+
+    relationship: "",
+
+    guarantor_member: null,
+  });
+
+const createInitialState =
+  (): RegistrationState => ({
+    currentStep: 0,
+
+    member: createInitialMemberState(),
+
+    nextOfKin: createInitialNextOfKinState(),
+
+    vehicle: createInitialVehicleState(),
+
+    guarantor: createInitialGuarantorState(),
+  });
 
 const initialState: RegistrationState =
   createInitialState();
@@ -134,7 +175,9 @@ const registrationSlice = createSlice({
 
     setNextOfKin(
       state,
-      action: PayloadAction<Partial<NextOfKinState>>,
+      action: PayloadAction<
+        Partial<NextOfKinState>
+      >,
     ) {
       Object.assign(
         state.nextOfKin,
@@ -160,7 +203,9 @@ const registrationSlice = createSlice({
 
     setVehicle(
       state,
-      action: PayloadAction<Partial<VehicleState>>,
+      action: PayloadAction<
+        Partial<VehicleState>
+      >,
     ) {
       Object.assign(
         state.vehicle,
@@ -186,7 +231,9 @@ const registrationSlice = createSlice({
 
     setGuarantor(
       state,
-      action: PayloadAction<Partial<GuarantorState>>,
+      action: PayloadAction<
+        Partial<GuarantorState>
+      >,
     ) {
       Object.assign(
         state.guarantor,

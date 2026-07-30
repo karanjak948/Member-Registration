@@ -79,7 +79,12 @@ const SidebarItems = () => {
   const pathDirect = pathname;
 
   // Get permissions from session
-  const { permissions } = usePermissions();
+  const { loading, permissions } = usePermissions();
+
+  // Prevent flicker while session is loading
+  if (loading) {
+    return null;
+  }
 
   // Build menu items dynamically based on permissions
   const menuItems = getMenuItems(permissions);

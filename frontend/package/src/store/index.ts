@@ -1,12 +1,10 @@
 import { configureStore } from "@reduxjs/toolkit";
 
 import registrationReducer from "./registration/registrationSlice";
-import editMemberReducer from "./edit/editMemberSlice";
 
 export const store = configureStore({
   reducer: {
     registration: registrationReducer,
-    editMember: editMemberReducer,
   },
 
   middleware: (getDefaultMiddleware) =>
@@ -14,7 +12,6 @@ export const store = configureStore({
       serializableCheck: {
         ignoredPaths: [
           "registration.member.passport_photo",
-          "editMember.member.passport_photo",
         ],
         ignoredActionPaths: [
           "payload.passport_photo",

@@ -92,7 +92,7 @@ export function getMenuItems(permissions: Permission[] = []): MenuItem[] {
   // REPORTS
   // ============================================================
 
-  // TODO: Add VIEW_REPORTS permission to backend when reports module is ready
+  // TODO: Replace with PERMISSIONS.VIEW_REPORTS when reports module is ready
   // For now, show reports if user can view members
   if (can(PERMISSIONS.VIEW_MEMBERS)) {
     items.push({
@@ -140,6 +140,17 @@ export function getMenuItems(permissions: Permission[] = []): MenuItem[] {
         href: "/administration/roles",
       });
     }
+
+    // TODO: Add Permissions page when backend permission management is ready
+    // Requires PERMISSIONS.MANAGE_PERMISSIONS
+    // if (can(PERMISSIONS.MANAGE_PERMISSIONS)) {
+    //   adminChildren.push({
+    //     id: "administration-permissions",
+    //     title: "Permissions",
+    //     icon: IconKey,
+    //     href: "/administration/permissions",
+    //   });
+    // }
 
     if (adminChildren.length > 0) {
       items.push({
