@@ -1,14 +1,17 @@
 from rest_framework import serializers, viewsets
 
 from ..models import Vehicle
-from ..permissions import IsAuthenticatedUser
+from ..permissions import (
+    IsAuthenticatedUser,
+    get_user_organization_membership,
+)
 from ..serializers import VehicleSerializer
 
 
 class VehicleViewSet(viewsets.ModelViewSet):
     """
     CRUD operations for vehicles belonging to members
-    owned by the authenticated user.
+    in the authenticated user's organization.
     """
 
     serializer_class = VehicleSerializer
@@ -17,20 +20,30 @@ class VehicleViewSet(viewsets.ModelViewSet):
         IsAuthenticatedUser,
     ]
 
-    def get_queryset(self):
-        user = self.request.user
+    def get_membership(self):
+        if not hasattr(self, "_organization_membership"):
+            self._organization_membership = (
+                get_user_organization_membership(
+                    self.request.user
+                )
+            )
 
-        if not user.is_authenticated:
+        return self._organization_membership
+
+    def get_queryset(self):
+        membership = self.get_membership()
+
+        if membership is None:
             return Vehicle.objects.none()
 
         queryset = (
             Vehicle.objects
             .select_related(
                 "member",
-                "member__created_by",
+                "member__organization",
             )
             .filter(
-                member__created_by=user,
+                member__organization=membership.organization,
             )
         )
 
@@ -50,15 +63,17 @@ class VehicleViewSet(viewsets.ModelViewSet):
             "member"
         ]
 
+        membership = self.get_membership()
+
         if (
-            member.created_by_id
-            != self.request.user.id
+            member.organization_id
+            != membership.organization_id
         ):
             raise serializers.ValidationError(
                 {
                     "member":
-                        "You cannot add a vehicle "
-                        "to this member."
+                        "The selected member does not belong "
+                        "to your organization."
                 }
             )
 

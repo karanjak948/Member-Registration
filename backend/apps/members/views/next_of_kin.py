@@ -1,14 +1,17 @@
 from rest_framework import serializers, viewsets
 
 from ..models import NextOfKin
-from ..permissions import IsAuthenticatedUser
+from ..permissions import (
+    IsAuthenticatedUser,
+    get_user_organization_membership,
+)
 from ..serializers import NextOfKinSerializer
 
 
 class NextOfKinViewSet(viewsets.ModelViewSet):
     """
     CRUD operations for next-of-kin records belonging
-    to members owned by the authenticated user.
+    to members in the authenticated user's organization.
     """
 
     serializer_class = NextOfKinSerializer
@@ -17,20 +20,30 @@ class NextOfKinViewSet(viewsets.ModelViewSet):
         IsAuthenticatedUser,
     ]
 
-    def get_queryset(self):
-        user = self.request.user
+    def get_membership(self):
+        if not hasattr(self, "_organization_membership"):
+            self._organization_membership = (
+                get_user_organization_membership(
+                    self.request.user
+                )
+            )
 
-        if not user.is_authenticated:
+        return self._organization_membership
+
+    def get_queryset(self):
+        membership = self.get_membership()
+
+        if membership is None:
             return NextOfKin.objects.none()
 
         queryset = (
             NextOfKin.objects
             .select_related(
                 "member",
-                "member__created_by",
+                "member__organization",
             )
             .filter(
-                member__created_by=user,
+                member__organization=membership.organization,
             )
         )
 
@@ -50,15 +63,17 @@ class NextOfKinViewSet(viewsets.ModelViewSet):
             "member"
         ]
 
+        membership = self.get_membership()
+
         if (
-            member.created_by_id
-            != self.request.user.id
+            member.organization_id
+            != membership.organization_id
         ):
             raise serializers.ValidationError(
                 {
                     "member":
-                        "You cannot add Next of Kin "
-                        "information to this member."
+                        "The selected member does not belong "
+                        "to your organization."
                 }
             )
 

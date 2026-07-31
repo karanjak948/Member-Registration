@@ -1,6 +1,7 @@
 from rest_framework import serializers
 
 from ..models import NextOfKin
+from apps.organizations.models import OrganizationUser
 
 
 class NextOfKinSerializer(serializers.ModelSerializer):
@@ -36,10 +37,23 @@ class NextOfKinSerializer(serializers.ModelSerializer):
                 "Authentication is required."
             )
 
-        if member.created_by_id != request.user.id:
+        membership = (
+            OrganizationUser.objects.filter(
+                user=request.user,
+                is_active=True,
+            )
+            .select_related("organization")
+            .first()
+        )
+
+        if membership is None:
             raise serializers.ValidationError(
-                "The selected member does not "
-                "belong to your account."
+                "You do not belong to an organization."
+            )
+
+        if member.organization_id != membership.organization_id:
+            raise serializers.ValidationError(
+                "The selected member does not belong to your organization."
             )
 
         return member

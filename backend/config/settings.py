@@ -54,6 +54,7 @@ INSTALLED_APPS = [
     "apps.members",
     "apps.reports",
     "apps.organizations",
+    "apps.common",
 ]
 
 MIDDLEWARE = [

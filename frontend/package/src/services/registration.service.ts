@@ -260,7 +260,9 @@ class RegistrationService {
     } = registration;
 
     console.log("Member:", member);
-    console.log("Next Of Kin:", nextOfKin);
+    console.log("Next Of Kin object:", nextOfKin);
+    console.log("Next Of Kin id:", nextOfKin.id);
+    console.log("Next Of Kin member:", nextOfKin.member);
     console.log("Vehicle:", vehicle);
     console.log("Guarantor:", guarantor);
 
@@ -279,10 +281,15 @@ class RegistrationService {
     if (this.hasData(nextOfKin.first_name)) {
       try {
         const payload = this.buildNextOfKinPayload(nextOfKin, memberId);
+        console.log("Next Of Kin payload:", payload);
+
+        console.log("Checking nextOfKin.id =", nextOfKin.id);
 
         if (nextOfKin.id) {
+          console.log("Updating existing Next Of Kin");
           await nextOfKinService.update(nextOfKin.id, payload);
         } else {
+          console.log("Creating new Next Of Kin");
           await nextOfKinService.create(payload);
         }
       } catch (err) {

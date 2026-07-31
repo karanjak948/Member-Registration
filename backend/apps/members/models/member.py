@@ -2,8 +2,10 @@ from django.conf import settings
 from django.db import models
 from django.db.models import Max
 
+from apps.common.models import AuditModel
 
-class Member(models.Model):
+
+class Member(AuditModel):
     """
     Core member profile.
     """
@@ -90,6 +92,46 @@ class Member(models.Model):
         db_index=True,
     )
 
+    # Workflow audit fields
+    approved_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="approved_members",
+        null=True,
+        blank=True,
+    )
+
+    approved_at = models.DateTimeField(
+        null=True,
+        blank=True,
+    )
+
+    rejected_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="rejected_members",
+        null=True,
+        blank=True,
+    )
+
+    rejected_at = models.DateTimeField(
+        null=True,
+        blank=True,
+    )
+
+    activated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="activated_members",
+        null=True,
+        blank=True,
+    )
+
+    activated_at = models.DateTimeField(
+        null=True,
+        blank=True,
+    )
+
     category = models.ForeignKey(
         "MemberCategory",
         on_delete=models.PROTECT,
@@ -102,22 +144,6 @@ class Member(models.Model):
         "organizations.Organization",
         on_delete=models.PROTECT,
         related_name="members",
-    )
-
-    created_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.PROTECT,
-        related_name="members_created",
-        null=True,
-        blank=True,
-    )
-
-    created_at = models.DateTimeField(
-        auto_now_add=True,
-    )
-
-    updated_at = models.DateTimeField(
-        auto_now=True,
     )
 
     class Meta:

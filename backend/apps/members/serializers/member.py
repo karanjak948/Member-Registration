@@ -27,6 +27,26 @@ class MemberSerializer(serializers.ModelSerializer):
         read_only=True,
     )
 
+    updated_by_username = serializers.CharField(
+        source="updated_by.username",
+        read_only=True,
+    )
+
+    approved_by_username = serializers.CharField(
+        source="approved_by.username",
+        read_only=True,
+    )
+
+    rejected_by_username = serializers.CharField(
+        source="rejected_by.username",
+        read_only=True,
+    )
+
+    activated_by_username = serializers.CharField(
+        source="activated_by.username",
+        read_only=True,
+    )
+
     class Meta:
         model = Member
 
@@ -56,6 +76,21 @@ class MemberSerializer(serializers.ModelSerializer):
             "created_by",
             "created_by_username",
 
+            "updated_by",
+            "updated_by_username",
+
+            "approved_by",
+            "approved_by_username",
+            "approved_at",
+
+            "rejected_by",
+            "rejected_by_username",
+            "rejected_at",
+
+            "activated_by",
+            "activated_by_username",
+            "activated_at",
+
             "created_at",
             "updated_at",
         )
@@ -73,6 +108,23 @@ class MemberSerializer(serializers.ModelSerializer):
             # Record authorship is assigned server-side.
             "created_by",
             "created_by_username",
+
+            "updated_by",
+            "updated_by_username",
+
+            # Workflow audit fields are set exclusively by
+            # the backend during workflow actions.
+            "approved_by",
+            "approved_by_username",
+            "approved_at",
+
+            "rejected_by",
+            "rejected_by_username",
+            "rejected_at",
+
+            "activated_by",
+            "activated_by_username",
+            "activated_at",
 
             # These fields may only be changed through the
             # dedicated RBAC-protected workflow actions.

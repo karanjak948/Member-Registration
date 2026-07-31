@@ -4,6 +4,7 @@ from datetime import date, datetime
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.forms.models import model_to_dict
+from django.utils import timezone
 
 from apps.members.models import (
     Member,
@@ -186,7 +187,9 @@ class MemberService:
             member.registration_stage
         )
 
-        member = serializer.save()
+        member = serializer.save(
+            updated_by=user,
+        )
 
         new_data = (
             MemberService._member_to_dict(
@@ -368,19 +371,25 @@ class MemberService:
         user,
         remarks="",
     ):
-        return (
-            MemberService
-            .change_registration_stage(
-                member=member,
-                stage=(
-                    Member
-                    .RegistrationStage
-                    .APPROVED
-                ),
-                user=user,
-                remarks=remarks,
-            )
+        # Update registration stage
+        member = MemberService.change_registration_stage(
+            member=member,
+            stage=Member.RegistrationStage.APPROVED,
+            user=user,
+            remarks=remarks,
         )
+
+        # Set approval audit fields
+        member.approved_by = user
+        member.approved_at = timezone.now()
+        member.save(
+            update_fields=[
+                "approved_by",
+                "approved_at",
+            ]
+        )
+
+        return member
 
     @staticmethod
     @transaction.atomic
@@ -389,19 +398,25 @@ class MemberService:
         user,
         remarks="",
     ):
-        return (
-            MemberService
-            .change_registration_stage(
-                member=member,
-                stage=(
-                    Member
-                    .RegistrationStage
-                    .REJECTED
-                ),
-                user=user,
-                remarks=remarks,
-            )
+        # Update registration stage
+        member = MemberService.change_registration_stage(
+            member=member,
+            stage=Member.RegistrationStage.REJECTED,
+            user=user,
+            remarks=remarks,
         )
+
+        # Set rejection audit fields
+        member.rejected_by = user
+        member.rejected_at = timezone.now()
+        member.save(
+            update_fields=[
+                "rejected_by",
+                "rejected_at",
+            ]
+        )
+
+        return member
 
     @staticmethod
     @transaction.atomic
@@ -423,9 +438,15 @@ class MemberService:
             Member.MemberStatus.ACTIVE
         )
 
+        # Set activation audit fields
+        member.activated_by = user
+        member.activated_at = timezone.now()
+
         member.save(
             update_fields=[
                 "status",
+                "activated_by",
+                "activated_at",
             ]
         )
 
@@ -514,10 +535,16 @@ class MemberService:
         # Set member status to ACTIVE
         member.status = Member.MemberStatus.ACTIVE
 
+        # Set activation audit fields
+        member.activated_by = user
+        member.activated_at = timezone.now()
+
         member.save(
             update_fields=[
                 "registration_stage",
                 "status",
+                "activated_by",
+                "activated_at",
             ]
         )
 
