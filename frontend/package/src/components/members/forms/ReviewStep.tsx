@@ -37,6 +37,8 @@ import { resetRegistration } from "@/store/registration/registrationSlice";
 import registrationService from "@/services/registration.service";
 import api from "@/services/api";
 
+import AuditInformation from "@/components/members/AuditInformation";
+
 /* =========================================================
    TYPES
 ========================================================= */
@@ -825,6 +827,12 @@ export default function ReviewStep({
               />
             </Grid>
           </ReviewSection>
+
+          {/* =============================================
+              AUDIT INFORMATION
+          ============================================== */}
+
+          {member.id && <AuditInformation member={member} />}
         </Stack>
 
         {/* =============================================

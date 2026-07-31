@@ -52,6 +52,27 @@ const createInitialMemberState = (): MemberState => ({
   status: "",
 
   registration_stage: "",
+
+  // Audit fields
+  created_by: null,
+  created_by_username: "",
+  created_at: null,
+
+  updated_by: null,
+  updated_by_username: "",
+  updated_at: null,
+
+  approved_by: null,
+  approved_by_username: "",
+  approved_at: null,
+
+  rejected_by: null,
+  rejected_by_username: "",
+  rejected_at: null,
+
+  activated_by: null,
+  activated_by_username: "",
+  activated_at: null,
 });
 
 const createInitialNextOfKinState =

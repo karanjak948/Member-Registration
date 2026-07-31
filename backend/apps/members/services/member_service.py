@@ -54,6 +54,30 @@ class MemberService:
             else None
         )
 
+        data["updated_by"] = (
+            member.updated_by.id
+            if member.updated_by
+            else None
+        )
+
+        data["approved_by"] = (
+            member.approved_by.id
+            if member.approved_by
+            else None
+        )
+
+        data["rejected_by"] = (
+            member.rejected_by.id
+            if member.rejected_by
+            else None
+        )
+
+        data["activated_by"] = (
+            member.activated_by.id
+            if member.activated_by
+            else None
+        )
+
         # ImageField
         data["passport_photo"] = (
             member.passport_photo.name
@@ -71,6 +95,24 @@ class MemberService:
         data["updated_at"] = (
             member.updated_at.isoformat()
             if member.updated_at
+            else None
+        )
+
+        data["approved_at"] = (
+            member.approved_at.isoformat()
+            if member.approved_at
+            else None
+        )
+
+        data["rejected_at"] = (
+            member.rejected_at.isoformat()
+            if member.rejected_at
+            else None
+        )
+
+        data["activated_at"] = (
+            member.activated_at.isoformat()
+            if member.activated_at
             else None
         )
 
@@ -275,9 +317,12 @@ class MemberService:
 
         member.registration_stage = stage
 
+        member.updated_by = user
+
         member.save(
             update_fields=[
                 "registration_stage",
+                "updated_by",
             ]
         )
 
@@ -382,10 +427,13 @@ class MemberService:
         # Set approval audit fields
         member.approved_by = user
         member.approved_at = timezone.now()
+        member.updated_by = user
+
         member.save(
             update_fields=[
                 "approved_by",
                 "approved_at",
+                "updated_by",
             ]
         )
 
@@ -409,10 +457,13 @@ class MemberService:
         # Set rejection audit fields
         member.rejected_by = user
         member.rejected_at = timezone.now()
+        member.updated_by = user
+
         member.save(
             update_fields=[
                 "rejected_by",
                 "rejected_at",
+                "updated_by",
             ]
         )
 
@@ -441,12 +492,14 @@ class MemberService:
         # Set activation audit fields
         member.activated_by = user
         member.activated_at = timezone.now()
+        member.updated_by = user
 
         member.save(
             update_fields=[
                 "status",
                 "activated_by",
                 "activated_at",
+                "updated_by",
             ]
         )
 
@@ -483,9 +536,12 @@ class MemberService:
             Member.MemberStatus.INACTIVE
         )
 
+        member.updated_by = user
+
         member.save(
             update_fields=[
                 "status",
+                "updated_by",
             ]
         )
 
@@ -538,6 +594,7 @@ class MemberService:
         # Set activation audit fields
         member.activated_by = user
         member.activated_at = timezone.now()
+        member.updated_by = user
 
         member.save(
             update_fields=[
@@ -545,6 +602,7 @@ class MemberService:
                 "status",
                 "activated_by",
                 "activated_at",
+                "updated_by",
             ]
         )
 

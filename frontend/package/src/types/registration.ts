@@ -42,6 +42,27 @@ export interface MemberState {
   status: string;
 
   registration_stage: string;
+
+  // Audit fields
+  created_by: number | null;
+  created_by_username: string;
+  created_at: string | null;
+
+  updated_by: number | null;
+  updated_by_username: string;
+  updated_at: string | null;
+
+  approved_by: number | null;
+  approved_by_username: string;
+  approved_at: string | null;
+
+  rejected_by: number | null;
+  rejected_by_username: string;
+  rejected_at: string | null;
+
+  activated_by: number | null;
+  activated_by_username: string;
+  activated_at: string | null;
 }
 
 /* =========================================================

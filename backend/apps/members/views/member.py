@@ -2,16 +2,15 @@ from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
+from apps.common.views import OrganizationScopedViewSet
+
 from ..models import Member
-from ..permissions import (
-    HasMemberPermission,
-    get_user_organization_membership,
-)
+from ..permissions import HasMemberPermission
 from ..serializers import MemberSerializer
 from ..services import MemberService
 
 
-class MemberViewSet(viewsets.ModelViewSet):
+class MemberViewSet(OrganizationScopedViewSet):
     """
     Organization-scoped CRUD and workflow operations
     for members.
@@ -32,24 +31,6 @@ class MemberViewSet(viewsets.ModelViewSet):
         HasMemberPermission,
     ]
 
-    def get_membership(self):
-        """
-        Resolve and cache the authenticated user's active
-        organization membership for this request.
-        """
-
-        if not hasattr(
-            self,
-            "_organization_membership",
-        ):
-            self._organization_membership = (
-                get_user_organization_membership(
-                    self.request.user
-                )
-            )
-
-        return self._organization_membership
-
     def get_queryset(self):
         """
         Return only members belonging to the authenticated
@@ -59,9 +40,9 @@ class MemberViewSet(viewsets.ModelViewSet):
         a user guesses another member's primary key.
         """
 
-        membership = self.get_membership()
+        organization = self.get_organization()
 
-        if membership is None:
+        if organization is None:
             return Member.objects.none()
 
         return (
@@ -72,7 +53,7 @@ class MemberViewSet(viewsets.ModelViewSet):
                 "created_by",
             )
             .filter(
-                organization=membership.organization,
+                organization=organization,
             )
         )
 
@@ -84,12 +65,12 @@ class MemberViewSet(viewsets.ModelViewSet):
         Clients must never choose either ownership field.
         """
 
-        membership = self.get_membership()
+        organization = self.get_organization()
 
         MemberService.create_member(
             serializer=serializer,
             user=self.request.user,
-            organization=membership.organization,
+            organization=organization,
         )
 
     def perform_update(self, serializer):

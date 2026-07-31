@@ -341,6 +341,61 @@ class RegistrationService {
       secondaryFailures,
     };
   }
+
+  // ==========================================================
+  // WORKFLOW HELPERS
+  // ==========================================================
+
+  /**
+   * Approve a member registration.
+   */
+  async approveMember(
+    id: number,
+    remarks = ""
+  ) {
+    return memberService.approve(
+      id,
+      remarks
+    );
+  }
+
+  /**
+   * Reject a member registration.
+   */
+  async rejectMember(
+    id: number,
+    remarks = ""
+  ) {
+    return memberService.reject(
+      id,
+      remarks
+    );
+  }
+
+  /**
+   * Activate a member.
+   */
+  async activateMember(id: number) {
+    return memberService.activate(id);
+  }
+
+  /**
+   * Deactivate a member.
+   */
+  async deactivateMember(id: number) {
+    return memberService.deactivate(id);
+  }
+
+  /**
+   * Complete member registration.
+   */
+  async completeMemberRegistration(
+    id: number
+  ) {
+    return memberService.completeRegistration(
+      id
+    );
+  }
 }
 
 export default new RegistrationService();

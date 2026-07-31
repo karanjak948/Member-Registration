@@ -41,6 +41,8 @@ import {
 
 import type { MemberState } from "@/types/registration";
 
+import { memberToState } from "@/utils/memberMapper";
+
 /* =========================================================
    TYPES
 ========================================================= */
@@ -120,7 +122,7 @@ export default function RegistrationWizard({
   const router = useRouter();
 
   const [loadingRegistration, setLoadingRegistration] = useState(
-    mode === "edit"
+    mode === "edit",
   );
   const [loadError, setLoadError] = useState("");
 
@@ -147,67 +149,14 @@ export default function RegistrationWizard({
 
     async function loadRegistration() {
       try {
-        const registration = await registrationService.loadRegistration(
-          id,
-        );
+        const registration = await registrationService.loadRegistration(id);
 
         console.log("Loaded registration:", registration);
         console.log("Loaded Next Of Kin:", registration.nextOfKin);
         console.log("Loaded Vehicle:", registration.vehicle);
         console.log("Loaded Guarantor:", registration.guarantor);
 
-        dispatch(
-          replaceMember({
-            id: registration.member.id,
-
-            membership_number:
-              registration.member.membership_number,
-
-            first_name:
-              registration.member.first_name,
-
-            other_names:
-              registration.member.other_names,
-
-            national_id:
-              registration.member.national_id,
-
-            phone_number:
-              registration.member.phone_number,
-
-            email:
-              registration.member.email ?? "",
-
-            physical_address:
-              registration.member.physical_address,
-
-            occupation:
-              registration.member.occupation,
-
-            kra_pin:
-              registration.member.kra_pin ?? "",
-
-            category:
-              registration.member.category ?? "",
-
-            category_details: registration.category
-              ? {
-                  id: registration.category.id,
-                  name: registration.category.name,
-                  code: registration.category.code,
-                }
-              : null,
-
-            passport_photo:
-              registration.member.passport_photo,
-
-            status:
-              registration.member.status,
-
-            registration_stage:
-              registration.member.registration_stage,
-          }),
-        );
+        dispatch(replaceMember(memberToState(registration.member)));
 
         if (registration.nextOfKin) {
           dispatch(
@@ -235,20 +184,14 @@ export default function RegistrationWizard({
       } catch (error) {
         console.error(error);
 
-        setLoadError(
-          "Unable to load registration.",
-        );
+        setLoadError("Unable to load registration.");
       } finally {
         setLoadingRegistration(false);
       }
     }
 
     loadRegistration();
-  }, [
-    mode,
-    memberId,
-    dispatch,
-  ]);
+  }, [mode, memberId, dispatch]);
 
   /* =======================================================
      CATEGORY WORKFLOW
@@ -454,12 +397,7 @@ export default function RegistrationWizard({
       --------------------------------------------------- */
 
       case "review":
-        return (
-          <ReviewStep
-            mode={mode}
-            onBack={handleBack}
-          />
-        );
+        return <ReviewStep mode={mode} onBack={handleBack} />;
 
       default:
         return null;
@@ -473,11 +411,7 @@ export default function RegistrationWizard({
   if (loadingRegistration) {
     return (
       <Container maxWidth="lg">
-        <Box
-          display="flex"
-          justifyContent="center"
-          py={8}
-        >
+        <Box display="flex" justifyContent="center" py={8}>
           <CircularProgress />
         </Box>
       </Container>
@@ -487,9 +421,7 @@ export default function RegistrationWizard({
   if (loadError) {
     return (
       <Container maxWidth="lg">
-        <Alert severity="error">
-          {loadError}
-        </Alert>
+        <Alert severity="error">{loadError}</Alert>
       </Container>
     );
   }

@@ -1,14 +1,13 @@
-from rest_framework import serializers, viewsets
+from rest_framework import serializers
+
+from apps.common.views import OrganizationScopedViewSet
 
 from ..models import NextOfKin
-from ..permissions import (
-    IsAuthenticatedUser,
-    get_user_organization_membership,
-)
+from ..permissions import IsAuthenticatedUser
 from ..serializers import NextOfKinSerializer
 
 
-class NextOfKinViewSet(viewsets.ModelViewSet):
+class NextOfKinViewSet(OrganizationScopedViewSet):
     """
     CRUD operations for next-of-kin records belonging
     to members in the authenticated user's organization.
@@ -20,20 +19,10 @@ class NextOfKinViewSet(viewsets.ModelViewSet):
         IsAuthenticatedUser,
     ]
 
-    def get_membership(self):
-        if not hasattr(self, "_organization_membership"):
-            self._organization_membership = (
-                get_user_organization_membership(
-                    self.request.user
-                )
-            )
-
-        return self._organization_membership
-
     def get_queryset(self):
-        membership = self.get_membership()
+        organization = self.get_organization()
 
-        if membership is None:
+        if organization is None:
             return NextOfKin.objects.none()
 
         queryset = (
@@ -43,7 +32,7 @@ class NextOfKinViewSet(viewsets.ModelViewSet):
                 "member__organization",
             )
             .filter(
-                member__organization=membership.organization,
+                member__organization=organization,
             )
         )
 
@@ -63,11 +52,11 @@ class NextOfKinViewSet(viewsets.ModelViewSet):
             "member"
         ]
 
-        membership = self.get_membership()
+        organization = self.get_organization()
 
         if (
             member.organization_id
-            != membership.organization_id
+            != organization.id
         ):
             raise serializers.ValidationError(
                 {

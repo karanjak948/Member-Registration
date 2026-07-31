@@ -40,13 +40,26 @@ export interface Member {
     | "REJECTED"
     | "ACTIVE";
 
-  created_by: number;
+  // Audit fields
+  created_by: number | null;
+  created_by_username: string | null;
+  created_at: string | null;
 
-  created_by_username: string;
+  updated_by: number | null;
+  updated_by_username: string | null;
+  updated_at: string | null;
 
-  created_at: string;
+  approved_by: number | null;
+  approved_by_username: string | null;
+  approved_at: string | null;
 
-  updated_at: string;
+  rejected_by: number | null;
+  rejected_by_username: string | null;
+  rejected_at: string | null;
+
+  activated_by: number | null;
+  activated_by_username: string | null;
+  activated_at: string | null;
 }
 
 export interface CreateMemberRequest {

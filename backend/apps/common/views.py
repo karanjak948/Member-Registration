@@ -1,28 +1,26 @@
 from rest_framework import viewsets
 
-from apps.members.permissions import (
-    get_user_organization_membership,
-)
+from apps.organizations.models import OrganizationUser
 
 
-class OrganizationScopedViewSet(
-    viewsets.ModelViewSet
-):
+class OrganizationScopedViewSet(viewsets.ModelViewSet):
     """
-    Base viewset for organization-owned resources.
-    """
+    Base viewset for organization-scoped resources.
 
-    organization_lookup = "organization"
+    Provides helper methods for retrieving the current
+    authenticated user's active organization membership.
+    """
 
     def get_membership(self):
-        if not hasattr(
-            self,
-            "_organization_membership",
-        ):
+        if not hasattr(self, "_organization_membership"):
             self._organization_membership = (
-                get_user_organization_membership(
-                    self.request.user
+                OrganizationUser.objects
+                .select_related("organization")
+                .filter(
+                    user=self.request.user,
+                    is_active=True,
                 )
+                .first()
             )
 
         return self._organization_membership
@@ -30,8 +28,7 @@ class OrganizationScopedViewSet(
     def get_organization(self):
         membership = self.get_membership()
 
-        return (
-            membership.organization
-            if membership
-            else None
-        )
+        if membership:
+            return membership.organization
+
+        return None

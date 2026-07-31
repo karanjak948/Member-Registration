@@ -47,6 +47,18 @@ class MemberSerializer(serializers.ModelSerializer):
         read_only=True,
     )
 
+    full_name = serializers.SerializerMethodField()
+
+    created_at_display = serializers.SerializerMethodField()
+
+    updated_at_display = serializers.SerializerMethodField()
+
+    approved_at_display = serializers.SerializerMethodField()
+
+    rejected_at_display = serializers.SerializerMethodField()
+
+    activated_at_display = serializers.SerializerMethodField()
+
     class Meta:
         model = Member
 
@@ -62,6 +74,8 @@ class MemberSerializer(serializers.ModelSerializer):
 
             "first_name",
             "other_names",
+            "full_name",
+
             "national_id",
             "phone_number",
             "email",
@@ -92,7 +106,16 @@ class MemberSerializer(serializers.ModelSerializer):
             "activated_at",
 
             "created_at",
+            "created_at_display",
+
             "updated_at",
+            "updated_at_display",
+
+            "approved_at_display",
+
+            "rejected_at_display",
+
+            "activated_at_display",
         )
 
         read_only_fields = (
@@ -133,4 +156,69 @@ class MemberSerializer(serializers.ModelSerializer):
 
             "created_at",
             "updated_at",
+
+            # Display fields are derived from the model.
+            "full_name",
+
+            "created_at_display",
+            "updated_at_display",
+            "approved_at_display",
+            "rejected_at_display",
+            "activated_at_display",
         )
+
+    def get_full_name(self, obj):
+        """
+        Return the member's full name.
+        """
+        return f"{obj.first_name} {obj.other_names}".strip()
+
+    def get_created_at_display(self, obj):
+        """
+        Return a formatted creation date string.
+        """
+        if obj.created_at:
+            return obj.created_at.strftime(
+                "%d %b %Y %I:%M %p"
+            )
+        return None
+
+    def get_updated_at_display(self, obj):
+        """
+        Return a formatted last update date string.
+        """
+        if obj.updated_at:
+            return obj.updated_at.strftime(
+                "%d %b %Y %I:%M %p"
+            )
+        return None
+
+    def get_approved_at_display(self, obj):
+        """
+        Return a formatted approval date string.
+        """
+        if obj.approved_at:
+            return obj.approved_at.strftime(
+                "%d %b %Y %I:%M %p"
+            )
+        return None
+
+    def get_rejected_at_display(self, obj):
+        """
+        Return a formatted rejection date string.
+        """
+        if obj.rejected_at:
+            return obj.rejected_at.strftime(
+                "%d %b %Y %I:%M %p"
+            )
+        return None
+
+    def get_activated_at_display(self, obj):
+        """
+        Return a formatted activation date string.
+        """
+        if obj.activated_at:
+            return obj.activated_at.strftime(
+                "%d %b %Y %I:%M %p"
+            )
+        return None

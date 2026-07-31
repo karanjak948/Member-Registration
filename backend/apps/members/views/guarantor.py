@@ -1,14 +1,13 @@
-from rest_framework import serializers, viewsets
+from rest_framework import serializers
+
+from apps.common.views import OrganizationScopedViewSet
 
 from ..models import Guarantor
-from ..permissions import (
-    IsAuthenticatedUser,
-    get_user_organization_membership,
-)
+from ..permissions import IsAuthenticatedUser
 from ..serializers import GuarantorSerializer
 
 
-class GuarantorViewSet(viewsets.ModelViewSet):
+class GuarantorViewSet(OrganizationScopedViewSet):
     """
     CRUD operations for guarantors belonging to members
     in the authenticated user's organization.
@@ -23,20 +22,10 @@ class GuarantorViewSet(viewsets.ModelViewSet):
         IsAuthenticatedUser,
     ]
 
-    def get_membership(self):
-        if not hasattr(self, "_organization_membership"):
-            self._organization_membership = (
-                get_user_organization_membership(
-                    self.request.user
-                )
-            )
-
-        return self._organization_membership
-
     def get_queryset(self):
-        membership = self.get_membership()
+        organization = self.get_organization()
 
-        if membership is None:
+        if organization is None:
             return Guarantor.objects.none()
 
         queryset = (
@@ -48,7 +37,7 @@ class GuarantorViewSet(viewsets.ModelViewSet):
                 "guarantor_member__organization",
             )
             .filter(
-                member__organization=membership.organization,
+                member__organization=organization,
             )
         )
 
@@ -74,11 +63,11 @@ class GuarantorViewSet(viewsets.ModelViewSet):
             )
         )
 
-        membership = self.get_membership()
+        organization = self.get_organization()
 
         if (
             member.organization_id
-            != membership.organization_id
+            != organization.id
         ):
             raise serializers.ValidationError(
                 {
@@ -91,7 +80,7 @@ class GuarantorViewSet(viewsets.ModelViewSet):
         if (
             guarantor_member is not None
             and guarantor_member.organization_id
-            != membership.organization_id
+            != organization.id
         ):
             raise serializers.ValidationError(
                 {

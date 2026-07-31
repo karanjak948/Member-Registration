@@ -15,16 +15,14 @@ import dynamic from "next/dynamic";
 import memberService from "@/services/member.service";
 import { Member } from "@/interfaces/member";
 
-const Chart = dynamic(
-  () => import("react-apexcharts"),
-  {
-    ssr: false,
-  }
-);
+const Chart = dynamic(() => import("react-apexcharts"), {
+  ssr: false,
+});
 
 export default function RegistrationChart() {
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
+  const currentYear = new Date().getFullYear();
 
   useEffect(() => {
     loadMembers();
@@ -43,18 +41,20 @@ export default function RegistrationChart() {
     const months = Array(12).fill(0);
 
     members.forEach((member) => {
+      // Safely check if created_at exists before using it
+      if (!member.created_at) {
+        return;
+      }
+
       const date = new Date(member.created_at);
 
-      if (
-        date.getFullYear() ===
-        new Date().getFullYear()
-      ) {
+      if (date.getFullYear() === currentYear) {
         months[date.getMonth()]++;
       }
     });
 
     return months;
-  }, [members]);
+  }, [members, currentYear]);
 
   const options: ApexCharts.ApexOptions = {
     chart: {
@@ -111,31 +111,17 @@ export default function RegistrationChart() {
   return (
     <Card>
       <CardContent>
-
-        <Typography
-          variant="h5"
-          mb={3}
-        >
+        <Typography variant="h5" mb={3}>
           Monthly Registrations
         </Typography>
 
         {loading ? (
-          <Box
-            display="flex"
-            justifyContent="center"
-            py={8}
-          >
+          <Box display="flex" justifyContent="center" py={8}>
             <CircularProgress />
           </Box>
         ) : (
-          <Chart
-            type="line"
-            height={350}
-            options={options}
-            series={series}
-          />
+          <Chart type="line" height={350} options={options} series={series} />
         )}
-
       </CardContent>
     </Card>
   );
