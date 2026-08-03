@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+
 import {
   Alert,
   Box,
@@ -21,6 +23,8 @@ import AutorenewOutlinedIcon from "@mui/icons-material/AutorenewOutlined";
 
 import { Member } from "@/interfaces/member";
 
+import useMemberWorkflow from "@/components/members/hooks/useMemberWorkflow";
+
 interface CompleteRegistrationDialogProps {
   open: boolean;
 
@@ -32,17 +36,24 @@ interface CompleteRegistrationDialogProps {
 
   onClose: () => void;
 
-  onCompleteRegistration: () => void | Promise<void>;
+  onSuccess?: () => void;
+
+  onCompleteRegistration?: () => void | Promise<void>;
 }
 
 export default function CompleteRegistrationDialog({
   open,
   member,
-  loading = false,
-  error,
+  loading: externalLoading = false,
+  error: externalError,
   onClose,
+  onSuccess,
   onCompleteRegistration,
 }: CompleteRegistrationDialogProps) {
+  const [internalError, setInternalError] = useState("");
+
+  const workflow = useMemberWorkflow();
+
   const getStageColor = (
     stage?: string
   ):
@@ -66,12 +77,39 @@ export default function CompleteRegistrationDialog({
     }
   };
 
+  async function handleCompleteRegistration() {
+    if (!member) return;
+
+    try {
+      setInternalError("");
+
+      if (onCompleteRegistration) {
+        await onCompleteRegistration();
+      } else {
+        await workflow.completeRegistration(member.id);
+      }
+
+      if (onSuccess) {
+        onSuccess();
+      }
+
+      onClose();
+    } catch (error) {
+      console.error("Failed to complete registration:", error);
+      setInternalError("Failed to complete registration. Please try again.");
+    }
+  }
+
+  const displayError = externalError || internalError;
+
   return (
     <Dialog
       open={open}
       fullWidth
       maxWidth="sm"
-      onClose={loading ? undefined : onClose}
+      onClose={
+        workflow.loading || externalLoading ? undefined : onClose
+      }
     >
       <DialogTitle>
         <Stack
@@ -101,9 +139,9 @@ export default function CompleteRegistrationDialog({
 
       <DialogContent>
         <Stack spacing={3}>
-          {error && (
+          {displayError && (
             <Alert severity="error">
-              {error}
+              {displayError}
             </Alert>
           )}
 
@@ -227,7 +265,7 @@ export default function CompleteRegistrationDialog({
         }}
       >
         <Button
-          disabled={loading}
+          disabled={workflow.loading || externalLoading}
           onClick={onClose}
         >
           Cancel
@@ -236,11 +274,11 @@ export default function CompleteRegistrationDialog({
         <LoadingButton
           color="primary"
           variant="contained"
-          loading={loading}
+          loading={workflow.loading || externalLoading}
           startIcon={
             <AutorenewOutlinedIcon />
           }
-          onClick={() => onCompleteRegistration()}
+          onClick={handleCompleteRegistration}
         >
           Complete Registration
         </LoadingButton>

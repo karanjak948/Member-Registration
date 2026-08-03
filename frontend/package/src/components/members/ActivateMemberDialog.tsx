@@ -1,6 +1,9 @@
 "use client";
 
+import { useState } from "react";
+
 import {
+  Alert,
   Box,
   Button,
   Chip,
@@ -20,6 +23,8 @@ import ToggleOnOutlinedIcon from "@mui/icons-material/ToggleOnOutlined";
 
 import { Member } from "@/interfaces/member";
 
+import useMemberWorkflow from "@/components/members/hooks/useMemberWorkflow";
+
 interface ActivateMemberDialogProps {
   open: boolean;
 
@@ -31,17 +36,24 @@ interface ActivateMemberDialogProps {
 
   onClose: () => void;
 
-  onActivate: () => void | Promise<void>;
+  onSuccess?: () => void;
+
+  onActivate?: () => void | Promise<void>;
 }
 
 export default function ActivateMemberDialog({
   open,
   member,
-  loading = false,
-  error,
+  loading: externalLoading = false,
+  error: externalError,
   onClose,
+  onSuccess,
   onActivate,
 }: ActivateMemberDialogProps) {
+  const [internalError, setInternalError] = useState("");
+
+  const workflow = useMemberWorkflow();
+
   const getStageColor = (
     stage?: string
   ):
@@ -65,13 +77,38 @@ export default function ActivateMemberDialog({
     }
   };
 
+  async function handleActivate() {
+    if (!member) return;
+
+    try {
+      setInternalError("");
+
+      if (onActivate) {
+        await onActivate();
+      } else {
+        await workflow.activate(member.id);
+      }
+
+      if (onSuccess) {
+        onSuccess();
+      }
+
+      onClose();
+    } catch (error) {
+      console.error("Failed to activate member:", error);
+      setInternalError("Failed to activate member. Please try again.");
+    }
+  }
+
+  const displayError = externalError || internalError;
+
   return (
     <Dialog
       open={open}
       fullWidth
       maxWidth="sm"
       onClose={
-        loading ? undefined : onClose
+        workflow.loading || externalLoading ? undefined : onClose
       }
     >
       <DialogTitle>
@@ -81,7 +118,7 @@ export default function ActivateMemberDialog({
           alignItems="center"
         >
           <ToggleOnOutlinedIcon
-            color="primary"
+            color="success"
           />
 
           <Box>
@@ -93,9 +130,9 @@ export default function ActivateMemberDialog({
               variant="body2"
               color="text.secondary"
             >
-              Activate this member and
-              allow them to participate
-              as an active member.
+              Activate this member to grant
+              them full access to member
+              benefits and services.
             </Typography>
           </Box>
         </Stack>
@@ -105,13 +142,10 @@ export default function ActivateMemberDialog({
 
       <DialogContent>
         <Stack spacing={3}>
-          {error && (
-            <Typography
-              color="error"
-              variant="body2"
-            >
-              {error}
-            </Typography>
+          {displayError && (
+            <Alert severity="error">
+              {displayError}
+            </Alert>
           )}
 
           <Paper
@@ -218,11 +252,9 @@ export default function ActivateMemberDialog({
                     <Chip
                       size="small"
                       color={
-                        member?.status ===
-                        "ACTIVE"
+                        member?.status === "ACTIVE"
                           ? "success"
-                          : member?.status ===
-                              "INACTIVE"
+                          : member?.status === "INACTIVE"
                             ? "warning"
                             : "error"
                       }
@@ -233,6 +265,10 @@ export default function ActivateMemberDialog({
               </Stack>
             </Stack>
           </Paper>
+
+          <Alert severity="info">
+            Activating this member will change their status from INACTIVE to ACTIVE.
+          </Alert>
         </Stack>
       </DialogContent>
 
@@ -246,21 +282,19 @@ export default function ActivateMemberDialog({
       >
         <Button
           onClick={onClose}
-          disabled={loading}
+          disabled={workflow.loading || externalLoading}
         >
           Cancel
         </Button>
 
         <LoadingButton
-          color="primary"
+          color="success"
           variant="contained"
-          loading={loading}
+          loading={workflow.loading || externalLoading}
           startIcon={
             <ToggleOnOutlinedIcon />
           }
-          onClick={() =>
-            onActivate()
-          }
+          onClick={handleActivate}
         >
           Activate Member
         </LoadingButton>

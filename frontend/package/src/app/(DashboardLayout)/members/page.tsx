@@ -30,75 +30,54 @@ import DeleteMemberDialog from "@/components/members/DeleteMemberDialog";
 export default function MembersPage() {
   const router = useRouter();
 
-  const {
-    members,
-    loading,
-    error,
-    refresh,
-  } = useMembers();
+  const { members, loading, error, refresh } = useMembers();
 
   const [search, setSearch] = useState("");
 
-  const [statusFilter, setStatusFilter] =
-    useState("");
+  const [statusFilter, setStatusFilter] = useState("");
 
-  const [stageFilter, setStageFilter] =
-    useState("");
+  const [stageFilter, setStageFilter] = useState("");
 
-  const [selectedMember, setSelectedMember] =
-    useState<Member | null>(null);
+  const [selectedMember, setSelectedMember] = useState<Member | null>(null);
 
   // ----------------------------------------------------
   // Dialog State
   // ----------------------------------------------------
 
-  const [approveOpen, setApproveOpen] =
-    useState(false);
+  const [approveOpen, setApproveOpen] = useState(false);
 
-  const [rejectOpen, setRejectOpen] =
-    useState(false);
+  const [rejectOpen, setRejectOpen] = useState(false);
 
-  const [activateOpen, setActivateOpen] =
-    useState(false);
+  const [activateOpen, setActivateOpen] = useState(false);
 
-  const [deactivateOpen, setDeactivateOpen] =
-    useState(false);
+  const [deactivateOpen, setDeactivateOpen] = useState(false);
 
   const [completeRegistrationOpen, setCompleteRegistrationOpen] =
     useState(false);
 
-  const [deleteOpen, setDeleteOpen] =
-    useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
 
   // ----------------------------------------------------
-  // Action State
+  // Action State (for delete only)
   // ----------------------------------------------------
 
-  const [actionLoading, setActionLoading] =
-    useState(false);
+  const [actionLoading, setActionLoading] = useState(false);
 
-  const [actionError, setActionError] =
-    useState("");
+  const [actionError, setActionError] = useState("");
 
   // ----------------------------------------------------
   // Snackbar
   // ----------------------------------------------------
 
-  const [snackbarOpen, setSnackbarOpen] =
-    useState(false);
+  const [snackbarOpen, setSnackbarOpen] = useState(false);
 
-  const [snackbarMessage, setSnackbarMessage] =
-    useState("");
+  const [snackbarMessage, setSnackbarMessage] = useState("");
 
-  const [snackbarSeverity, setSnackbarSeverity] =
-    useState<"success" | "error">(
-      "success"
-    );
+  const [snackbarSeverity, setSnackbarSeverity] = useState<"success" | "error">(
+    "success",
+  );
 
-  const showSnackbar = (
-    message: string,
-    severity: "success" | "error"
-  ) => {
+  const showSnackbar = (message: string, severity: "success" | "error") => {
     setSnackbarMessage(message);
     setSnackbarSeverity(severity);
     setSnackbarOpen(true);
@@ -113,40 +92,19 @@ export default function MembersPage() {
       const value = search.toLowerCase();
 
       const matchesSearch =
-        member.membership_number
-          ?.toLowerCase()
-          .includes(value) ||
-        member.first_name
-          ?.toLowerCase()
-          .includes(value) ||
-        member.other_names
-          ?.toLowerCase()
-          .includes(value) ||
-        member.phone_number
-          ?.toLowerCase()
-          .includes(value);
+        member.membership_number?.toLowerCase().includes(value) ||
+        member.first_name?.toLowerCase().includes(value) ||
+        member.other_names?.toLowerCase().includes(value) ||
+        member.phone_number?.toLowerCase().includes(value);
 
-      const matchesStatus =
-        !statusFilter ||
-        member.status === statusFilter;
+      const matchesStatus = !statusFilter || member.status === statusFilter;
 
       const matchesStage =
-        !stageFilter ||
-        member.registration_stage ===
-          stageFilter;
+        !stageFilter || member.registration_stage === stageFilter;
 
-      return (
-        matchesSearch &&
-        matchesStatus &&
-        matchesStage
-      );
+      return matchesSearch && matchesStatus && matchesStage;
     });
-  }, [
-    members,
-    search,
-    statusFilter,
-    stageFilter,
-  ]);
+  }, [members, search, statusFilter, stageFilter]);
 
   // ----------------------------------------------------
   // Helpers
@@ -165,37 +123,30 @@ export default function MembersPage() {
     setActionError("");
   };
 
-  // Fixed: Added trailing comma after T to prevent JSX parsing conflict
-  const executeAction = async <T,>(
-    action: () => Promise<T>,
-    successMessage: string
-  ): Promise<void> => {
+  // ----------------------------------------------------
+  // Delete Handler
+  // ----------------------------------------------------
+
+  const handleDelete = async () => {
+    if (!selectedMember) return;
+
     try {
       setActionLoading(true);
       setActionError("");
 
-      await action();
+      await memberService.delete(selectedMember.id);
 
       await refresh();
 
-      showSnackbar(
-        successMessage,
-        "success"
-      );
+      showSnackbar("Member deleted successfully.", "success");
 
       closeDialogs();
     } catch (err: any) {
       console.error(err);
 
-      setActionError(
-        err?.response?.data?.detail ??
-          "Operation failed."
-      );
+      setActionError(err?.response?.data?.detail ?? "Operation failed.");
 
-      showSnackbar(
-        "Operation failed.",
-        "error"
-      );
+      showSnackbar("Operation failed.", "error");
     } finally {
       setActionLoading(false);
     }
@@ -205,144 +156,40 @@ export default function MembersPage() {
   // Workflow Open Handlers
   // ----------------------------------------------------
 
-  const openApprove = (
-    member: Member
-  ) => {
+  const openApprove = (member: Member) => {
     setSelectedMember(member);
     setApproveOpen(true);
   };
 
-  const openReject = (
-    member: Member
-  ) => {
+  const openReject = (member: Member) => {
     setSelectedMember(member);
     setRejectOpen(true);
   };
 
-  const openActivate = (
-    member: Member
-  ) => {
+  const openActivate = (member: Member) => {
     setSelectedMember(member);
     setActivateOpen(true);
   };
 
-  const openDeactivate = (
-    member: Member
-  ) => {
+  const openDeactivate = (member: Member) => {
     setSelectedMember(member);
     setDeactivateOpen(true);
   };
 
-  const openCompleteRegistration = (
-    member: Member
-  ) => {
+  const openCompleteRegistration = (member: Member) => {
     setSelectedMember(member);
     setCompleteRegistrationOpen(true);
   };
 
-  const openDelete = (
-    member: Member
-  ) => {
+  const openDelete = (member: Member) => {
     setSelectedMember(member);
     setDeleteOpen(true);
   };
 
-  // ----------------------------------------------------
-  // Workflow API Calls
-  // ----------------------------------------------------
-
-  const handleApprove = async (
-    remarks: string
-  ) => {
-    if (!selectedMember) return;
-
-    await executeAction(
-      () =>
-        memberService.approve(
-          selectedMember.id,
-          remarks
-        ),
-      "Member approved successfully."
-    );
-  };
-
-  const handleReject = async (
-    remarks: string
-  ) => {
-    if (!selectedMember) return;
-
-    await executeAction(
-      () =>
-        memberService.reject(
-          selectedMember.id,
-          remarks
-        ),
-      "Member rejected successfully."
-    );
-  };
-
-  const handleActivate =
-    async () => {
-      if (!selectedMember) return;
-
-      await executeAction(
-        () =>
-          memberService.activate(
-            selectedMember.id
-          ),
-        "Member activated successfully."
-      );
-    };
-
-  const handleDeactivate =
-    async () => {
-      if (!selectedMember) return;
-
-      await executeAction(
-        () =>
-          memberService.deactivate(
-            selectedMember.id
-          ),
-        "Member deactivated successfully."
-      );
-    };
-
-  const handleCompleteRegistration =
-    async () => {
-      if (!selectedMember) return;
-
-      await executeAction(
-        () =>
-          memberService.completeRegistration(
-            selectedMember.id
-          ),
-        "Registration completed successfully."
-      );
-    };
-
-  const handleDelete =
-    async () => {
-      if (!selectedMember) return;
-
-      await executeAction(
-        () =>
-          memberService.delete(
-            selectedMember.id
-          ),
-        "Member deleted successfully."
-      );
-    };
-
   return (
     <>
-      <Container
-        maxWidth={false}
-        sx={{ mt: 3 }}
-      >
-        <Typography
-          variant="h4"
-          mb={3}
-        >
+      <Container maxWidth={false} sx={{ mt: 3 }}>
+        <Typography variant="h4" mb={3}>
           Member Management
         </Typography>
 
@@ -358,31 +205,17 @@ export default function MembersPage() {
 
         <Box mt={3}>
           {loading ? (
-            <Box
-              display="flex"
-              justifyContent="center"
-              py={8}
-            >
+            <Box display="flex" justifyContent="center" py={8}>
               <CircularProgress />
             </Box>
           ) : error ? (
-            <Alert severity="error">
-              {error}
-            </Alert>
+            <Alert severity="error">{error}</Alert>
           ) : (
             <MemberDataGrid
               members={filteredMembers}
               loading={loading}
-              onView={(member) =>
-                router.push(
-                  `/members/${member.id}`
-                )
-              }
-              onEdit={(member) =>
-                router.push(
-                  `/members/${member.id}/edit`
-                )
-              }
+              onView={(member) => router.push(`/members/${member.id}`)}
+              onEdit={(member) => router.push(`/members/${member.id}/edit`)}
               onApprove={openApprove}
               onReject={openReject}
               onActivate={openActivate}
@@ -397,9 +230,7 @@ export default function MembersPage() {
       <Snackbar
         open={snackbarOpen}
         autoHideDuration={4000}
-        onClose={() =>
-          setSnackbarOpen(false)
-        }
+        onClose={() => setSnackbarOpen(false)}
         anchorOrigin={{
           vertical: "top",
           horizontal: "right",
@@ -408,9 +239,7 @@ export default function MembersPage() {
         <Alert
           severity={snackbarSeverity}
           variant="filled"
-          onClose={() =>
-            setSnackbarOpen(false)
-          }
+          onClose={() => setSnackbarOpen(false)}
           sx={{
             width: "100%",
           }}
@@ -425,7 +254,11 @@ export default function MembersPage() {
         loading={actionLoading}
         error={actionError}
         onClose={closeDialogs}
-        onApprove={handleApprove}
+        onSuccess={async () => {
+          await refresh();
+          showSnackbar("Member approved successfully.", "success");
+          closeDialogs();
+        }}
       />
 
       <RejectMemberDialog
@@ -434,7 +267,11 @@ export default function MembersPage() {
         loading={actionLoading}
         error={actionError}
         onClose={closeDialogs}
-        onReject={handleReject}
+        onSuccess={async () => {
+          await refresh();
+          showSnackbar("Member rejected successfully.", "success");
+          closeDialogs();
+        }}
       />
 
       <ActivateMemberDialog
@@ -443,7 +280,11 @@ export default function MembersPage() {
         loading={actionLoading}
         error={actionError}
         onClose={closeDialogs}
-        onActivate={handleActivate}
+        onSuccess={async () => {
+          await refresh();
+          showSnackbar("Member activated successfully.", "success");
+          closeDialogs();
+        }}
       />
 
       <DeactivateMemberDialog
@@ -452,7 +293,11 @@ export default function MembersPage() {
         loading={actionLoading}
         error={actionError}
         onClose={closeDialogs}
-        onDeactivate={handleDeactivate}
+        onSuccess={async () => {
+          await refresh();
+          showSnackbar("Member deactivated successfully.", "success");
+          closeDialogs();
+        }}
       />
 
       <CompleteRegistrationDialog
@@ -461,7 +306,11 @@ export default function MembersPage() {
         loading={actionLoading}
         error={actionError}
         onClose={closeDialogs}
-        onCompleteRegistration={handleCompleteRegistration}
+        onSuccess={async () => {
+          await refresh();
+          showSnackbar("Registration completed successfully.", "success");
+          closeDialogs();
+        }}
       />
 
       <DeleteMemberDialog

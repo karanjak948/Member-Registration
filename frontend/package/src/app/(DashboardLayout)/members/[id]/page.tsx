@@ -48,6 +48,18 @@ export default function ViewMemberPage() {
     }
   }
 
+  async function refreshMember() {
+    if (!member?.id) return;
+
+    try {
+      const updated = await memberService.getById(member.id);
+
+      setMember(updated);
+    } catch (error) {
+      console.error("Failed to refresh member:", error);
+    }
+  }
+
   if (loading) {
     return (
       <Box display="flex" justifyContent="center" mt={10}>
@@ -93,7 +105,7 @@ export default function ViewMemberPage() {
         </Stack>
       </Stack>
 
-      <MemberDetails member={member} />
+      <MemberDetails member={member} onRefresh={refreshMember} />
     </Box>
   );
 }

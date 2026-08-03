@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+
 import {
   Alert,
   Box,
@@ -21,6 +23,8 @@ import ToggleOffOutlinedIcon from "@mui/icons-material/ToggleOffOutlined";
 
 import { Member } from "@/interfaces/member";
 
+import useMemberWorkflow from "@/components/members/hooks/useMemberWorkflow";
+
 interface DeactivateMemberDialogProps {
   open: boolean;
 
@@ -32,17 +36,24 @@ interface DeactivateMemberDialogProps {
 
   onClose: () => void;
 
-  onDeactivate: () => void | Promise<void>;
+  onSuccess?: () => void;
+
+  onDeactivate?: () => void | Promise<void>;
 }
 
 export default function DeactivateMemberDialog({
   open,
   member,
-  loading = false,
-  error,
+  loading: externalLoading = false,
+  error: externalError,
   onClose,
+  onSuccess,
   onDeactivate,
 }: DeactivateMemberDialogProps) {
+  const [internalError, setInternalError] = useState("");
+
+  const workflow = useMemberWorkflow();
+
   const getStageColor = (
     stage?: string
   ):
@@ -66,13 +77,38 @@ export default function DeactivateMemberDialog({
     }
   };
 
+  async function handleDeactivate() {
+    if (!member) return;
+
+    try {
+      setInternalError("");
+
+      if (onDeactivate) {
+        await onDeactivate();
+      } else {
+        await workflow.deactivate(member.id);
+      }
+
+      if (onSuccess) {
+        onSuccess();
+      }
+
+      onClose();
+    } catch (error) {
+      console.error("Failed to deactivate member:", error);
+      setInternalError("Failed to deactivate member. Please try again.");
+    }
+  }
+
+  const displayError = externalError || internalError;
+
   return (
     <Dialog
       open={open}
       fullWidth
       maxWidth="sm"
       onClose={
-        loading ? undefined : onClose
+        workflow.loading || externalLoading ? undefined : onClose
       }
     >
       <DialogTitle>
@@ -82,7 +118,7 @@ export default function DeactivateMemberDialog({
           alignItems="center"
         >
           <ToggleOffOutlinedIcon
-            color="warning"
+            color="error"
           />
 
           <Box>
@@ -94,9 +130,9 @@ export default function DeactivateMemberDialog({
               variant="body2"
               color="text.secondary"
             >
-              Deactivate this member and
-              prevent further activity until
-              they are activated again.
+              Deactivate this member to
+              temporarily suspend their
+              access and benefits.
             </Typography>
           </Box>
         </Stack>
@@ -106,9 +142,9 @@ export default function DeactivateMemberDialog({
 
       <DialogContent>
         <Stack spacing={3}>
-          {error && (
+          {displayError && (
             <Alert severity="error">
-              {error}
+              {displayError}
             </Alert>
           )}
 
@@ -216,11 +252,9 @@ export default function DeactivateMemberDialog({
                     <Chip
                       size="small"
                       color={
-                        member?.status ===
-                        "ACTIVE"
+                        member?.status === "ACTIVE"
                           ? "success"
-                          : member?.status ===
-                              "INACTIVE"
+                          : member?.status === "INACTIVE"
                             ? "warning"
                             : "error"
                       }
@@ -233,11 +267,8 @@ export default function DeactivateMemberDialog({
           </Paper>
 
           <Alert severity="warning">
-            This action will immediately
-            change the member's status to
-            <strong> INACTIVE</strong>.
-            The member can be activated
-            again later.
+            This action will immediately change the member's status to
+            <strong> INACTIVE</strong>. The member can be activated again later.
           </Alert>
         </Stack>
       </DialogContent>
@@ -252,21 +283,19 @@ export default function DeactivateMemberDialog({
       >
         <Button
           onClick={onClose}
-          disabled={loading}
+          disabled={workflow.loading || externalLoading}
         >
           Cancel
         </Button>
 
         <LoadingButton
-          color="warning"
+          color="error"
           variant="contained"
-          loading={loading}
+          loading={workflow.loading || externalLoading}
           startIcon={
             <ToggleOffOutlinedIcon />
           }
-          onClick={() =>
-            onDeactivate()
-          }
+          onClick={handleDeactivate}
         >
           Deactivate Member
         </LoadingButton>

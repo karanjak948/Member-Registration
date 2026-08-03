@@ -24,6 +24,8 @@ import CancelOutlinedIcon from "@mui/icons-material/CancelOutlined";
 
 import { Member } from "@/interfaces/member";
 
+import useMemberWorkflow from "@/components/members/hooks/useMemberWorkflow";
+
 interface RejectMemberDialogProps {
   open: boolean;
 
@@ -35,7 +37,9 @@ interface RejectMemberDialogProps {
 
   onClose: () => void;
 
-  onReject: (
+  onSuccess?: () => void;
+
+  onReject?: (
     remarks: string
   ) => void | Promise<void>;
 }
@@ -43,17 +47,21 @@ interface RejectMemberDialogProps {
 export default function RejectMemberDialog({
   open,
   member,
-  loading = false,
-  error,
+  loading: externalLoading = false,
+  error: externalError,
   onClose,
+  onSuccess,
   onReject,
 }: RejectMemberDialogProps) {
-  const [remarks, setRemarks] =
-    useState("");
+  const [remarks, setRemarks] = useState("");
+  const [internalError, setInternalError] = useState("");
+
+  const workflow = useMemberWorkflow();
 
   useEffect(() => {
     if (open) {
       setRemarks("");
+      setInternalError("");
     }
   }, [open]);
 
@@ -80,13 +88,38 @@ export default function RejectMemberDialog({
     }
   };
 
+  async function handleReject() {
+    if (!member) return;
+
+    try {
+      setInternalError("");
+
+      if (onReject) {
+        await onReject(remarks);
+      } else {
+        await workflow.reject(member.id, remarks);
+      }
+
+      if (onSuccess) {
+        onSuccess();
+      }
+
+      onClose();
+    } catch (error) {
+      console.error("Failed to reject member:", error);
+      setInternalError("Failed to reject member. Please try again.");
+    }
+  }
+
+  const displayError = externalError || internalError;
+
   return (
     <Dialog
       open={open}
       fullWidth
       maxWidth="sm"
       onClose={
-        loading ? undefined : onClose
+        workflow.loading || externalLoading ? undefined : onClose
       }
     >
       <DialogTitle>
@@ -120,9 +153,9 @@ export default function RejectMemberDialog({
 
       <DialogContent>
         <Stack spacing={3}>
-          {error && (
+          {displayError && (
             <Alert severity="error">
-              {error}
+              {displayError}
             </Alert>
           )}
 
@@ -231,7 +264,7 @@ export default function RejectMemberDialog({
             fullWidth
             required
             value={remarks}
-            disabled={loading}
+            disabled={workflow.loading || externalLoading}
             onChange={(e) =>
               setRemarks(
                 e.target.value
@@ -252,7 +285,7 @@ export default function RejectMemberDialog({
       >
         <Button
           onClick={onClose}
-          disabled={loading}
+          disabled={workflow.loading || externalLoading}
         >
           Cancel
         </Button>
@@ -260,18 +293,14 @@ export default function RejectMemberDialog({
         <LoadingButton
           color="error"
           variant="contained"
-          loading={loading}
+          loading={workflow.loading || externalLoading}
           startIcon={
             <CancelOutlinedIcon />
           }
           disabled={
             remarks.trim().length === 0
           }
-          onClick={() =>
-            onReject(
-              remarks.trim()
-            )
-          }
+          onClick={handleReject}
         >
           Reject Member
         </LoadingButton>

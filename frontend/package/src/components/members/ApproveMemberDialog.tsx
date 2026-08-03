@@ -24,6 +24,8 @@ import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
 
 import { Member } from "@/interfaces/member";
 
+import useMemberWorkflow from "@/components/members/hooks/useMemberWorkflow";
+
 interface ApproveMemberDialogProps {
   open: boolean;
 
@@ -35,25 +37,26 @@ interface ApproveMemberDialogProps {
 
   onClose: () => void;
 
-  onApprove: (
-    remarks: string
-  ) => void | Promise<void>;
+  onSuccess?: () => void;
 }
 
 export default function ApproveMemberDialog({
   open,
   member,
-  loading = false,
-  error,
+  loading: externalLoading = false,
+  error: externalError,
   onClose,
-  onApprove,
+  onSuccess,
 }: ApproveMemberDialogProps) {
-  const [remarks, setRemarks] =
-    useState("");
+  const [remarks, setRemarks] = useState("");
+  const [internalError, setInternalError] = useState("");
+
+  const workflow = useMemberWorkflow();
 
   useEffect(() => {
     if (open) {
       setRemarks("");
+      setInternalError("");
     }
   }, [open]);
 
@@ -80,13 +83,34 @@ export default function ApproveMemberDialog({
     }
   };
 
+  async function handleApprove() {
+    if (!member) return;
+
+    try {
+      setInternalError("");
+
+      await workflow.approve(member.id, remarks);
+
+      if (onSuccess) {
+        onSuccess();
+      }
+
+      onClose();
+    } catch (error) {
+      console.error("Failed to approve member:", error);
+      setInternalError("Failed to approve member. Please try again.");
+    }
+  }
+
+  const displayError = externalError || internalError;
+
   return (
     <Dialog
       open={open}
       fullWidth
       maxWidth="sm"
       onClose={
-        loading ? undefined : onClose
+        workflow.loading || externalLoading ? undefined : onClose
       }
     >
       <DialogTitle>
@@ -120,9 +144,9 @@ export default function ApproveMemberDialog({
 
       <DialogContent>
         <Stack spacing={3}>
-          {error && (
+          {displayError && (
             <Alert severity="error">
-              {error}
+              {displayError}
             </Alert>
           )}
 
@@ -230,7 +254,7 @@ export default function ApproveMemberDialog({
             maxRows={6}
             fullWidth
             value={remarks}
-            disabled={loading}
+            disabled={workflow.loading || externalLoading}
             onChange={(e) =>
               setRemarks(
                 e.target.value
@@ -251,7 +275,7 @@ export default function ApproveMemberDialog({
       >
         <Button
           onClick={onClose}
-          disabled={loading}
+          disabled={workflow.loading || externalLoading}
         >
           Cancel
         </Button>
@@ -259,13 +283,11 @@ export default function ApproveMemberDialog({
         <LoadingButton
           color="success"
           variant="contained"
-          loading={loading}
+          loading={workflow.loading || externalLoading}
           startIcon={
             <CheckCircleOutlineIcon />
           }
-          onClick={() =>
-            onApprove(remarks)
-          }
+          onClick={handleApprove}
         >
           Approve Member
         </LoadingButton>
