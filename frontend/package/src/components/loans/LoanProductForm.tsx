@@ -2,24 +2,13 @@
 
 import { useState } from "react";
 
-import {
-  Box,
-  Card,
-  CardContent,
-  Stack,
-  Typography,
-} from "@mui/material";
+import { Box, Card, CardContent, Stack, Typography } from "@mui/material";
 
-import {
-  FormProvider,
-  useForm,
-} from "react-hook-form";
+import { FormProvider, useForm } from "react-hook-form";
 
 import loanProductService from "@/services/loanProduct.service";
 
-import {
-  LoanProductCreate,
-} from "@/interfaces/loanProduct";
+import { LoanProductCreate } from "@/interfaces/loanProduct";
 
 import BasicInformation from "./sections/BasicInformation";
 import InterestConfiguration from "./sections/InterestConfiguration";
@@ -86,30 +75,39 @@ const defaultValues: LoanProductCreate = {
   penalties: [],
 };
 
-export default function LoanProductForm() {
+interface LoanProductFormProps {
+  mode?: "create" | "edit";
+  initialValues?: LoanProductCreate;
+  productCode?: string;
+}
+
+export default function LoanProductForm({
+  mode = "create",
+  initialValues,
+  productCode,
+}: LoanProductFormProps) {
   const methods = useForm<LoanProductCreate>({
-    defaultValues,
+    defaultValues: initialValues ?? defaultValues,
     mode: "onBlur",
   });
 
-  const [loading, setLoading] =
-    useState(false);
+  const [loading, setLoading] = useState(false);
 
-  async function onSubmit(
-    data: LoanProductCreate
-  ) {
+  async function onSubmit(data: LoanProductCreate) {
     try {
       setLoading(true);
 
-      await loanProductService.create(data);
+      if (mode === "edit" && productCode) {
+        await loanProductService.update(productCode, data);
+      } else {
+        await loanProductService.create(data);
 
-      methods.reset(defaultValues);
-
-      // Snackbar will be added later.
+        methods.reset(defaultValues);
+      }
     } catch (error) {
       console.error(
-        "Failed to create loan product:",
-        error
+        `Failed to ${mode === "edit" ? "update" : "create"} loan product:`,
+        error,
       );
     } finally {
       setLoading(false);
@@ -118,20 +116,12 @@ export default function LoanProductForm() {
 
   return (
     <FormProvider {...methods}>
-      <Box
-        component="form"
-        onSubmit={methods.handleSubmit(
-          onSubmit
-        )}
-      >
+      <Box component="form" onSubmit={methods.handleSubmit(onSubmit)}>
         <Card>
           <CardContent>
             <Stack spacing={3}>
-              <Typography
-                variant="h5"
-                fontWeight={700}
-              >
-                Loan Product
+              <Typography variant="h5" fontWeight={700}>
+                {mode === "create" ? "Loan Product" : "Edit Loan Product"}
               </Typography>
 
               <BasicInformation />
@@ -152,9 +142,7 @@ export default function LoanProductForm() {
 
               <DynamicPenaltyTable />
 
-              <FormActions
-                loading={loading}
-              />
+              <FormActions loading={loading} />
             </Stack>
           </CardContent>
         </Card>

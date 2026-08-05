@@ -15,8 +15,7 @@ export type LoanStatus =
   | "rejected"
   | "disbursed"
   | "active"
-  | "completed"
-  | "defaulted";
+  | "closed";
 
 /**
  * Request body when applying for a loan.
@@ -24,6 +23,7 @@ export type LoanStatus =
  */
 export interface LoanCreate {
   member_id: number;
+
   loan_product_id: number;
 
   guarantor_member_id?: number | null;
@@ -46,7 +46,7 @@ export interface LoanCreate {
 /**
  * Loan returned by the backend.
  * GET /api/loans
- * GET /api/loans/{id}
+ * GET /api/loans/{loan_id}
  */
 export interface Loan {
   id: number;
@@ -80,7 +80,10 @@ export interface Loan {
 
 /**
  * Update request.
- * PUT /api/loans/{loan_id}
+ *
+ * The current API documentation does not expose
+ * a dedicated update payload, so this interface
+ * can be expanded as the backend evolves.
  */
 export interface LoanUpdate {
   status?: LoanStatus;
@@ -97,7 +100,7 @@ export interface LoanUpdate {
 }
 
 /**
- * Loan list response.
+ * Collection of loans.
  */
 export type LoanList = Loan[];
 

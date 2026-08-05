@@ -1,70 +1,75 @@
-import api from "./api";
+import loanApi from "./loanApi";
 
 import {
   Loan,
   LoanCreate,
+  LoanList,
   LoanUpdate,
 } from "@/interfaces/loan";
 
 class LoanService {
   /**
-   * List all loans.
+   * GET /api/loans
    */
-  async getAll(): Promise<Loan[]> {
-    const response = await api.get("/loans");
+  async getAll(): Promise<LoanList> {
+    const response =
+      await loanApi.get("/loans");
 
     return response.data;
   }
 
   /**
-   * Get a single loan.
+   * GET /api/loans/{loan_id}
    */
   async getById(
     loanId: number
   ): Promise<Loan> {
-    const response = await api.get(
-      `/loans/${loanId}`
-    );
+    const response =
+      await loanApi.get(
+        `/loans/${loanId}`
+      );
 
     return response.data;
   }
 
   /**
-   * Apply for a loan.
+   * POST /api/loans
    */
-  async create(
+  async applyLoan(
     data: LoanCreate
   ): Promise<Loan> {
-    const response = await api.post(
-      "/loans",
-      data
-    );
+    const response =
+      await loanApi.post(
+        "/loans",
+        data
+      );
 
     return response.data;
   }
 
   /**
-   * Update a loan.
+   * PUT /api/loans/{loan_id}
    */
   async update(
     loanId: number,
     data: LoanUpdate
   ): Promise<Loan> {
-    const response = await api.put(
-      `/loans/${loanId}`,
-      data
-    );
+    const response =
+      await loanApi.put(
+        `/loans/${loanId}`,
+        data
+      );
 
     return response.data;
   }
 
   /**
-   * Delete a loan.
+   * DELETE /api/loans/{loan_id}
    */
   async delete(
     loanId: number
   ): Promise<void> {
-    await api.delete(
+    await loanApi.delete(
       `/loans/${loanId}`
     );
   }

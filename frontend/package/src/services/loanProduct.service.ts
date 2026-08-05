@@ -1,4 +1,4 @@
-import api from "./api";
+import loanApi from "./loanApi";
 
 import {
   LoanProduct,
@@ -8,73 +8,69 @@ import {
 
 class LoanProductService {
   /**
-   * List all loan products.
+   * GET /api/loan-products
    */
   async getAll(): Promise<LoanProduct[]> {
-    const response = await api.get("/loan-products");
+    const response =
+      await loanApi.get(
+        "/loan-products"
+      );
 
     return response.data;
   }
 
   /**
-   * Get a single loan product.
+   * GET /api/loan-products/{product_id}
    */
   async getById(
     productId: number
   ): Promise<LoanProduct> {
-    const response = await api.get(
-      `/loan-products/${productId}`
-    );
+    const response =
+      await loanApi.get(
+        `/loan-products/${productId}`
+      );
 
     return response.data;
   }
 
   /**
-   * Create a new loan product.
+   * POST /api/loan-products
    */
   async create(
     data: LoanProductCreate
   ): Promise<LoanProduct> {
-    const response = await api.post(
-      "/loan-products",
-      data
-    );
+    const response =
+      await loanApi.post(
+        "/loan-products",
+        data
+      );
 
     return response.data;
   }
 
   /**
-   * Update an existing loan product.
-   *
-   * Backend expects the product code
-   * instead of the numeric id.
+   * PUT /api/loan-products/{product_code}
    */
   async update(
     productCode: string,
     data: LoanProductUpdate
   ): Promise<LoanProduct> {
-    const response = await api.put(
-      `/loan-products/${productCode}`,
-      data
-    );
+    const response =
+      await loanApi.put(
+        `/loan-products/${productCode}`,
+        data
+      );
 
     return response.data;
   }
 
   /**
-   * Delete a loan product.
-   *
-   * NOTE:
-   * The current API documentation does
-   * not expose a DELETE endpoint.
-   *
-   * If one is added later this method
-   * can simply be updated.
+   * DELETE endpoint reserved for future use.
    */
   async delete(
     productId: number
   ): Promise<void> {
-    await api.delete(
+    await loanApi.delete(
       `/loan-products/${productId}`
     );
   }
