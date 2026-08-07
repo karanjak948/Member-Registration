@@ -212,8 +212,16 @@ export interface LoanProduct {
   penalties: LoanProductPenalty[];
 }
 
+/* ===========================
+   UPDATE
+=========================== */
+
 export interface LoanProductUpdate
   extends Partial<LoanProductCreate> {}
+
+/* ===========================
+   LIST
+=========================== */
 
 export type LoanProductList =
   LoanProduct[];

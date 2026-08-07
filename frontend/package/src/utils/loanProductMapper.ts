@@ -113,7 +113,9 @@ export function mapLoanProductToForm(
     ),
 
     allocation_order:
-      product.allocation_order,
+      product.allocation_order
+        ? product.allocation_order
+        : "penalty,interest,principal",
 
     fees: product.fees.map((fee) => ({
       fee_name: fee.fee_name,
@@ -122,8 +124,9 @@ export function mapLoanProductToForm(
 
       fee_basis: fee.fee_basis,
 
-      charge_stage: fee.charge_stage,
-
+      // charge_stage is NOT part of the API response
+      // It is only used during fee creation
+      // Do not map it from the response
       affects_principal:
         fee.affects_principal,
 

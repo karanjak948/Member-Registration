@@ -9,11 +9,9 @@ interface RouteContext {
   }>;
 }
 
-/*
-|--------------------------------------------------------------------------
-| GET
-|--------------------------------------------------------------------------
-*/
+/* -------------------------------------------------------------------------- */
+/* GET */
+/* -------------------------------------------------------------------------- */
 
 export async function GET(
   request: NextRequest,
@@ -21,6 +19,8 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
+
+    console.log("GET Loan Product:", id);
 
     const response = await fetch(
       `${API_URL}/${id}`,
@@ -35,16 +35,20 @@ export async function GET(
 
     const data = await response.json();
 
+    console.log("Loan Product Response:", data);
+
     return NextResponse.json(data, {
       status: response.status,
     });
   } catch (error) {
-    console.error(error);
+    console.error("GET Loan Product Error:", error);
 
     return NextResponse.json(
       {
         detail:
-          "Unable to connect to Loan API.",
+          error instanceof Error
+            ? error.message
+            : "Unknown server error",
       },
       {
         status: 500,
@@ -53,11 +57,9 @@ export async function GET(
   }
 }
 
-/*
-|--------------------------------------------------------------------------
-| PUT
-|--------------------------------------------------------------------------
-*/
+/* -------------------------------------------------------------------------- */
+/* PUT */
+/* -------------------------------------------------------------------------- */
 
 export async function PUT(
   request: NextRequest,
@@ -68,8 +70,12 @@ export async function PUT(
 
     const body = await request.json();
 
-    console.log("Updating Product:", id);
-    console.log(body);
+    console.log("=================================");
+    console.log("Updating Loan Product");
+    console.log("Product ID:", id);
+    console.log("Payload:");
+    console.dir(body, { depth: null });
+    console.log("=================================");
 
     const response = await fetch(
       `${API_URL}/${id}`,
@@ -77,28 +83,39 @@ export async function PUT(
         method: "PUT",
         headers: {
           Accept: "application/json",
-          "Content-Type":
-            "application/json",
+          "Content-Type": "application/json",
         },
         body: JSON.stringify(body),
       }
     );
 
-    const data = await response.json();
+    const responseText = await response.text();
+
+    console.log("Royal API Status:", response.status);
+    console.log("Royal API Response:", responseText);
+
+    let data;
+
+    try {
+      data = JSON.parse(responseText);
+    } catch {
+      data = {
+        detail: responseText,
+      };
+    }
 
     return NextResponse.json(data, {
       status: response.status,
     });
   } catch (error) {
-    console.error(
-      "Loan Product Update Error:",
-      error
-    );
+    console.error("PUT Loan Product Error:", error);
 
     return NextResponse.json(
       {
         detail:
-          "Unable to connect to Loan API.",
+          error instanceof Error
+            ? error.message
+            : "Unknown server error",
       },
       {
         status: 500,

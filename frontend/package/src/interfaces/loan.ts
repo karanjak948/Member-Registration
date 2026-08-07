@@ -11,11 +11,15 @@
  */
 export type LoanStatus =
   | "pending_application"
+  | "appraised"
   | "approved"
-  | "rejected"
-  | "disbursed"
   | "active"
-  | "closed";
+  | "watchful"
+  | "non_performing"
+  | "doubtful"
+  | "closed"
+  | "written_off"
+  | "rejected";
 
 /**
  * Request body when applying for a loan.
@@ -26,21 +30,21 @@ export interface LoanCreate {
 
   loan_product_id: number;
 
-  guarantor_member_id?: number | null;
+  guarantor_member_id: number | null;
 
   principal_amount: number;
 
   application_date: string;
 
-  disbursement_date?: string | null;
+  disbursement_date: string | null;
 
-  num_periods: number;
+  num_periods: number | null;
 
-  security_provided_value?: number | null;
+  security_provided_value: number | null;
 
-  security_provided_notes?: string;
+  security_provided_notes: string | null;
 
-  deposit_paid_amount?: number | null;
+  deposit_paid_amount: number | null;
 }
 
 /**
@@ -86,15 +90,15 @@ export interface Loan {
  * can be expanded as the backend evolves.
  */
 export interface LoanUpdate {
-  status?: LoanStatus;
+  status?: LoanStatus | null;
 
-  outstanding_balance?: number;
+  outstanding_balance?: number | null;
 
   guarantor_member_id?: number | null;
 
   security_provided_value?: number | null;
 
-  security_provided_notes?: string;
+  security_provided_notes?: string | null;
 
   deposit_paid_amount?: number | null;
 }

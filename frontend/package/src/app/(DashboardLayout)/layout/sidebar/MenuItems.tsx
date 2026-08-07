@@ -7,6 +7,9 @@ import {
   IconSettings,
   IconUsersGroup,
   IconUserShield,
+  IconCash,
+  IconReceipt,
+  IconPlus,
 } from "@tabler/icons-react";
 
 import type { ElementType } from "react";
@@ -87,6 +90,42 @@ export function getMenuItems(permissions: Permission[] = []): MenuItem[] {
       });
     }
   }
+
+  // ============================================================
+  // LOAN MANAGEMENT
+  // ============================================================
+
+  items.push({
+    navlabel: true,
+    subheader: "LOAN MANAGEMENT",
+  });
+
+  items.push({
+    id: "loans",
+    title: "Loans",
+    icon: IconCash,
+
+    children: [
+      {
+        id: "loan-products",
+        title: "Loan Products",
+        href: "/loan-products",
+        icon: IconReceipt,
+      },
+      {
+        id: "new-loan-product",
+        title: "New Loan Product",
+        href: "/loan-products/new",
+        icon: IconPlus,
+      },
+      {
+        id: "apply-loan",
+        title: "Apply Loan",
+        href: "/loans/apply",
+        icon: IconCash,
+      },
+    ],
+  });
 
   // ============================================================
   // REPORTS

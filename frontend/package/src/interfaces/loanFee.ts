@@ -9,10 +9,16 @@
  */
 export type FeeType =
   | "fixed"
+  | "fixed_amount"
   | "percentage";
 
 /**
  * When the fee is charged.
+ *
+ * NOTE:
+ * The Royal API does NOT currently return this field
+ * in GET /loan-products/{id}, although it may be used
+ * when creating a product.
  */
 export type FeeChargeStage =
   | "application"
@@ -21,7 +27,7 @@ export type FeeChargeStage =
   | "repayment";
 
 /**
- * Fee basis for calculation.
+ * Fee basis.
  */
 export type FeeBasis =
   | "loan_amount"
@@ -29,7 +35,7 @@ export type FeeBasis =
   | "interest";
 
 /**
- * Payload sent when creating a loan product fee.
+ * Payload used for Create/Update.
  */
 export interface LoanProductFeeCreate {
   fee_name: string;
@@ -40,7 +46,12 @@ export interface LoanProductFeeCreate {
 
   fee_basis: FeeBasis;
 
-  charge_stage: FeeChargeStage;
+  /**
+   * Optional because the API does not return it.
+   * The UI should default this to "application"
+   * when creating a new fee.
+   */
+  charge_stage?: FeeChargeStage;
 
   affects_principal: boolean;
 
@@ -50,7 +61,7 @@ export interface LoanProductFeeCreate {
 }
 
 /**
- * Fee returned by the backend.
+ * Fee returned by Royal API.
  */
 export interface LoanProductFee {
   id: number;
@@ -65,7 +76,10 @@ export interface LoanProductFee {
 
   fee_basis: FeeBasis;
 
-  charge_stage: FeeChargeStage;
+  /**
+   * Optional because GET responses currently omit it.
+   */
+  charge_stage?: FeeChargeStage;
 
   affects_principal: boolean;
 
@@ -73,12 +87,15 @@ export interface LoanProductFee {
 
   ledger_account_name: string;
 
-  created_at: string;
+  /**
+   * Optional because current API responses omit them.
+   */
+  created_at?: string;
 
-  updated_at: string;
+  updated_at?: string;
 }
 
 /**
- * Collection of fees.
+ * Fee collection.
  */
 export type LoanFeeList = LoanProductFee[];

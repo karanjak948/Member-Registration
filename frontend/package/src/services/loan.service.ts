@@ -12,8 +12,7 @@ class LoanService {
    * GET /api/loans
    */
   async getAll(): Promise<LoanList> {
-    const response =
-      await loanApi.get("/loans");
+    const response = await loanApi.get("/loans");
 
     return response.data;
   }
@@ -22,12 +21,11 @@ class LoanService {
    * GET /api/loans/{loan_id}
    */
   async getById(
-    loanId: number
+    loanId: number,
   ): Promise<Loan> {
-    const response =
-      await loanApi.get(
-        `/loans/${loanId}`
-      );
+    const response = await loanApi.get(
+      `/loans/${loanId}`,
+    );
 
     return response.data;
   }
@@ -36,13 +34,15 @@ class LoanService {
    * POST /api/loans
    */
   async applyLoan(
-    data: LoanCreate
+    data: LoanCreate,
   ): Promise<Loan> {
-    const response =
-      await loanApi.post(
-        "/loans",
-        data
-      );
+    console.log("Applying Loan");
+    console.log("Payload:", data);
+
+    const response = await loanApi.post(
+      "/loans",
+      data,
+    );
 
     return response.data;
   }
@@ -52,13 +52,15 @@ class LoanService {
    */
   async update(
     loanId: number,
-    data: LoanUpdate
+    data: LoanUpdate,
   ): Promise<Loan> {
-    const response =
-      await loanApi.put(
-        `/loans/${loanId}`,
-        data
-      );
+    console.log("Updating Loan:", loanId);
+    console.log("Payload:", data);
+
+    const response = await loanApi.put(
+      `/loans/${loanId}`,
+      data,
+    );
 
     return response.data;
   }
@@ -67,10 +69,10 @@ class LoanService {
    * DELETE /api/loans/{loan_id}
    */
   async delete(
-    loanId: number
+    loanId: number,
   ): Promise<void> {
     await loanApi.delete(
-      `/loans/${loanId}`
+      `/loans/${loanId}`,
     );
   }
 }

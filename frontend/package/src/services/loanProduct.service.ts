@@ -11,24 +11,20 @@ class LoanProductService {
    * GET /api/loan-products
    */
   async getAll(): Promise<LoanProduct[]> {
-    const response =
-      await loanApi.get(
-        "/loan-products"
-      );
+    const response = await loanApi.get("/loan-products");
 
     return response.data;
   }
 
   /**
-   * GET /api/loan-products/{product_id}
+   * GET /api/loan-products/{product_code}
    */
   async getById(
     productId: number
   ): Promise<LoanProduct> {
-    const response =
-      await loanApi.get(
-        `/loan-products/${productId}`
-      );
+    const response = await loanApi.get(
+      `/loan-products/${productId}`
+    );
 
     return response.data;
   }
@@ -39,11 +35,10 @@ class LoanProductService {
   async create(
     data: LoanProductCreate
   ): Promise<LoanProduct> {
-    const response =
-      await loanApi.post(
-        "/loan-products",
-        data
-      );
+    const response = await loanApi.post(
+      "/loan-products",
+      data
+    );
 
     return response.data;
   }
@@ -55,23 +50,25 @@ class LoanProductService {
     productCode: string,
     data: LoanProductUpdate
   ): Promise<LoanProduct> {
-    const response =
-      await loanApi.put(
-        `/loan-products/${productCode}`,
-        data
-      );
+    console.log("Updating Product Code:", productCode);
+    console.log("Payload:", data);
+
+    const response = await loanApi.put(
+      `/loan-products/${productCode}`,
+      data
+    );
 
     return response.data;
   }
 
   /**
-   * DELETE endpoint reserved for future use.
+   * DELETE /api/loan-products/{product_code}
    */
   async delete(
-    productId: number
+    productCode: string
   ): Promise<void> {
     await loanApi.delete(
-      `/loan-products/${productId}`
+      `/loan-products/${productCode}`
     );
   }
 }

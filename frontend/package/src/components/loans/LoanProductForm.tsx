@@ -97,7 +97,16 @@ export default function LoanProductForm({
     try {
       setLoading(true);
 
-      if (mode === "edit" && productCode) {
+      console.log("Submitting Loan Product");
+      console.log("Mode:", mode);
+      console.log("Product Code:", productCode);
+      console.log("Payload:", data);
+
+      if (mode === "edit") {
+        if (!productCode) {
+          throw new Error("Missing product code.");
+        }
+
         await loanProductService.update(productCode, data);
       } else {
         await loanProductService.create(data);
