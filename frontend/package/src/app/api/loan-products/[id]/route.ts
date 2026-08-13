@@ -18,6 +18,7 @@ export async function GET(
   { params }: RouteContext
 ) {
   try {
+    // ✅ MUST await params in Next.js 16
     const { id } = await params;
 
     console.log("GET Loan Product:", id);
@@ -66,6 +67,7 @@ export async function PUT(
   { params }: RouteContext
 ) {
   try {
+    // ✅ MUST await params in Next.js 16
     const { id } = await params;
 
     const body = await request.json();

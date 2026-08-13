@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-
+import { useRouter } from "next/navigation";
 import {
   Button,
   Card,
@@ -11,10 +11,10 @@ import {
   Stack,
   TextField,
   Typography,
+  Snackbar,
+  Alert,
 } from "@mui/material";
-
 import { Controller, FormProvider, useForm, useWatch } from "react-hook-form";
-
 import { LoanCreate } from "@/interfaces/loan";
 import loanService from "@/services/loan.service";
 import { useMembers } from "@/hooks/useMembers";
@@ -36,6 +36,7 @@ const defaultValues: LoanCreate = {
 };
 
 export default function ApplyLoanForm() {
+  const router = useRouter();
   const methods = useForm<LoanCreate>({
     defaultValues,
     mode: "onBlur",
@@ -45,6 +46,15 @@ export default function ApplyLoanForm() {
   const { products } = useLoanProducts();
 
   const [loading, setLoading] = useState(false);
+  const [snackbar, setSnackbar] = useState<{
+    open: boolean;
+    message: string;
+    severity: "success" | "error";
+  }>({
+    open: false,
+    message: "",
+    severity: "success",
+  });
 
   const selectedLoanProductId = useWatch({
     control: methods.control,
@@ -68,15 +78,88 @@ export default function ApplyLoanForm() {
     try {
       setLoading(true);
 
-      console.log("Loan Payload:", data);
+      // =============== FORMAT DATA FOR THE API ===============
+      const payload = { ...data };
 
-      await loanService.applyLoan(data);
+      // 1. Format Dates to simple YYYY-MM-DD
+      if (payload.application_date) {
+        payload.application_date = new Date(payload.application_date)
+          .toISOString()
+          .split("T")[0];
+      }
+
+      if (payload.disbursement_date) {
+        payload.disbursement_date = new Date(payload.disbursement_date)
+          .toISOString()
+          .split("T")[0];
+      } else {
+        // Remove null dates
+        delete (payload as any).disbursement_date;
+      }
+
+      // 2. Remove null/empty optional fields
+      if (payload.security_provided_value === null) {
+        delete (payload as any).security_provided_value;
+      }
+
+      if (
+        payload.security_provided_notes === null ||
+        payload.security_provided_notes === ""
+      ) {
+        delete (payload as any).security_provided_notes;
+      }
+
+      // 3. Convert Deposit to String (Royal API expects "100.00", not 100 or null)
+      if (payload.deposit_paid_amount !== null) {
+        (payload as any).deposit_paid_amount = Number(
+          payload.deposit_paid_amount,
+        ).toFixed(2);
+      } else {
+        (payload as any).deposit_paid_amount = "0.00";
+      }
+
+      console.log(
+        "Loan Payload (Formatted):",
+        JSON.stringify(payload, null, 2),
+      );
+
+      await loanService.applyLoan(payload);
 
       methods.reset(defaultValues);
 
-      console.log("Loan applied successfully.");
-    } catch (error) {
+      setSnackbar({
+        open: true,
+        message: "Loan application submitted successfully!",
+        severity: "success",
+      });
+
+      setTimeout(() => {
+        router.push("/loans");
+      }, 2000);
+    } catch (error: any) {
       console.error("Failed to apply loan:", error);
+
+      let errorMessage = "Failed to submit loan application. Please try again.";
+
+      if (error.response?.status === 500) {
+        errorMessage =
+          error.response?.data?.detail ||
+          "The Loan Service encountered an internal error.";
+      } else if (error.response?.status === 400) {
+        errorMessage =
+          error.response?.data?.detail ||
+          "Invalid loan application. Please check your inputs.";
+      } else if (error.response?.data?.detail) {
+        errorMessage = error.response.data.detail;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+
+      setSnackbar({
+        open: true,
+        message: errorMessage,
+        severity: "error",
+      });
     } finally {
       setLoading(false);
     }
@@ -92,14 +175,13 @@ export default function ApplyLoanForm() {
                 Apply Loan
               </Typography>
 
+              {/* ✅ MUI v5/v6 Syntax: size={{ xs: 12, md: 6 }} */}
               <Grid container spacing={3}>
                 <Grid size={{ xs: 12, md: 6 }}>
                   <Controller
                     name="member_id"
                     control={methods.control}
-                    rules={{
-                      validate: (v) => v > 0 || "Select a member",
-                    }}
+                    rules={{ validate: (v) => v > 0 || "Select a member" }}
                     render={({ field, fieldState }) => (
                       <TextField
                         select
@@ -111,7 +193,6 @@ export default function ApplyLoanForm() {
                         helperText={fieldState.error?.message}
                       >
                         <MenuItem value={0}>Select Member</MenuItem>
-
                         {members.map((member) => (
                           <MenuItem key={member.id} value={member.id}>
                             {member.first_name} {member.other_names}
@@ -140,7 +221,6 @@ export default function ApplyLoanForm() {
                         helperText={fieldState.error?.message}
                       >
                         <MenuItem value={0}>Select Loan Product</MenuItem>
-
                         {products.map((product) => (
                           <MenuItem key={product.id} value={product.id}>
                             {product.product_name}
@@ -151,15 +231,12 @@ export default function ApplyLoanForm() {
                   />
                 </Grid>
 
-                {/* Conditional Guarantor Field */}
                 {requiresGuarantor && (
                   <Grid size={{ xs: 12, md: 6 }}>
                     <Controller
                       name="guarantor_member_id"
                       control={methods.control}
-                      rules={{
-                        required: "Please select a guarantor.",
-                      }}
+                      rules={{ required: "Please select a guarantor." }}
                       render={({ field, fieldState }) => (
                         <TextField
                           {...field}
@@ -171,7 +248,6 @@ export default function ApplyLoanForm() {
                           helperText={fieldState.error?.message}
                         >
                           <MenuItem value="">-- Select Guarantor --</MenuItem>
-
                           {members
                             .filter(
                               (member) =>
@@ -216,20 +292,14 @@ export default function ApplyLoanForm() {
                   <Controller
                     name="application_date"
                     control={methods.control}
-                    rules={{
-                      required: "Application date is required",
-                    }}
+                    rules={{ required: "Application date is required" }}
                     render={({ field, fieldState }) => (
                       <TextField
                         {...field}
                         fullWidth
                         type="date"
                         label="Application Date"
-                        slotProps={{
-                          inputLabel: {
-                            shrink: true,
-                          },
-                        }}
+                        slotProps={{ inputLabel: { shrink: true } }}
                         error={!!fieldState.error}
                         helperText={fieldState.error?.message}
                       />
@@ -248,11 +318,7 @@ export default function ApplyLoanForm() {
                         label="Disbursement Date"
                         value={field.value ?? ""}
                         onChange={(e) => field.onChange(e.target.value || null)}
-                        slotProps={{
-                          inputLabel: {
-                            shrink: true,
-                          },
-                        }}
+                        slotProps={{ inputLabel: { shrink: true } }}
                       />
                     )}
                   />
@@ -349,6 +415,21 @@ export default function ApplyLoanForm() {
           </CardContent>
         </Card>
       </form>
+
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))}
+        anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+      >
+        <Alert
+          severity={snackbar.severity}
+          variant="filled"
+          onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </FormProvider>
   );
 }

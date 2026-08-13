@@ -14,34 +14,45 @@ import { LoanList } from "@/interfaces/loan";
  * with a refresh function.
  */
 export function useLoans() {
-  const [loans, setLoans] =
-    useState<LoanList>([]);
-
-  const [loading, setLoading] =
-    useState(true);
-
-  const [error, setError] =
-    useState("");
+  const [loans, setLoans] = useState<LoanList>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   const loadLoans = useCallback(async () => {
     try {
       setLoading(true);
-
       setError("");
 
-      const data =
-        await loanService.getAll();
+      console.log("Loading loans...");
 
-      setLoans(data);
-    } catch (err) {
-      console.error(
-        "Failed to load loans:",
-        err
-      );
+      const data = await loanService.getAll();
 
-      setError(
-        "Unable to load loans."
-      );
+      // Ensure we always have an array
+      const loanList = Array.isArray(data) ? data : [];
+      
+      // Log the full data to see what IDs are actually returned
+      console.log("Full loan data:", JSON.stringify(loanList, null, 2));
+      console.log("Loan IDs:", loanList.map(l => ({ 
+        id: l.id, 
+        loan_number: l.loan_number,
+        type: typeof l.id
+      })));
+
+      setLoans(loanList);
+      
+      console.log(`Loaded ${loanList.length} loans`);
+    } catch (err: any) {
+      console.error("Failed to load loans:", err);
+
+      if (err.response?.status === 405) {
+        setError("Loans API is not available. Please check the backend configuration.");
+      } else if (err.response?.status === 404) {
+        setError("Loans endpoint not found. Please check the API URL.");
+      } else if (err.response?.status === 500) {
+        setError("The loan service is currently unavailable. Please try again later.");
+      } else {
+        setError("Unable to load loans. Please try again.");
+      }
     } finally {
       setLoading(false);
     }
@@ -53,11 +64,8 @@ export function useLoans() {
 
   return {
     loans,
-
     loading,
-
     error,
-
     refresh: loadLoans,
   };
 }
