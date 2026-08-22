@@ -14,7 +14,10 @@ class Organization(models.Model):
     owner = models.OneToOneField(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
-        related_name="organization",
+        # ================= FIX =================
+        # Changed from "organization" to avoid conflict with User.organization
+        related_name="owned_organization", 
+        # =======================================
     )
 
     name = models.CharField(

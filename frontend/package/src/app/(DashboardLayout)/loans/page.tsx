@@ -29,6 +29,7 @@ import {
 import {
   Visibility as VisibilityIcon,
   Refresh as RefreshIcon,
+  Add as AddIcon, // ✅ ADDED THIS IMPORT
 } from "@mui/icons-material";
 
 import { useLoans } from "@/hooks/useLoans";
@@ -135,14 +136,27 @@ export default function LoansPage() {
               View and manage all loan applications
             </Typography>
           </Box>
-          <Button
-            variant="outlined"
-            startIcon={<RefreshIcon />}
-            onClick={refresh}
-            size="small"
-          >
-            Refresh
-          </Button>
+          
+          {/* ✅ ADDED: The new button group for Actions */}
+          <Stack direction="row" spacing={2}>
+            <Button
+              variant="outlined"
+              startIcon={<RefreshIcon />}
+              onClick={refresh}
+              size="small"
+            >
+              Refresh
+            </Button>
+            
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={() => router.push("/loans/apply")}
+              size="small"
+            >
+              Apply Loan
+            </Button>
+          </Stack>
         </Box>
 
         {/* Error */}

@@ -10,6 +10,18 @@ class User(AbstractUser):
     and account profiles.
     """
 
+    # ==================== FIXED ====================
+    # Added related_query_name to avoid reverse accessor clash
+    organization = models.ForeignKey(
+        'organizations.Organization',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="users",
+        related_query_name="user_org"  # <--- THIS FIXES THE ERROR
+    )
+    # ===============================================
+
     profile_photo = models.ImageField(
         upload_to="profile_photos/",
         blank=True,

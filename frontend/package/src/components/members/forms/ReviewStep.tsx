@@ -34,8 +34,8 @@ import { useAppDispatch, useAppSelector } from "@/store/hooks";
 
 import { resetRegistration } from "@/store/registration/registrationSlice";
 
-import registrationService from "@/services/registration.service";
-import api from "@/services/api";
+// Use the direct member service
+import memberService from "@/services/member.service";
 
 import AuditInformation from "@/components/members/AuditInformation";
 
@@ -199,23 +199,13 @@ export default function ReviewStep({
       setCategoriesLoading(true);
 
       try {
+        const api = (await import("@/services/api")).default;
         const response = await api.get("/member-categories/");
 
         if (!mounted) {
           return;
         }
 
-        /*
-         * Supports:
-         *
-         * [...]
-         *
-         * and DRF pagination:
-         *
-         * {
-         *   results: [...]
-         * }
-         */
         const data = Array.isArray(response.data)
           ? response.data
           : (response.data?.results ?? []);
@@ -223,13 +213,6 @@ export default function ReviewStep({
         setCategories(data);
       } catch (err) {
         console.error("Failed to load member categories:", err);
-
-        /*
-         * Category lookup failure should
-         * not destroy the registration.
-         *
-         * We can still display the raw ID.
-         */
       } finally {
         if (mounted) {
           setCategoriesLoading(false);
@@ -253,26 +236,17 @@ export default function ReviewStep({
 
     if (!photo) {
       setPhotoPreview(null);
-
       return;
     }
 
-    /*
-     * Newly selected browser file.
-     */
     if (photo instanceof File) {
       const objectUrl = URL.createObjectURL(photo);
-
       setPhotoPreview(objectUrl);
-
       return () => {
         URL.revokeObjectURL(objectUrl);
       };
     }
 
-    /*
-     * Existing backend URL/path.
-     */
     if (typeof photo === "string") {
       setPhotoPreview(photo);
     }
@@ -331,15 +305,105 @@ export default function ReviewStep({
   ======================================================= */
 
   async function createRegistration() {
-    await registrationService.createRegistration(registration);
+    // Build FormData directly from the Redux state
+    const formData = new FormData();
 
-    setSuccess(true);
+    // 🔥 FIXED: Added String() wrapper around all append() values to fix TypeScript errors
+    formData.append("first_name", String(member.first_name || ""));
+    formData.append("other_names", String(member.other_names || ""));
+    formData.append("national_id", String(member.national_id || ""));
+    formData.append("phone_number", String(member.phone_number || ""));
+    formData.append("email", String(member.email || ""));
+    formData.append("physical_address", String(member.physical_address || ""));
+    formData.append("occupation", String(member.occupation || ""));
+    formData.append("kra_pin", String(member.kra_pin || ""));
+    formData.append("category", String(member.category || ""));
 
-    window.setTimeout(() => {
-      dispatch(resetRegistration());
+    if (member.passport_photo instanceof File) {
+      formData.append("passport_photo", member.passport_photo);
+    }
 
-      router.replace("/members");
-    }, 1200);
+    if (hasNextOfKin) {
+      formData.append(
+        "next_of_kin_first_name",
+        String(nextOfKin.first_name || ""),
+      );
+      formData.append(
+        "next_of_kin_other_names",
+        String(nextOfKin.other_names || ""),
+      );
+      formData.append(
+        "next_of_kin_relationship",
+        String(nextOfKin.relationship || ""),
+      );
+      formData.append(
+        "next_of_kin_national_id",
+        String(nextOfKin.national_id || ""),
+      );
+      formData.append(
+        "next_of_kin_phone_number",
+        String(nextOfKin.phone_number || ""),
+      );
+      formData.append(
+        "next_of_kin_physical_address",
+        String(nextOfKin.physical_address || ""),
+      );
+      formData.append(
+        "next_of_kin_is_primary",
+        String(nextOfKin.is_primary || "false"),
+      );
+    }
+
+    if (hasVehicle) {
+      formData.append(
+        "vehicle_registration_number",
+        String(vehicle.registration_number || ""),
+      );
+      formData.append("vehicle_make", String(vehicle.make || ""));
+      formData.append("vehicle_model", String(vehicle.model || ""));
+      formData.append("vehicle_year", String(vehicle.year || ""));
+      formData.append("vehicle_color", String(vehicle.color || ""));
+      formData.append(
+        "vehicle_engine_number",
+        String(vehicle.engine_number || ""),
+      );
+      formData.append(
+        "vehicle_chassis_number",
+        String(vehicle.chassis_number || ""),
+      );
+    }
+
+    if (hasGuarantor) {
+      formData.append(
+        "guarantor_first_name",
+        String(guarantor.first_name || ""),
+      );
+      formData.append(
+        "guarantor_other_names",
+        String(guarantor.other_names || ""),
+      );
+      formData.append(
+        "guarantor_national_id",
+        String(guarantor.national_id || ""),
+      );
+      formData.append(
+        "guarantor_phone_number",
+        String(guarantor.phone_number || ""),
+      );
+      formData.append(
+        "guarantor_relationship",
+        String(guarantor.relationship || ""),
+      );
+      formData.append(
+        "guarantor_guarantor_member",
+        String(guarantor.guarantor_member || ""),
+      );
+    }
+
+    // 🔥 SECURITY: Do NOT append 'organization' or 'created_by'
+    // Django's perform_create() will inject request.user.organization automatically.
+
+    await memberService.create(formData);
   }
 
   /* =======================================================
@@ -347,15 +411,21 @@ export default function ReviewStep({
   ======================================================= */
 
   async function updateRegistration() {
-    await registrationService.updateRegistration(registration);
+    const formData = new FormData();
+    formData.append("first_name", String(member.first_name || ""));
+    formData.append("other_names", String(member.other_names || ""));
+    formData.append("national_id", String(member.national_id || ""));
+    formData.append("phone_number", String(member.phone_number || ""));
+    formData.append("email", String(member.email || ""));
+    formData.append("physical_address", String(member.physical_address || ""));
+    formData.append("occupation", String(member.occupation || ""));
+    formData.append("kra_pin", String(member.kra_pin || ""));
+    formData.append("category", String(member.category || ""));
+    if (member.passport_photo instanceof File) {
+      formData.append("passport_photo", member.passport_photo);
+    }
 
-    setSuccess(true);
-
-    window.setTimeout(() => {
-      dispatch(resetRegistration());
-
-      router.replace("/members");
-    }, 1200);
+    await memberService.update(Number(member.id), formData);
   }
 
   /* =======================================================
@@ -363,9 +433,6 @@ export default function ReviewStep({
   ======================================================= */
 
   async function saveRegistration() {
-    /*
-     * Prevent duplicate requests.
-     */
     if (loading || submissionLock.current) {
       return;
     }
@@ -373,15 +440,10 @@ export default function ReviewStep({
     setError("");
     setWarning("");
 
-    /* -----------------------------------------------------
-       PRE-SUBMISSION VALIDATION
-    ----------------------------------------------------- */
-
     if (!hasMemberDetails) {
       setError(
         "The primary member details are missing from the registration draft. Return to Member Details, verify the required fields, and continue through the wizard again.",
       );
-
       return;
     }
 
@@ -389,16 +451,10 @@ export default function ReviewStep({
       setError(
         "A member category has not been saved in the registration draft. Return to Member Details and select a category before submitting.",
       );
-
       return;
     }
 
-    /*
-     * Lock synchronously before any
-     * asynchronous request begins.
-     */
     submissionLock.current = true;
-
     setLoading(true);
 
     try {
@@ -407,15 +463,16 @@ export default function ReviewStep({
       } else {
         await createRegistration();
       }
+
+      setSuccess(true);
+
+      window.setTimeout(() => {
+        dispatch(resetRegistration());
+        router.replace("/members");
+      }, 1200);
     } catch (err) {
       console.error("Registration error:", err);
-
       setError(getApiErrorMessage(err));
-
-      /*
-       * Primary member creation failed,
-       * therefore retrying is safe.
-       */
       submissionLock.current = false;
     } finally {
       setLoading(false);
@@ -439,7 +496,6 @@ export default function ReviewStep({
       <Grid
         size={{
           xs: 12,
-
           md: fullWidth ? 12 : 6,
         }}
       >
@@ -500,9 +556,7 @@ export default function ReviewStep({
               xs: 2,
               md: 2.5,
             },
-
             py: 2,
-
             bgcolor: "background.default",
           }}
         >
@@ -523,11 +577,9 @@ export default function ReviewStep({
                 sx={{
                   width: 40,
                   height: 40,
-
                   bgcolor: completed
                     ? "primary.main"
                     : "action.disabledBackground",
-
                   color: completed ? "primary.contrastText" : "text.secondary",
                 }}
               >
@@ -538,7 +590,6 @@ export default function ReviewStep({
                 <Typography variant="subtitle1" fontWeight={700}>
                   {title}
                 </Typography>
-
                 <Typography variant="caption" color="text.secondary">
                   {subtitle}
                 </Typography>
@@ -578,10 +629,6 @@ export default function ReviewStep({
   return (
     <>
       <Box>
-        {/* =============================================
-            REVIEW HEADER
-        ============================================== */}
-
         <Box sx={{ mb: 3 }}>
           <Typography variant="h5" fontWeight={700}>
             Review Registration
@@ -592,10 +639,6 @@ export default function ReviewStep({
             can return to previous steps to make corrections.
           </Typography>
         </Box>
-
-        {/* =============================================
-            INCOMPLETE DRAFT WARNING
-        ============================================== */}
 
         {!memberReady && (
           <Alert
@@ -622,10 +665,6 @@ export default function ReviewStep({
           </Alert>
         )}
 
-        {/* =============================================
-            API ERROR
-        ============================================== */}
-
         {error && (
           <Alert
             severity="error"
@@ -639,23 +678,13 @@ export default function ReviewStep({
           </Alert>
         )}
 
-        {/* =============================================
-            PARTIAL SUCCESS WARNING
-        ============================================== */}
-
         {warning && (
           <Alert severity="warning" sx={{ mb: 3 }}>
             {warning}
           </Alert>
         )}
 
-        {/* =============================================
-            REVIEW SECTIONS
-        ============================================== */}
-
         <Stack spacing={2.5}>
-          {/* MEMBER */}
-
           <ReviewSection
             title="Member Details"
             subtitle="Primary member information"
@@ -679,13 +708,9 @@ export default function ReviewStep({
                   variant="rounded"
                   sx={{
                     width: 110,
-
                     height: 130,
-
                     border: "1px solid",
-
                     borderColor: "divider",
-
                     flexShrink: 0,
                   }}
                 />
@@ -700,22 +725,15 @@ export default function ReviewStep({
                 }}
               >
                 <Detail label="First Name" value={member.first_name} />
-
                 <Detail label="Other Names" value={member.other_names} />
-
                 <Detail label="National ID" value={member.national_id} />
-
                 <Detail label="Phone Number" value={member.phone_number} />
-
                 <Detail label="Email Address" value={member.email} />
-
                 <Detail
                   label="Occupation / Business"
                   value={member.occupation}
                 />
-
                 <Detail label="KRA PIN" value={member.kra_pin} />
-
                 <Detail
                   label="Member Category"
                   value={
@@ -726,7 +744,6 @@ export default function ReviewStep({
                       : categoryName
                   }
                 />
-
                 <Detail
                   label="Physical Address"
                   value={member.physical_address}
@@ -736,8 +753,6 @@ export default function ReviewStep({
             </Stack>
           </ReviewSection>
 
-          {/* NEXT OF KIN */}
-
           <ReviewSection
             title="Next of Kin"
             subtitle="Emergency and family contact information"
@@ -746,22 +761,16 @@ export default function ReviewStep({
           >
             <Grid container spacing={2.5}>
               <Detail label="First Name" value={nextOfKin.first_name} />
-
               <Detail label="Other Names" value={nextOfKin.other_names} />
-
               <Detail label="Relationship" value={nextOfKin.relationship} />
-
               <Detail label="National ID" value={nextOfKin.national_id} />
-
               <Detail label="Phone Number" value={nextOfKin.phone_number} />
-
               <Detail
                 label="Primary Next of Kin"
                 value={
                   hasNextOfKin ? (nextOfKin.is_primary ? "Yes" : "No") : null
                 }
               />
-
               <Detail
                 label="Physical Address"
                 value={nextOfKin.physical_address}
@@ -769,8 +778,6 @@ export default function ReviewStep({
               />
             </Grid>
           </ReviewSection>
-
-          {/* VEHICLE */}
 
           <ReviewSection
             title="Vehicle Details"
@@ -783,17 +790,11 @@ export default function ReviewStep({
                 label="Registration Number"
                 value={vehicle.registration_number}
               />
-
               <Detail label="Make" value={vehicle.make} />
-
               <Detail label="Model" value={vehicle.model} />
-
               <Detail label="Year" value={vehicle.year} />
-
               <Detail label="Color" value={vehicle.color} />
-
               <Detail label="Engine Number" value={vehicle.engine_number} />
-
               <Detail
                 label="Chassis Number"
                 value={vehicle.chassis_number}
@@ -801,8 +802,6 @@ export default function ReviewStep({
               />
             </Grid>
           </ReviewSection>
-
-          {/* GUARANTOR */}
 
           <ReviewSection
             title="Guarantor"
@@ -812,15 +811,10 @@ export default function ReviewStep({
           >
             <Grid container spacing={2.5}>
               <Detail label="First Name" value={guarantor.first_name} />
-
               <Detail label="Other Names" value={guarantor.other_names} />
-
               <Detail label="National ID" value={guarantor.national_id} />
-
               <Detail label="Phone Number" value={guarantor.phone_number} />
-
               <Detail label="Relationship" value={guarantor.relationship} />
-
               <Detail
                 label="Linked Member ID"
                 value={guarantor.guarantor_member}
@@ -828,24 +822,14 @@ export default function ReviewStep({
             </Grid>
           </ReviewSection>
 
-          {/* =============================================
-              AUDIT INFORMATION
-          ============================================== */}
-
           {member.id && <AuditInformation member={member} />}
         </Stack>
-
-        {/* =============================================
-            ACTION BAR
-        ============================================== */}
 
         <Box
           sx={{
             mt: 4,
             pt: 3,
-
             borderTop: "1px solid",
-
             borderColor: "divider",
           }}
         >
@@ -915,10 +899,6 @@ export default function ReviewStep({
           </Stack>
         </Box>
       </Box>
-
-      {/* =============================================
-          SUCCESS NOTIFICATION
-      ============================================== */}
 
       <Snackbar
         open={success}

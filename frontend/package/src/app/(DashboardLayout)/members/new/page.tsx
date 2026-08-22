@@ -46,7 +46,6 @@ type RegistrationStepKey =
 
 interface RegistrationStepDefinition {
   key: RegistrationStepKey;
-
   label: string;
 }
 
@@ -59,22 +58,18 @@ const REGISTRATION_STEPS: RegistrationStepDefinition[] = [
     key: "member",
     label: "Member Details",
   },
-
   {
     key: "nextOfKin",
     label: "Next of Kin",
   },
-
   {
     key: "vehicle",
     label: "Vehicle",
   },
-
   {
     key: "guarantor",
     label: "Guarantor",
   },
-
   {
     key: "review",
     label: "Review",
@@ -134,7 +129,6 @@ export default function RegisterMemberPage() {
     ) {
       return storedCurrentStep;
     }
-
     return 0;
   });
 
@@ -162,12 +156,10 @@ export default function RegisterMemberPage() {
   function goToStep(nextStep: number) {
     const normalizedStep = Math.min(
       Math.max(nextStep, 0),
-
       Math.max(steps.length - 1, 0),
     );
 
     dispatch(setCurrentStep(normalizedStep));
-
     setActiveStep(normalizedStep);
   }
 
@@ -193,7 +185,6 @@ export default function RegisterMemberPage() {
      * category_details -> frontend workflow metadata
      */
     dispatch(replaceMember(data as MemberState));
-
     handleNext();
   }
 
@@ -234,10 +225,6 @@ export default function RegisterMemberPage() {
     const required = isStepRequired(currentStep.key);
 
     switch (currentStep.key) {
-      /* ---------------------------------------------------
-         MEMBER
-      --------------------------------------------------- */
-
       case "member":
         return (
           <MemberDetailsStep
@@ -247,15 +234,10 @@ export default function RegisterMemberPage() {
           />
         );
 
-      /* ---------------------------------------------------
-         NEXT OF KIN
-      --------------------------------------------------- */
-
       case "nextOfKin":
         return (
           <Box>
             {!required && <OptionalStepNotice label="Next of Kin" />}
-
             <NextOfKinStep
               required={required}
               onBack={handleBack}
@@ -265,15 +247,10 @@ export default function RegisterMemberPage() {
           </Box>
         );
 
-      /* ---------------------------------------------------
-         VEHICLE
-      --------------------------------------------------- */
-
       case "vehicle":
         return (
           <Box>
             {!required && <OptionalStepNotice label="Vehicle" />}
-
             <VehicleStep
               required={required}
               onBack={handleBack}
@@ -283,15 +260,10 @@ export default function RegisterMemberPage() {
           </Box>
         );
 
-      /* ---------------------------------------------------
-         GUARANTOR
-      --------------------------------------------------- */
-
       case "guarantor":
         return (
           <Box>
             {!required && <OptionalStepNotice label="Guarantor" />}
-
             <GuarantorStep
               required={required}
               onBack={handleBack}
@@ -300,10 +272,6 @@ export default function RegisterMemberPage() {
             />
           </Box>
         );
-
-      /* ---------------------------------------------------
-         REVIEW
-      --------------------------------------------------- */
 
       case "review":
         return <ReviewStep onBack={handleBack} />;
@@ -328,28 +296,19 @@ export default function RegisterMemberPage() {
       }}
     >
       {/* HEADER */}
-
-      <Box
-        sx={{
-          mb: 3,
-        }}
-      >
+      <Box sx={{ mb: 3 }}>
         <Box
           sx={{
             display: "flex",
-
             alignItems: {
               xs: "flex-start",
               sm: "center",
             },
-
             justifyContent: "space-between",
-
             flexDirection: {
               xs: "column",
               sm: "row",
             },
-
             gap: 1.5,
           }}
         >
@@ -357,14 +316,7 @@ export default function RegisterMemberPage() {
             <Typography variant="h4" fontWeight={700}>
               Register Member
             </Typography>
-
-            <Typography
-              variant="body2"
-              color="text.secondary"
-              sx={{
-                mt: 0.5,
-              }}
-            >
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
               Complete the required registration information before submitting
               the member for approval.
             </Typography>
@@ -373,11 +325,8 @@ export default function RegisterMemberPage() {
           <Box
             sx={{
               display: "flex",
-
               gap: 1,
-
               flexWrap: "wrap",
-
               justifyContent: {
                 xs: "flex-start",
                 sm: "flex-end",
@@ -391,7 +340,6 @@ export default function RegisterMemberPage() {
                 size="small"
               />
             )}
-
             <Chip
               label="Data Capture Pending"
               color="warning"
@@ -403,16 +351,12 @@ export default function RegisterMemberPage() {
       </Box>
 
       {/* WIZARD */}
-
       <Card
         elevation={0}
         sx={{
           border: "1px solid",
-
           borderColor: "divider",
-
           borderRadius: 3,
-
           overflow: "visible",
         }}
       >
@@ -423,7 +367,6 @@ export default function RegisterMemberPage() {
               sm: 2.5,
               md: 3,
             },
-
             "&:last-child": {
               pb: {
                 xs: 2,
@@ -434,13 +377,10 @@ export default function RegisterMemberPage() {
           }}
         >
           {/* STEPPER */}
-
           <Box
             sx={{
               overflowX: "auto",
-
               overflowY: "hidden",
-
               pb: 1,
             }}
           >
@@ -449,13 +389,11 @@ export default function RegisterMemberPage() {
               alternativeLabel
               sx={{
                 mb: 4,
-
                 minWidth: 650,
               }}
             >
               {steps.map((step, index) => {
                 const required = isStepRequired(step.key);
-
                 return (
                   <Step key={step.key} completed={index < safeActiveStep}>
                     <StepLabel
@@ -478,33 +416,22 @@ export default function RegisterMemberPage() {
           </Box>
 
           {/* STEP CONTEXT */}
-
-          <Box
-            sx={{
-              mb: 3,
-            }}
-          >
+          <Box sx={{ mb: 3 }}>
             <Typography variant="subtitle2" color="text.secondary">
               Step {safeActiveStep + 1} of {steps.length}
             </Typography>
-
             <Box
               sx={{
                 display: "flex",
-
                 alignItems: "center",
-
                 gap: 1,
-
                 mt: 0.25,
-
                 flexWrap: "wrap",
               }}
             >
               <Typography variant="h5" fontWeight={700}>
                 {currentStep?.label}
               </Typography>
-
               {currentStep &&
                 hasSelectedCategory &&
                 !isStepRequired(currentStep.key) && (
@@ -514,7 +441,6 @@ export default function RegisterMemberPage() {
           </Box>
 
           {/* ACTIVE FORM */}
-
           <Box>{renderCurrentStep()}</Box>
         </CardContent>
       </Card>
@@ -528,12 +454,7 @@ export default function RegisterMemberPage() {
 
 function OptionalStepNotice({ label }: { label: string }) {
   return (
-    <Alert
-      severity="info"
-      sx={{
-        mb: 3,
-      }}
-    >
+    <Alert severity="info" sx={{ mb: 3 }}>
       {label} information is optional for this member category. Complete it when
       applicable, or skip this step and continue with registration.
     </Alert>

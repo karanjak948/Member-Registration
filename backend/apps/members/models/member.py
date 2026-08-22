@@ -37,6 +37,7 @@ class Member(AuditModel):
 
     other_names = models.CharField(
         max_length=150,
+        blank=True,
     )
 
     national_id = models.CharField(

@@ -9,6 +9,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from django.db.models.deletion import ProtectedError
+from django.contrib.auth import get_user_model
 
 from rest_framework import (
     generics,
@@ -39,6 +40,9 @@ from .serializers import (
 from .services import OrganizationAccessService
 
 from rest_framework.exceptions import PermissionDenied
+
+# Get the User model
+User = get_user_model()
 
 
 class OrganizationAPIView(APIView):
@@ -645,6 +649,39 @@ class OrganizationUserListCreateView(APIView):
             request.user
         )
 
+        # ===================== UPDATED LOGIC =====================
+        # If the request contains a 'username' parameter and that user
+        # already exists, we assign them directly to the organization
+        # without requiring a password.
+        username = request.data.get('username')
+        if username:
+            try:
+                existing_user = User.objects.get(username=username)
+
+                # Check if they are already a member of the organization
+                if OrganizationUser.objects.filter(organization=organization, user=existing_user).exists():
+                    return Response(
+                        {"detail": f"User '{username}' is already a member of this organization."},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
+                # Assign the existing user directly
+                membership = OrganizationUser.objects.create(
+                    organization=organization,
+                    user=existing_user,
+                    role_id=request.data.get('role_id'),
+                    is_active=True,
+                )
+
+                output = OrganizationUserSerializer(membership)
+                return Response(output.data, status=status.HTTP_201_CREATED)
+
+            except User.DoesNotExist:
+                # If the user doesn't exist, we let the serializer handle creation
+                pass
+        # ==========================================================
+
+        # Existing logic for creating a brand new user
         serializer = OrganizationUserCreateSerializer(
             data=request.data,
             context={

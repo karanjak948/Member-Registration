@@ -1,12 +1,7 @@
 "use client";
 
-import { useState } from "react";
-
-import {
-  Add as AddIcon,
-  Refresh as RefreshIcon,
-} from "@mui/icons-material";
-
+import { useRouter } from "next/navigation";
+import { Add as AddIcon, Refresh as RefreshIcon } from "@mui/icons-material";
 import {
   Box,
   Button,
@@ -18,17 +13,14 @@ import {
 } from "@mui/material";
 
 import { usePermissions } from "@/hooks/usePermissions";
-
 import { UserToolbarProps } from "@/types/user-components";
 
-import UserDialog from "./UserDialog";
+// Remove the UserDialog import since we are going to the page now
+// import UserDialog from "./UserDialog";
 
-export default function UserToolbar({
-  onRefresh,
-}: UserToolbarProps) {
+export default function UserToolbar({ onRefresh }: UserToolbarProps) {
+  const router = useRouter(); // ✅ Add this
   const { can } = usePermissions();
-
-  const [dialogOpen, setDialogOpen] = useState(false);
 
   return (
     <>
@@ -37,8 +29,7 @@ export default function UserToolbar({
         sx={{
           p: 3,
           borderRadius: 3,
-          border: (theme) =>
-            `1px solid ${theme.palette.divider}`,
+          border: (theme) => `1px solid ${theme.palette.divider}`,
           mb: 2,
         }}
       >
@@ -60,29 +51,17 @@ export default function UserToolbar({
             spacing={3}
           >
             <Box>
-              <Typography
-                variant="h4"
-                fontWeight={700}
-                gutterBottom
-              >
+              <Typography variant="h4" fontWeight={700} gutterBottom>
                 User Management
               </Typography>
 
-              <Typography
-                variant="body1"
-                color="text.secondary"
-              >
-                Manage organization users, assign roles,
-                activate accounts and control access
-                permissions.
+              <Typography variant="body1" color="text.secondary">
+                Manage organization users, assign roles, activate accounts and
+                control access permissions.
               </Typography>
             </Box>
 
-            <Stack
-              direction="row"
-              spacing={2}
-              flexWrap="wrap"
-            >
+            <Stack direction="row" spacing={2} flexWrap="wrap">
               <Button
                 variant="outlined"
                 startIcon={<RefreshIcon />}
@@ -96,9 +75,8 @@ export default function UserToolbar({
                   variant="contained"
                   startIcon={<AddIcon />}
                   size="large"
-                  onClick={() =>
-                    setDialogOpen(true)
-                  }
+                  // ✅ FIXED: Redirects to the new page instead of opening a dialog
+                  onClick={() => router.push("/administration/users/new")}
                 >
                   New User
                 </Button>
@@ -123,10 +101,7 @@ export default function UserToolbar({
               sm: "center",
             }}
           >
-            <Typography
-              variant="body2"
-              color="text.secondary"
-            >
+            <Typography variant="body2" color="text.secondary">
               Organization Administration
             </Typography>
 
@@ -139,21 +114,6 @@ export default function UserToolbar({
           </Stack>
         </Stack>
       </Paper>
-
-      {/* ===================================== */}
-      {/* CREATE USER */}
-      {/* ===================================== */}
-
-      <UserDialog
-        open={dialogOpen}
-        mode="create"
-        user={null}
-        onClose={() => setDialogOpen(false)}
-        onSuccess={async () => {
-          setDialogOpen(false);
-          await onRefresh();
-        }}
-      />
     </>
   );
 }

@@ -13,7 +13,6 @@ from .models import (
     Role,
 )
 
-
 User = get_user_model()
 
 
@@ -72,13 +71,16 @@ class OrganizationSerializer(
                 "Organization code is required."
             )
 
-        queryset = Organization.objects.filter(
-            code__iexact=value
-        )
-
-        if self.instance is not None:
-            queryset = queryset.exclude(
+        # 🔥 FIXED: Correctly handle empty or null instances for the frontend flow
+        if self.instance and self.instance.id:
+            queryset = Organization.objects.filter(
+                code__iexact=value
+            ).exclude(
                 pk=self.instance.pk
+            )
+        else:
+            queryset = Organization.objects.filter(
+                code__iexact=value
             )
 
         if queryset.exists():

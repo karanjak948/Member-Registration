@@ -126,10 +126,10 @@ export const authOptions: NextAuthOptions = {
             organization: user.organization,
 
             role: {
-              id: user.role.id,
-              name: user.role.name,
-              description: user.role.description,
-              isSystemRole: user.role.is_system_role,
+              id: user?.role?.id ?? 0,
+              name: user?.role?.name ?? "Default User",
+              description: user?.role?.description ?? "",
+              isSystemRole: user?.role?.is_system_role ?? false,
             },
 
             permissions: user.permissions ?? [],

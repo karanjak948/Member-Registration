@@ -10,6 +10,7 @@ import {
   IconCash,
   IconReceipt,
   IconPlus,
+  IconBriefcase,
 } from "@tabler/icons-react";
 
 import type { ElementType } from "react";
@@ -100,12 +101,19 @@ export function getMenuItems(permissions: Permission[] = []): MenuItem[] {
     subheader: "LOAN MANAGEMENT",
   });
 
+  // ✅ PROFESSIONAL STRUCTURE: ONE dropdown "Loan Management" that contains everything
   items.push({
-    id: "loans",
-    title: "Loans",
-    icon: IconCash,
+    id: "loan-management",
+    title: "Loan Management",
+    icon: IconBriefcase,
 
     children: [
+      {
+        id: "loans",
+        title: "Loans",
+        href: "/loans",
+        icon: IconCash,
+      },
       {
         id: "loan-products",
         title: "Loan Products",
@@ -179,17 +187,6 @@ export function getMenuItems(permissions: Permission[] = []): MenuItem[] {
         href: "/administration/roles",
       });
     }
-
-    // TODO: Add Permissions page when backend permission management is ready
-    // Requires PERMISSIONS.MANAGE_PERMISSIONS
-    // if (can(PERMISSIONS.MANAGE_PERMISSIONS)) {
-    //   adminChildren.push({
-    //     id: "administration-permissions",
-    //     title: "Permissions",
-    //     icon: IconKey,
-    //     href: "/administration/permissions",
-    //   });
-    // }
 
     if (adminChildren.length > 0) {
       items.push({

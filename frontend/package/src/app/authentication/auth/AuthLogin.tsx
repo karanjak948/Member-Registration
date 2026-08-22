@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState } from "react";
-
 import {
   Alert,
   Box,
@@ -14,14 +13,11 @@ import {
   Stack,
   Typography,
 } from "@mui/material";
-
 import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
 import VisibilityOffOutlinedIcon from "@mui/icons-material/VisibilityOffOutlined";
-
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { signIn } from "next-auth/react";
-
 import CustomTextField from "@/app/(DashboardLayout)/components/forms/theme-elements/CustomTextField";
 
 interface LoginType {
@@ -32,31 +28,22 @@ interface LoginType {
 
 const AuthLogin = ({ title, subtitle, subtext }: LoginType) => {
   const router = useRouter();
-
   const [username, setUsername] = useState("");
-
   const [password, setPassword] = useState("");
-
   const [showPassword, setShowPassword] = useState(false);
-
   const [loading, setLoading] = useState(false);
-
   const [error, setError] = useState("");
 
   async function handleLogin(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (loading) {
-      return;
-    }
+    if (loading) return;
 
     const normalizedUsername = username.trim();
-
     if (!normalizedUsername) {
       setError("Username is required.");
       return;
     }
-
     if (!password) {
       setError("Password is required.");
       return;
@@ -77,17 +64,25 @@ const AuthLogin = ({ title, subtitle, subtext }: LoginType) => {
         return;
       }
 
+      // Handle NextAuth errors
       if (result.error) {
-        setError("Invalid username or password.");
+        // Check if error contains a detailed message from Django
+        if (result.error.includes(":")) {
+          // Extract the actual error message from "Error: Message"
+          const detailedError = result.error.split(":")[1].trim();
+          setError(detailedError || "Invalid username or password.");
+        } else {
+          setError("Invalid username or password.");
+        }
         return;
       }
 
+      // Login Successful
       router.push("/");
       router.refresh();
-    } catch (err) {
+    } catch (err: any) {
       console.error("Login failed:", err);
-
-      setError("Unable to sign in. Please try again.");
+      setError(err?.message || "Unable to sign in. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -100,7 +95,6 @@ const AuthLogin = ({ title, subtitle, subtext }: LoginType) => {
           {title}
         </Typography>
       )}
-
       {subtext}
 
       <Box component="form" onSubmit={handleLogin} noValidate>
@@ -115,7 +109,6 @@ const AuthLogin = ({ title, subtitle, subtext }: LoginType) => {
             >
               Username
             </Typography>
-
             <CustomTextField
               id="username"
               fullWidth
@@ -124,10 +117,7 @@ const AuthLogin = ({ title, subtitle, subtext }: LoginType) => {
               disabled={loading}
               onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
                 setUsername(event.target.value);
-
-                if (error) {
-                  setError("");
-                }
+                if (error) setError("");
               }}
             />
           </Box>
@@ -142,7 +132,6 @@ const AuthLogin = ({ title, subtitle, subtext }: LoginType) => {
             >
               Password
             </Typography>
-
             <CustomTextField
               id="password"
               fullWidth
@@ -152,10 +141,7 @@ const AuthLogin = ({ title, subtitle, subtext }: LoginType) => {
               disabled={loading}
               onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
                 setPassword(event.target.value);
-
-                if (error) {
-                  setError("");
-                }
+                if (error) setError("");
               }}
               InputProps={{
                 endAdornment: (
@@ -195,14 +181,11 @@ const AuthLogin = ({ title, subtitle, subtext }: LoginType) => {
                 label="Remember this device"
               />
             </FormGroup>
-
             <Typography
               component={Link}
               href="/authentication/forgot-password"
               color="primary"
-              sx={{
-                textDecoration: "none",
-              }}
+              sx={{ textDecoration: "none" }}
             >
               Forgot Password?
             </Typography>
