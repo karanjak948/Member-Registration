@@ -14,16 +14,16 @@ const MSidebar = ({
 }: ItemType) => {
   const lgUp = useMediaQuery((theme: any) => theme.breakpoints.up("lg"));
 
-  const sidebarWidth = "270px";
+  const sidebarWidth = "260px";
 
-  // Custom CSS for short scrollbar
+  // Custom CSS for dark green scrollbar
   const scrollbarStyles = {
     "&::-webkit-scrollbar": {
-      width: "7px",
+      width: "5px",
     },
     "&::-webkit-scrollbar-thumb": {
-      backgroundColor: "#eff2f7",
-      borderRadius: "15px",
+      backgroundColor: "rgba(255, 255, 255, 0.2)",
+      borderRadius: "10px",
     },
   };
 
@@ -35,9 +35,6 @@ const MSidebar = ({
           flexShrink: 0,
         }}
       >
-        {/* ------------------------------------------- */}
-        {/* Sidebar for desktop */}
-        {/* ------------------------------------------- */}
         <Drawer
           anchor="left"
           open={isSidebarOpen}
@@ -48,24 +45,14 @@ const MSidebar = ({
                 boxSizing: "border-box",
                 ...scrollbarStyles,
                 width: sidebarWidth,
+                borderRight: "1px solid rgba(0, 0, 0, 0.12)",
+                bgcolor: "#064e3b",
               },
             },
           }}
         >
-          {/* ------------------------------------------- */}
-          {/* Sidebar Box */}
-          {/* ------------------------------------------- */}
-          <Box
-            sx={{
-              height: "100%",
-            }}
-          >
-            <Box>
-              {/* ------------------------------------------- */}
-              {/* Sidebar Items */}
-              {/* ------------------------------------------- */}
-              <SidebarItems />
-            </Box>
+          <Box sx={{ height: "100%" }}>
+            <SidebarItems />
           </Box>
         </Drawer>
       </Box>
@@ -83,22 +70,15 @@ const MSidebar = ({
           sx: {
             boxShadow: (theme) => theme.shadows[8],
             ...scrollbarStyles,
+            width: sidebarWidth,
+            bgcolor: "#064e3b",
           },
         },
       }}
     >
-      {/* ------------------------------------------- */}
-      {/* Sidebar Box */}
-      {/* ------------------------------------------- */}
-      <Box>
-        {/* ------------------------------------------- */}
-        {/* Sidebar Items */}
-        {/* ------------------------------------------- */}
+      <Box sx={{ height: "100%" }}>
         <SidebarItems />
       </Box>
-      {/* ------------------------------------------- */}
-      {/* Sidebar For Mobile */}
-      {/* ------------------------------------------- */}
     </Drawer>
   );
 };

@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-
 import {
   Alert,
   Box,
@@ -12,32 +11,31 @@ import {
   DialogContent,
   DialogTitle,
   Divider,
+  Grid,
   Paper,
   Stack,
   Typography,
 } from "@mui/material";
-
 import { LoadingButton } from "@mui/lab";
-
-import ToggleOnOutlinedIcon from "@mui/icons-material/ToggleOnOutlined";
-
+import {
+  IconUserCheck,
+  IconId,
+  IconUser,
+  IconPhone,
+  IconCategory,
+  IconCircleCheck,
+  IconAlertCircle,
+} from "@tabler/icons-react";
 import { Member } from "@/interfaces/member";
-
 import useMemberWorkflow from "@/components/members/hooks/useMemberWorkflow";
 
 interface ActivateMemberDialogProps {
   open: boolean;
-
   member: Member | null;
-
   loading?: boolean;
-
   error?: string;
-
   onClose: () => void;
-
   onSuccess?: () => void;
-
   onActivate?: () => void | Promise<void>;
 }
 
@@ -51,48 +49,21 @@ export default function ActivateMemberDialog({
   onActivate,
 }: ActivateMemberDialogProps) {
   const [internalError, setInternalError] = useState("");
-
   const workflow = useMemberWorkflow();
-
-  const getStageColor = (
-    stage?: string
-  ):
-    | "warning"
-    | "success"
-    | "error"
-    | "primary"
-    | "default" => {
-    switch (stage) {
-      case "APPROVED":
-        return "primary";
-
-      case "ACTIVE":
-        return "success";
-
-      case "REJECTED":
-        return "error";
-
-      default:
-        return "warning";
-    }
-  };
 
   async function handleActivate() {
     if (!member) return;
 
     try {
       setInternalError("");
-
       if (onActivate) {
         await onActivate();
       } else {
         await workflow.activate(member.id);
       }
-
       if (onSuccess) {
         onSuccess();
       }
-
       onClose();
     } catch (error) {
       console.error("Failed to activate member:", error);
@@ -101,200 +72,210 @@ export default function ActivateMemberDialog({
   }
 
   const displayError = externalError || internalError;
+  const isLoading = workflow.loading || externalLoading;
 
   return (
     <Dialog
       open={open}
       fullWidth
       maxWidth="sm"
-      onClose={
-        workflow.loading || externalLoading ? undefined : onClose
-      }
+      onClose={isLoading ? undefined : onClose}
+      PaperProps={{
+        sx: {
+          borderRadius: 3.5,
+          boxShadow: "0 20px 40px -10px rgba(0,0,0,0.2)",
+          overflow: "hidden",
+        },
+      }}
     >
-      <DialogTitle>
-        <Stack
-          direction="row"
-          spacing={1.5}
-          alignItems="center"
+      {/* Header Banner */}
+      <Box
+        sx={{
+          px: 3,
+          py: 2.5,
+          background: "linear-gradient(135deg, #064e3b 0%, #059669 100%)",
+          color: "#ffffff",
+          display: "flex",
+          alignItems: "center",
+          gap: 2,
+        }}
+      >
+        <Box
+          sx={{
+            width: 46,
+            height: 46,
+            borderRadius: 2.5,
+            bgcolor: "rgba(255, 255, 255, 0.2)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            color: "#ffffff",
+            boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+          }}
         >
-          <ToggleOnOutlinedIcon
-            color="success"
-          />
+          <IconUserCheck size={26} stroke={2.5} />
+        </Box>
+        <Box>
+          <Typography variant="h6" fontWeight={900} sx={{ color: "#ffffff", letterSpacing: "-0.3px" }}>
+            Activate Member Account
+          </Typography>
+          <Typography variant="caption" sx={{ color: "#a7f3d0", fontWeight: 600 }}>
+            Grant full operational access and enable SACCO credit &amp; savings services
+          </Typography>
+        </Box>
+      </Box>
 
-          <Box>
-            <Typography variant="h6">
-              Activate Member
-            </Typography>
-
-            <Typography
-              variant="body2"
-              color="text.secondary"
-            >
-              Activate this member to grant
-              them full access to member
-              benefits and services.
-            </Typography>
-          </Box>
-        </Stack>
-      </DialogTitle>
-
-      <Divider />
-
-      <DialogContent>
-        <Stack spacing={3}>
+      <DialogContent sx={{ p: 3 }}>
+        <Stack spacing={2.5}>
           {displayError && (
-            <Alert severity="error">
+            <Alert severity="error" sx={{ borderRadius: 2.5, fontWeight: 700 }}>
               {displayError}
             </Alert>
           )}
 
-          <Paper
-            variant="outlined"
-            sx={{
-              p: 2.5,
-            }}
-          >
-            <Stack spacing={2}>
-              <Typography
-                variant="subtitle1"
-                fontWeight={600}
-              >
-                Member Information
+          {member && (
+            <Paper
+              elevation={0}
+              sx={{
+                p: 2.5,
+                borderRadius: 3,
+                border: "1px solid #e2e8f0",
+                borderLeft: "5px solid #059669",
+                bgcolor: "#f8fafc",
+              }}
+            >
+              <Typography variant="caption" sx={{ fontWeight: 800, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                Member Identity &amp; Status
               </Typography>
 
-              <Divider />
-
-              <Stack spacing={1.5}>
-                <Box>
-                  <Typography
-                    variant="caption"
-                    color="text.secondary"
-                  >
-                    Membership Number
+              <Grid container spacing={2} sx={{ mt: 0.5 }}>
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <Typography variant="caption" sx={{ color: "#64748b", fontWeight: 600, display: "flex", alignItems: "center", gap: 0.5 }}>
+                    <IconId size={14} /> Membership Number
                   </Typography>
-
-                  <Typography fontWeight={600}>
-                    {member?.membership_number}
+                  <Typography sx={{ fontWeight: 900, color: "#065f46", fontFamily: "monospace", fontSize: "1rem" }}>
+                    {member.membership_number}
                   </Typography>
-                </Box>
+                </Grid>
 
-                <Box>
-                  <Typography
-                    variant="caption"
-                    color="text.secondary"
-                  >
-                    Full Name
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <Typography variant="caption" sx={{ color: "#64748b", fontWeight: 600, display: "flex", alignItems: "center", gap: 0.5 }}>
+                    <IconUser size={14} /> Full Name
                   </Typography>
-
-                  <Typography fontWeight={600}>
-                    {member?.first_name}{" "}
-                    {member?.other_names}
+                  <Typography sx={{ fontWeight: 800, color: "#0f172a", fontSize: "1rem" }}>
+                    {member.first_name} {member.other_names}
                   </Typography>
-                </Box>
+                </Grid>
 
-                <Box>
-                  <Typography
-                    variant="caption"
-                    color="text.secondary"
-                  >
-                    Category
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <Typography variant="caption" sx={{ color: "#64748b", fontWeight: 600, display: "flex", alignItems: "center", gap: 0.5 }}>
+                    <IconCategory size={14} /> Category Tier
                   </Typography>
-
-                  <Typography fontWeight={600}>
-                    {member?.category_name ??
-                      "-"}
+                  <Typography sx={{ fontWeight: 700, color: "#334155" }}>
+                    {member.category_name || "Normal Member"}
                   </Typography>
-                </Box>
+                </Grid>
 
-                <Box>
-                  <Typography
-                    variant="caption"
-                    color="text.secondary"
-                  >
-                    Phone Number
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <Typography variant="caption" sx={{ color: "#64748b", fontWeight: 600, display: "flex", alignItems: "center", gap: 0.5 }}>
+                    <IconPhone size={14} /> Phone Number
                   </Typography>
-
-                  <Typography fontWeight={600}>
-                    {member?.phone_number}
+                  <Typography sx={{ fontWeight: 700, color: "#334155", fontFamily: "monospace" }}>
+                    {member.phone_number}
                   </Typography>
-                </Box>
+                </Grid>
 
-                <Box>
-                  <Typography
-                    variant="caption"
-                    color="text.secondary"
-                  >
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <Typography variant="caption" sx={{ color: "#64748b", fontWeight: 600 }}>
                     Registration Stage
                   </Typography>
-
-                  <Box mt={0.5}>
+                  <Box sx={{ mt: 0.5 }}>
                     <Chip
                       size="small"
-                      label={
-                        member?.registration_stage
-                      }
-                      color={getStageColor(
-                        member?.registration_stage
-                      )}
+                      label={member.registration_stage?.replace(/_/g, " ")}
+                      sx={{
+                        fontWeight: 800,
+                        fontSize: "0.72rem",
+                        bgcolor: "#ecfdf5",
+                        color: "#059669",
+                        border: "1px solid #a7f3d0",
+                      }}
                     />
                   </Box>
-                </Box>
+                </Grid>
 
-                <Box>
-                  <Typography
-                    variant="caption"
-                    color="text.secondary"
-                  >
-                    Current Status
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <Typography variant="caption" sx={{ color: "#64748b", fontWeight: 600 }}>
+                    Current Account Status
                   </Typography>
-
-                  <Box mt={0.5}>
+                  <Box sx={{ mt: 0.5 }}>
                     <Chip
                       size="small"
-                      color={
-                        member?.status === "ACTIVE"
-                          ? "success"
-                          : member?.status === "INACTIVE"
-                            ? "warning"
-                            : "error"
-                      }
-                      label={member?.status}
+                      label={member.status}
+                      sx={{
+                        fontWeight: 800,
+                        fontSize: "0.72rem",
+                        bgcolor: "#fffbeb",
+                        color: "#d97706",
+                        border: "1px solid #fde68a",
+                      }}
                     />
                   </Box>
-                </Box>
-              </Stack>
-            </Stack>
-          </Paper>
+                </Grid>
+              </Grid>
+            </Paper>
+          )}
 
-          <Alert severity="info">
-            Activating this member will change their status from INACTIVE to ACTIVE.
-          </Alert>
+          <Box
+            sx={{
+              p: 2,
+              borderRadius: 2.5,
+              bgcolor: "#f0fdf4",
+              border: "1px solid #bbf7d0",
+              display: "flex",
+              alignItems: "flex-start",
+              gap: 1.5,
+            }}
+          >
+            <IconCircleCheck size={20} color="#059669" style={{ marginTop: 2, flexShrink: 0 }} />
+            <Typography variant="body2" sx={{ color: "#065f46", fontWeight: 600, lineHeight: 1.5 }}>
+              Activating this member will transition their account from <strong>INACTIVE</strong> to <strong>ACTIVE</strong>, enabling loan applications, deposit collections, and member portal access.
+            </Typography>
+          </Box>
         </Stack>
       </DialogContent>
 
-      <Divider />
-
-      <DialogActions
-        sx={{
-          px: 3,
-          py: 2,
-        }}
-      >
+      <DialogActions sx={{ px: 3, py: 2.5, bgcolor: "#f8fafc", borderTop: "1px solid #e2e8f0" }}>
         <Button
+          variant="outlined"
           onClick={onClose}
-          disabled={workflow.loading || externalLoading}
+          disabled={isLoading}
+          sx={{
+            fontWeight: 800,
+            borderRadius: 2,
+            px: 2.5,
+            borderColor: "#cbd5e1",
+            color: "#475569",
+          }}
         >
           Cancel
         </Button>
 
         <LoadingButton
-          color="success"
           variant="contained"
-          loading={workflow.loading || externalLoading}
-          startIcon={
-            <ToggleOnOutlinedIcon />
-          }
           onClick={handleActivate}
+          loading={isLoading}
+          startIcon={<IconUserCheck size={18} />}
+          sx={{
+            bgcolor: "#059669",
+            color: "#ffffff",
+            fontWeight: 800,
+            borderRadius: 2,
+            px: 3.5,
+            py: 1,
+            boxShadow: "0 4px 14px rgba(5, 150, 105, 0.35)",
+            "&:hover": { bgcolor: "#047857" },
+          }}
         >
           Activate Member
         </LoadingButton>

@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-
 import {
   Alert,
   Box,
@@ -10,34 +9,31 @@ import {
   Dialog,
   DialogActions,
   DialogContent,
-  DialogTitle,
-  Divider,
+  Grid,
   Paper,
   Stack,
   Typography,
 } from "@mui/material";
-
 import { LoadingButton } from "@mui/lab";
-
-import AutorenewOutlinedIcon from "@mui/icons-material/AutorenewOutlined";
-
+import {
+  IconRefresh,
+  IconId,
+  IconUser,
+  IconPhone,
+  IconCategory,
+  IconCircleCheck,
+  IconCheck,
+} from "@tabler/icons-react";
 import { Member } from "@/interfaces/member";
-
 import useMemberWorkflow from "@/components/members/hooks/useMemberWorkflow";
 
 interface CompleteRegistrationDialogProps {
   open: boolean;
-
   member: Member | null;
-
   loading?: boolean;
-
   error?: string;
-
   onClose: () => void;
-
   onSuccess?: () => void;
-
   onCompleteRegistration?: () => void | Promise<void>;
 }
 
@@ -51,48 +47,21 @@ export default function CompleteRegistrationDialog({
   onCompleteRegistration,
 }: CompleteRegistrationDialogProps) {
   const [internalError, setInternalError] = useState("");
-
   const workflow = useMemberWorkflow();
-
-  const getStageColor = (
-    stage?: string
-  ):
-    | "warning"
-    | "success"
-    | "error"
-    | "primary"
-    | "default" => {
-    switch (stage) {
-      case "APPROVED":
-        return "primary";
-
-      case "ACTIVE":
-        return "success";
-
-      case "REJECTED":
-        return "error";
-
-      default:
-        return "warning";
-    }
-  };
 
   async function handleCompleteRegistration() {
     if (!member) return;
 
     try {
       setInternalError("");
-
       if (onCompleteRegistration) {
         await onCompleteRegistration();
       } else {
         await workflow.completeRegistration(member.id);
       }
-
       if (onSuccess) {
         onSuccess();
       }
-
       onClose();
     } catch (error) {
       console.error("Failed to complete registration:", error);
@@ -101,184 +70,210 @@ export default function CompleteRegistrationDialog({
   }
 
   const displayError = externalError || internalError;
+  const isLoading = workflow.loading || externalLoading;
 
   return (
     <Dialog
       open={open}
       fullWidth
       maxWidth="sm"
-      onClose={
-        workflow.loading || externalLoading ? undefined : onClose
-      }
+      onClose={isLoading ? undefined : onClose}
+      PaperProps={{
+        sx: {
+          borderRadius: 3.5,
+          boxShadow: "0 20px 40px -10px rgba(0,0,0,0.2)",
+          overflow: "hidden",
+        },
+      }}
     >
-      <DialogTitle>
-        <Stack
-          direction="row"
-          spacing={1.5}
-          alignItems="center"
+      {/* Header Banner */}
+      <Box
+        sx={{
+          px: 3,
+          py: 2.5,
+          background: "linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%)",
+          color: "#ffffff",
+          display: "flex",
+          alignItems: "center",
+          gap: 2,
+        }}
+      >
+        <Box
+          sx={{
+            width: 46,
+            height: 46,
+            borderRadius: 2.5,
+            bgcolor: "rgba(255, 255, 255, 0.2)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            color: "#ffffff",
+            boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+          }}
         >
-          <AutorenewOutlinedIcon color="primary" />
+          <IconRefresh size={26} stroke={2.5} />
+        </Box>
+        <Box>
+          <Typography variant="h6" fontWeight={900} sx={{ color: "#ffffff", letterSpacing: "-0.3px" }}>
+            Complete Member Registration
+          </Typography>
+          <Typography variant="caption" sx={{ color: "#bfdbfe", fontWeight: 600 }}>
+            Finalize onboarding workflow and transition approved applicant to active status
+          </Typography>
+        </Box>
+      </Box>
 
-          <Box>
-            <Typography variant="h6">
-              Complete Registration
-            </Typography>
-
-            <Typography
-              variant="body2"
-              color="text.secondary"
-            >
-              Complete the registration workflow for this
-              approved applicant.
-            </Typography>
-          </Box>
-        </Stack>
-      </DialogTitle>
-
-      <Divider />
-
-      <DialogContent>
-        <Stack spacing={3}>
+      <DialogContent sx={{ p: 3 }}>
+        <Stack spacing={2.5}>
           {displayError && (
-            <Alert severity="error">
+            <Alert severity="error" sx={{ borderRadius: 2.5, fontWeight: 700 }}>
               {displayError}
             </Alert>
           )}
 
-          <Paper
-            variant="outlined"
-            sx={{ p: 2.5 }}
-          >
-            <Stack spacing={2}>
-              <Typography
-                variant="subtitle1"
-                fontWeight={600}
-              >
-                Member Information
+          {member && (
+            <Paper
+              elevation={0}
+              sx={{
+                p: 2.5,
+                borderRadius: 3,
+                border: "1px solid #e2e8f0",
+                borderLeft: "5px solid #2563eb",
+                bgcolor: "#f8fafc",
+              }}
+            >
+              <Typography variant="caption" sx={{ fontWeight: 800, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                Member Overview
               </Typography>
 
-              <Divider />
-
-              <Stack spacing={1.5}>
-                <Box>
-                  <Typography
-                    variant="caption"
-                    color="text.secondary"
-                  >
-                    Membership Number
+              <Grid container spacing={2} sx={{ mt: 0.5 }}>
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <Typography variant="caption" sx={{ color: "#64748b", fontWeight: 600, display: "flex", alignItems: "center", gap: 0.5 }}>
+                    <IconId size={14} /> Membership Number
                   </Typography>
-
-                  <Typography fontWeight={600}>
-                    {member?.membership_number}
+                  <Typography sx={{ fontWeight: 900, color: "#1d4ed8", fontFamily: "monospace", fontSize: "1rem" }}>
+                    {member.membership_number}
                   </Typography>
-                </Box>
+                </Grid>
 
-                <Box>
-                  <Typography
-                    variant="caption"
-                    color="text.secondary"
-                  >
-                    Full Name
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <Typography variant="caption" sx={{ color: "#64748b", fontWeight: 600, display: "flex", alignItems: "center", gap: 0.5 }}>
+                    <IconUser size={14} /> Full Name
                   </Typography>
-
-                  <Typography fontWeight={600}>
-                    {member?.first_name}{" "}
-                    {member?.other_names}
+                  <Typography sx={{ fontWeight: 800, color: "#0f172a", fontSize: "1rem" }}>
+                    {member.first_name} {member.other_names}
                   </Typography>
-                </Box>
+                </Grid>
 
-                <Box>
-                  <Typography
-                    variant="caption"
-                    color="text.secondary"
-                  >
-                    Category
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <Typography variant="caption" sx={{ color: "#64748b", fontWeight: 600, display: "flex", alignItems: "center", gap: 0.5 }}>
+                    <IconCategory size={14} /> Category Tier
                   </Typography>
-
-                  <Typography fontWeight={600}>
-                    {member?.category_name ?? "-"}
+                  <Typography sx={{ fontWeight: 700, color: "#334155" }}>
+                    {member.category_name || "Special Member"}
                   </Typography>
-                </Box>
+                </Grid>
 
-                <Box>
-                  <Typography
-                    variant="caption"
-                    color="text.secondary"
-                  >
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <Typography variant="caption" sx={{ color: "#64748b", fontWeight: 600, display: "flex", alignItems: "center", gap: 0.5 }}>
+                    <IconPhone size={14} /> Phone Number
+                  </Typography>
+                  <Typography sx={{ fontWeight: 700, color: "#334155", fontFamily: "monospace" }}>
+                    {member.phone_number}
+                  </Typography>
+                </Grid>
+
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <Typography variant="caption" sx={{ color: "#64748b", fontWeight: 600 }}>
                     Registration Stage
                   </Typography>
-
-                  <Box mt={0.5}>
+                  <Box sx={{ mt: 0.5 }}>
                     <Chip
                       size="small"
-                      label={
-                        member?.registration_stage
-                      }
-                      color={getStageColor(
-                        member?.registration_stage
-                      )}
+                      label={member.registration_stage?.replace(/_/g, " ")}
+                      sx={{
+                        fontWeight: 800,
+                        fontSize: "0.72rem",
+                        bgcolor: "#eff6ff",
+                        color: "#2563eb",
+                        border: "1px solid #bfdbfe",
+                      }}
                     />
                   </Box>
-                </Box>
+                </Grid>
 
-                <Box>
-                  <Typography
-                    variant="caption"
-                    color="text.secondary"
-                  >
-                    Current Status
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <Typography variant="caption" sx={{ color: "#64748b", fontWeight: 600 }}>
+                    Account Status
                   </Typography>
-
-                  <Box mt={0.5}>
+                  <Box sx={{ mt: 0.5 }}>
                     <Chip
                       size="small"
-                      color={
-                        member?.status === "ACTIVE"
-                          ? "success"
-                          : member?.status === "INACTIVE"
-                            ? "warning"
-                            : "error"
-                      }
-                      label={member?.status}
+                      label={member.status}
+                      sx={{
+                        fontWeight: 800,
+                        fontSize: "0.72rem",
+                        bgcolor: member.status === "ACTIVE" ? "#ecfdf5" : "#fffbeb",
+                        color: member.status === "ACTIVE" ? "#059669" : "#d97706",
+                        border: `1px solid ${member.status === "ACTIVE" ? "#a7f3d0" : "#fde68a"}`,
+                      }}
                     />
                   </Box>
-                </Box>
-              </Stack>
-            </Stack>
-          </Paper>
+                </Grid>
+              </Grid>
+            </Paper>
+          )}
 
-          <Alert severity="info">
-            Completing registration will finalize the member's
-            registration, move them to the ACTIVE stage, and
-            make the member fully operational within the
-            organization.
-          </Alert>
+          <Box
+            sx={{
+              p: 2,
+              borderRadius: 2.5,
+              bgcolor: "#eff6ff",
+              border: "1px solid #bfdbfe",
+              display: "flex",
+              alignItems: "flex-start",
+              gap: 1.5,
+            }}
+          >
+            <IconCircleCheck size={20} color="#2563eb" style={{ marginTop: 2, flexShrink: 0 }} />
+            <Typography variant="body2" sx={{ color: "#1e3a8a", fontWeight: 600, lineHeight: 1.5 }}>
+              Completing registration will finalize this applicant&apos;s registration file and promote them to the <strong>ACTIVE</strong> membership stage, making them fully operational.
+            </Typography>
+          </Box>
         </Stack>
       </DialogContent>
 
-      <Divider />
-
-      <DialogActions
-        sx={{
-          px: 3,
-          py: 2,
-        }}
-      >
+      <DialogActions sx={{ px: 3, py: 2.5, bgcolor: "#f8fafc", borderTop: "1px solid #e2e8f0" }}>
         <Button
-          disabled={workflow.loading || externalLoading}
+          variant="outlined"
           onClick={onClose}
+          disabled={isLoading}
+          sx={{
+            fontWeight: 800,
+            borderRadius: 2,
+            px: 2.5,
+            borderColor: "#cbd5e1",
+            color: "#475569",
+          }}
         >
           Cancel
         </Button>
 
         <LoadingButton
-          color="primary"
           variant="contained"
-          loading={workflow.loading || externalLoading}
-          startIcon={
-            <AutorenewOutlinedIcon />
-          }
           onClick={handleCompleteRegistration}
+          loading={isLoading}
+          startIcon={<IconCheck size={18} />}
+          sx={{
+            bgcolor: "#2563eb",
+            color: "#ffffff",
+            fontWeight: 800,
+            borderRadius: 2,
+            px: 3.5,
+            py: 1,
+            boxShadow: "0 4px 14px rgba(37, 99, 235, 0.35)",
+            "&:hover": { bgcolor: "#1d4ed8" },
+          }}
         >
           Complete Registration
         </LoadingButton>

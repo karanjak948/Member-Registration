@@ -7,20 +7,35 @@ import { z } from "zod";
 import axios from "axios";
 
 import {
+  Avatar,
   Box,
   Button,
+  Chip,
   CircularProgress,
   Grid,
   MenuItem,
+  Paper,
+  Stack,
   TextField,
+  Typography,
   Alert,
   Snackbar,
+  InputAdornment,
 } from "@mui/material";
 
 import roleService from "@/services/role.service";
 import userService from "@/services/user.service";
 import { Role } from "@/types/role";
 import { UserFormProps } from "@/types/user-components";
+import {
+  IconAt,
+  IconMail,
+  IconUser,
+  IconShieldLock,
+  IconLock,
+  IconCheck,
+  IconDeviceFloppy,
+} from "@tabler/icons-react";
 
 // ============================================================
 // SCHEMAS
@@ -70,10 +85,6 @@ interface UserFormData {
   confirm_password?: string;
 }
 
-// ============================================================
-// COMPONENT
-// ============================================================
-
 export default function UserForm({
   mode,
   user,
@@ -90,8 +101,7 @@ export default function UserForm({
     severity: "success" as "success" | "error",
   });
 
-  const schema =
-    mode === "create" ? createUserSchema : editUserSchema;
+  const schema = mode === "create" ? createUserSchema : editUserSchema;
 
   const {
     control,
@@ -116,21 +126,15 @@ export default function UserForm({
     },
   });
 
-  // ============================================================
-  // LOAD ROLES
-  // ============================================================
-
+  // Load Roles
   useEffect(() => {
     async function loadRoles() {
       try {
         setRolesLoading(true);
-
-        const data = await roleService.getRoles();
-
-        setRoles(data);
+        const fetchedRoles = await roleService.getRoles();
+        setRoles(Array.isArray(fetchedRoles) ? fetchedRoles : []);
       } catch (err) {
         console.error("Failed to load roles:", err);
-        setError("Unable to load roles. Please refresh and try again.");
       } finally {
         setRolesLoading(false);
       }
@@ -138,34 +142,26 @@ export default function UserForm({
     loadRoles();
   }, []);
 
-  // ============================================================
-  // RESET FORM WHEN USER CHANGES
-  // ============================================================
-
+  // Sync default values when user prop changes
   useEffect(() => {
-    if (mode === "edit" && user) {
+    if (user && mode === "edit") {
       reset({
         username: user.username,
         email: user.email,
-        first_name: user.first_name ?? "",
-        last_name: user.last_name ?? "",
-        role_id: user.role.id,
+        first_name: user.first_name || "",
+        last_name: user.last_name || "",
+        role_id: user.role?.id ?? 0,
       });
     }
-  }, [mode, user, reset]);
-
-  // ============================================================
-  // SUBMIT
-  // ============================================================
+  }, [user, mode, reset]);
 
   const onSubmit = async (data: UserFormData) => {
-    setLoading(true);
-    setError("");
-
     try {
+      setLoading(true);
+      setError("");
+
       if (mode === "create") {
-        // Create mode
-        const payload = {
+        await userService.createUser({
           username: data.username,
           email: data.email,
           first_name: data.first_name || "",
@@ -173,26 +169,19 @@ export default function UserForm({
           password: data.password!,
           confirm_password: data.confirm_password!,
           role_id: data.role_id,
-        };
-
-        await userService.createUser(payload);
-
-        reset();
-
+        });
         setSnackbar({
           open: true,
           message: "User created successfully!",
           severity: "success",
         });
-      } else {
-        // Edit mode
-        await userService.updateUser(user!.id, {
+      } else if (user) {
+        await userService.updateUser(user.id, {
           first_name: data.first_name || "",
           last_name: data.last_name || "",
           email: data.email,
           role_id: data.role_id,
         });
-
         setSnackbar({
           open: true,
           message: "User updated successfully!",
@@ -200,57 +189,36 @@ export default function UserForm({
         });
       }
 
-      await onSuccess();
-    } catch (error: unknown) {
-      console.error(`Failed to ${mode} user:`, error);
-
-      // Handle field-specific errors from backend
-      if (axios.isAxiosError(error)) {
-        const responseData = error.response?.data;
-        if (responseData && typeof responseData === "object") {
-          if (responseData.username) {
-            setFieldError("username", {
-              type: "manual",
-              message: Array.isArray(responseData.username)
-                ? responseData.username[0]
-                : responseData.username,
-            });
-          }
-          if (responseData.email) {
-            setFieldError("email", {
-              type: "manual",
-              message: Array.isArray(responseData.email)
-                ? responseData.email[0]
-                : responseData.email,
-            });
-          }
-          if (responseData.role_id) {
-            setFieldError("role_id", {
-              type: "manual",
-              message: Array.isArray(responseData.role_id)
-                ? responseData.role_id[0]
-                : responseData.role_id,
-            });
-          }
-          if (responseData.detail) {
-            setError(responseData.detail);
-          } else {
-            setError(`Unable to ${mode} user. Please check the form and try again.`);
-          }
+      setTimeout(async () => {
+        await onSuccess();
+      }, 500);
+    } catch (err: any) {
+      console.error(err);
+      if (axios.isAxiosError(err) && err.response?.data) {
+        const errorData = err.response.data;
+        if (typeof errorData === "object") {
+          Object.keys(errorData).forEach((field) => {
+            const message = Array.isArray(errorData[field])
+              ? errorData[field][0]
+              : errorData[field];
+            if (field in data) {
+              setFieldError(field as any, { message });
+            } else {
+              setError(message);
+            }
+          });
         } else {
-          setError(`Unable to ${mode} user. Please try again.`);
+          setError(err.response.data.detail || "An error occurred.");
         }
       } else {
-        setError(`Unable to ${mode} user. Please try again.`);
+        setError("Failed to process request. Please try again.");
       }
     } finally {
       setLoading(false);
     }
   };
 
-  // ============================================================
-  // RENDER
-  // ============================================================
+  const fullName = user ? `${user.first_name || ""} ${user.last_name || ""}`.trim() || user.username : "";
 
   return (
     <>
@@ -261,9 +229,58 @@ export default function UserForm({
           </Alert>
         )}
 
-        <Grid container spacing={3}>
+        {/* User Context Banner when Editing */}
+        {mode === "edit" && user && (
+          <Paper
+            elevation={0}
+            sx={{
+              p: 2.5,
+              mb: 3,
+              borderRadius: 2.5,
+              bgcolor: "#f8fafc",
+              border: "1px solid #e2e8f0",
+            }}
+          >
+            <Stack direction="row" spacing={2} alignItems="center">
+              <Avatar
+                sx={{
+                  width: 50,
+                  height: 50,
+                  bgcolor: "primary.main",
+                  fontWeight: 700,
+                  fontSize: "1.2rem",
+                }}
+              >
+                {(user.first_name || user.username).charAt(0).toUpperCase()}
+              </Avatar>
+
+              <Box flex={1}>
+                <Stack direction="row" spacing={1.5} alignItems="center">
+                  <Typography variant="subtitle1" fontWeight={800}>
+                    {fullName}
+                  </Typography>
+                  <Chip
+                    label={user.is_active ? "● Active Account" : "Inactive"}
+                    size="small"
+                    sx={{
+                      fontWeight: 700,
+                      fontSize: "0.72rem",
+                      bgcolor: user.is_active ? "rgba(16, 185, 129, 0.12)" : "rgba(239, 68, 68, 0.12)",
+                      color: user.is_active ? "#059669" : "#dc2626",
+                    }}
+                  />
+                </Stack>
+                <Typography variant="caption" color="text.secondary">
+                  Account ID: #{user.id} • Username: @{user.username}
+                </Typography>
+              </Box>
+            </Stack>
+          </Paper>
+        )}
+
+        <Grid container spacing={2.5}>
           {/* Username */}
-          <Grid size={{ xs: 12, md: 6 }}>
+          <Grid size={{ xs: 12, sm: 6 }}>
             <Controller
               name="username"
               control={control}
@@ -275,16 +292,27 @@ export default function UserForm({
                   label="Username"
                   placeholder="johndoe"
                   error={!!errors.username}
-                  helperText={errors.username?.message}
+                  helperText={
+                    errors.username?.message ||
+                    (mode === "edit" ? "Unique system handle (immutable)" : undefined)
+                  }
                   disabled={loading || mode === "edit"}
-                  autoComplete="username"
+                  slotProps={{
+                    input: {
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <IconAt size={18} style={{ color: "#94a3b8" }} />
+                        </InputAdornment>
+                      ),
+                    },
+                  }}
                 />
               )}
             />
           </Grid>
 
           {/* Email */}
-          <Grid size={{ xs: 12, md: 6 }}>
+          <Grid size={{ xs: 12, sm: 6 }}>
             <Controller
               name="email"
               control={control}
@@ -299,14 +327,22 @@ export default function UserForm({
                   error={!!errors.email}
                   helperText={errors.email?.message}
                   disabled={loading}
-                  autoComplete="email"
+                  slotProps={{
+                    input: {
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <IconMail size={18} style={{ color: "#94a3b8" }} />
+                        </InputAdornment>
+                      ),
+                    },
+                  }}
                 />
               )}
             />
           </Grid>
 
           {/* First Name */}
-          <Grid size={{ xs: 12, md: 6 }}>
+          <Grid size={{ xs: 12, sm: 6 }}>
             <Controller
               name="first_name"
               control={control}
@@ -315,18 +351,26 @@ export default function UserForm({
                   {...field}
                   fullWidth
                   label="First Name"
-                  placeholder="John"
+                  placeholder="Caroline"
                   error={!!errors.first_name}
                   helperText={errors.first_name?.message}
                   disabled={loading}
-                  autoComplete="given-name"
+                  slotProps={{
+                    input: {
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <IconUser size={18} style={{ color: "#94a3b8" }} />
+                        </InputAdornment>
+                      ),
+                    },
+                  }}
                 />
               )}
             />
           </Grid>
 
           {/* Last Name */}
-          <Grid size={{ xs: 12, md: 6 }}>
+          <Grid size={{ xs: 12, sm: 6 }}>
             <Controller
               name="last_name"
               control={control}
@@ -335,20 +379,28 @@ export default function UserForm({
                   {...field}
                   fullWidth
                   label="Last Name"
-                  placeholder="Doe"
+                  placeholder="Karanja"
                   error={!!errors.last_name}
                   helperText={errors.last_name?.message}
                   disabled={loading}
-                  autoComplete="family-name"
+                  slotProps={{
+                    input: {
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <IconUser size={18} style={{ color: "#94a3b8" }} />
+                        </InputAdornment>
+                      ),
+                    },
+                  }}
                 />
               )}
             />
           </Grid>
 
-          {/* Password - Only show in create mode */}
+          {/* Password fields (Create mode only) */}
           {mode === "create" && (
             <>
-              <Grid size={{ xs: 12, md: 6 }}>
+              <Grid size={{ xs: 12, sm: 6 }}>
                 <Controller
                   name="password"
                   control={control}
@@ -363,13 +415,21 @@ export default function UserForm({
                       error={!!errors.password}
                       helperText={errors.password?.message}
                       disabled={loading}
-                      autoComplete="new-password"
+                      slotProps={{
+                        input: {
+                          startAdornment: (
+                            <InputAdornment position="start">
+                              <IconLock size={18} style={{ color: "#94a3b8" }} />
+                            </InputAdornment>
+                          ),
+                        },
+                      }}
                     />
                   )}
                 />
               </Grid>
 
-              <Grid size={{ xs: 12, md: 6 }}>
+              <Grid size={{ xs: 12, sm: 6 }}>
                 <Controller
                   name="confirm_password"
                   control={control}
@@ -384,7 +444,15 @@ export default function UserForm({
                       error={!!errors.confirm_password}
                       helperText={errors.confirm_password?.message}
                       disabled={loading}
-                      autoComplete="new-password"
+                      slotProps={{
+                        input: {
+                          startAdornment: (
+                            <InputAdornment position="start">
+                              <IconLock size={18} style={{ color: "#94a3b8" }} />
+                            </InputAdornment>
+                          ),
+                        },
+                      }}
                     />
                   )}
                 />
@@ -392,7 +460,7 @@ export default function UserForm({
             </>
           )}
 
-          {/* Role */}
+          {/* Assigned Role */}
           <Grid size={{ xs: 12 }}>
             <Controller
               name="role_id"
@@ -402,31 +470,45 @@ export default function UserForm({
                   select
                   fullWidth
                   required
-                  label="Role"
+                  label="Assigned Authorization Role"
                   value={rolesLoading ? 0 : (field.value ?? 0)}
                   onChange={(e) => field.onChange(Number(e.target.value))}
                   error={!!errors.role_id}
-                  helperText={errors.role_id?.message}
+                  helperText={
+                    errors.role_id?.message ||
+                    "Assigning a role grants all permissions configured under that security tier"
+                  }
                   disabled={loading || rolesLoading}
                   slotProps={{
-                    select: {
-                      displayEmpty: true,
+                    input: {
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <IconShieldLock size={18} style={{ color: "#94a3b8" }} />
+                        </InputAdornment>
+                      ),
                     },
                   }}
                 >
                   <MenuItem value={0} disabled>
-                    {rolesLoading ? "Loading roles..." : "Select a role"}
+                    {rolesLoading ? "Loading roles..." : "Select an authorization role"}
                   </MenuItem>
                   {roles.map((role) => (
-                    <MenuItem key={role.id} value={role.id}>
-                      {role.name}
+                    <MenuItem key={role.id} value={role.id} sx={{ py: 1.5 }}>
+                      <Box>
+                        <Stack direction="row" spacing={1} alignItems="center">
+                          <Typography fontWeight={700} variant="body2">
+                            {role.name}
+                          </Typography>
+                          {role.is_system_role && (
+                            <Chip label="System Core" size="small" color="warning" sx={{ height: 20, fontSize: "0.68rem" }} />
+                          )}
+                        </Stack>
+                        <Typography variant="caption" color="text.secondary" display="block">
+                          {role.description || "Configured organization role"}
+                        </Typography>
+                      </Box>
                     </MenuItem>
                   ))}
-                  {!rolesLoading && roles.length === 0 && (
-                    <MenuItem value={0} disabled>
-                      No roles available
-                    </MenuItem>
-                  )}
                 </TextField>
               )}
             />
@@ -437,7 +519,7 @@ export default function UserForm({
         <Box
           sx={{
             mt: 4,
-            pt: 3,
+            pt: 2.5,
             borderTop: "1px solid",
             borderColor: "divider",
             display: "flex",
@@ -445,53 +527,40 @@ export default function UserForm({
             gap: 2,
           }}
         >
-          <Button variant="outlined" onClick={onCancel} disabled={loading}>
+          <Button
+            variant="outlined"
+            onClick={onCancel}
+            disabled={loading}
+            sx={{ px: 3, fontWeight: 600, textTransform: "none" }}
+          >
             Cancel
           </Button>
 
           <Button
             type="submit"
             variant="contained"
-            disabled={loading}
-            sx={{ minWidth: 140 }}
+            disabled={loading || rolesLoading}
+            startIcon={loading ? <CircularProgress size={18} color="inherit" /> : <IconDeviceFloppy size={18} />}
+            sx={{
+              px: 3.5,
+              fontWeight: 700,
+              textTransform: "none",
+              bgcolor: "#2563eb",
+              "&:hover": { bgcolor: "#1d4ed8" },
+            }}
           >
-            {loading ? (
-              <CircularProgress size={22} color="inherit" />
-            ) : mode === "create" ? (
-              "Create User"
-            ) : (
-              "Save Changes"
-            )}
+            {loading ? "Saving..." : mode === "create" ? "Create Account" : "Save Changes"}
           </Button>
         </Box>
       </Box>
 
-      {/* Snackbar */}
       <Snackbar
         open={snackbar.open}
-        autoHideDuration={4000}
-        onClose={() =>
-          setSnackbar((prev) => ({
-            ...prev,
-            open: false,
-          }))
-        }
-        anchorOrigin={{
-          vertical: "bottom",
-          horizontal: "right",
-        }}
+        autoHideDuration={3000}
+        onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))}
+        anchorOrigin={{ vertical: "top", horizontal: "right" }}
       >
-        <Alert
-          severity={snackbar.severity}
-          variant="filled"
-          onClose={() =>
-            setSnackbar((prev) => ({
-              ...prev,
-              open: false,
-            }))
-          }
-          sx={{ width: "100%" }}
-        >
+        <Alert severity={snackbar.severity} variant="filled">
           {snackbar.message}
         </Alert>
       </Snackbar>

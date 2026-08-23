@@ -120,40 +120,54 @@ export default function UserDataGrid({
 
       {
         field: "email",
-        headerName: "Email",
+        headerName: "Email Address",
         flex: 1.4,
         minWidth: 250,
-      },
-
-      {
-        field: "role",
-        headerName: "Role",
-        width: 180,
-
-        renderCell: ({ row }) => (
-          <Chip
-            label={row.role.name}
-            color="primary"
-            variant="outlined"
-            size="small"
-          />
+        renderCell: ({ value }) => (
+          <Typography variant="body2" sx={{ color: "text.primary", fontWeight: 500 }}>
+            {value}
+          </Typography>
         ),
       },
 
       {
-        field: "is_active",
-        headerName: "Status",
-        width: 140,
+        field: "role",
+        headerName: "Assigned Role",
+        width: 190,
+        renderCell: ({ row }) => {
+          const isOwner = row.role?.name === "Owner" || row.is_superuser;
+          return (
+            <Chip
+              label={row.role?.name || (isOwner ? "Owner" : "Staff")}
+              size="small"
+              sx={{
+                bgcolor: isOwner ? "rgba(99, 102, 241, 0.12)" : "rgba(13, 148, 136, 0.12)",
+                color: isOwner ? "#4f46e5" : "#0d9488",
+                fontWeight: 700,
+                border: isOwner ? "1px solid rgba(99, 102, 241, 0.3)" : "1px solid rgba(13, 148, 136, 0.3)",
+                borderRadius: 1.5,
+              }}
+            />
+          );
+        },
+      },
 
+      {
+        field: "is_active",
+        headerName: "Account Status",
+        width: 150,
         renderCell: ({ value }) => (
           <Chip
-            label={value ? "Active" : "Inactive"}
-            color={value ? "success" : "error"}
+            label={value ? "● Active" : "Inactive"}
+            size="small"
             sx={{
-              fontWeight: 600,
+              fontWeight: 700,
+              bgcolor: value ? "rgba(16, 185, 129, 0.12)" : "rgba(239, 68, 68, 0.12)",
+              color: value ? "#059669" : "#dc2626",
+              border: value ? "1px solid rgba(16, 185, 129, 0.3)" : "1px solid rgba(239, 68, 68, 0.3)",
+              borderRadius: 1.5,
               minWidth: 80,
             }}
-            size="small"
           />
         ),
       },

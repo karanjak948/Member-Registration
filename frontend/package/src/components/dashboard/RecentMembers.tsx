@@ -18,6 +18,7 @@ import VisibilityIcon from "@mui/icons-material/Visibility";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 
 import { Member } from "@/interfaces/member";
+import { getMediaUrl } from "@/utils/media";
 
 interface RecentMembersProps {
   members: Member[];
@@ -104,13 +105,7 @@ export default function RecentMembers({ members }: RecentMembersProps) {
               >
                 <Stack direction="row" spacing={2} alignItems="center" flex={1}>
                   <Avatar
-                    src={
-                      member.passport_photo
-                        ? member.passport_photo.startsWith("http")
-                          ? member.passport_photo
-                          : `http://127.0.0.1:8000${member.passport_photo}`
-                        : undefined
-                    }
+                    src={getMediaUrl(member.passport_photo)}
                     alt={`${member.first_name ?? ""} ${member.other_names ?? ""}`.trim()}
                     sx={{
                       bgcolor: "primary.main",

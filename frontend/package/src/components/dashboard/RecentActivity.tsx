@@ -26,6 +26,8 @@ import {
 } from "@tabler/icons-react";
 
 import { Member } from "@/interfaces/member";
+import { useRouter } from "next/navigation";
+import { getMediaUrl } from "@/utils/media";
 
 interface RecentActivityProps {
   members: Member[];
@@ -113,15 +115,7 @@ export default function RecentActivity({
               >
                 <ListItemAvatar>
                   <Avatar
-                    src={
-                      activity.passport_photo
-                        ? activity.passport_photo.startsWith(
-                            "http"
-                          )
-                          ? activity.passport_photo
-                          : `http://127.0.0.1:8000${activity.passport_photo}`
-                        : undefined
-                    }
+                    src={getMediaUrl(activity.passport_photo)}
                     alt={`${activity.first_name ?? ""} ${
                       activity.other_names ?? ""
                     }`.trim()}

@@ -70,9 +70,9 @@ export default function useMemberWorkflow() {
       );
     },
 
-    deactivate(id: number) {
+    deactivate(id: number, remarks?: string) {
       return run(() =>
-        memberService.deactivate(id)
+        memberService.deactivate(id, remarks)
       );
     },
 

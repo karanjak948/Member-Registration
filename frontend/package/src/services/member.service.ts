@@ -129,10 +129,12 @@ class MemberService {
    * Deactivate member.
    */
   async deactivate(
-    id: number
+    id: number,
+    remarks = ""
   ): Promise<Member> {
     const { data } = await api.post<Member>(
-      `/members/${id}/deactivate/`
+      `/members/${id}/deactivate/`,
+      { remarks }
     );
 
     return data;

@@ -14,12 +14,24 @@ import {
 export function memberToState(
   member: Member
 ): MemberState {
+  const categoryCode =
+    member.category_code?.trim().toUpperCase() ||
+    (member.category_name?.toLowerCase().includes("normal")
+      ? "NORMAL"
+      : member.category_name?.toLowerCase().includes("special")
+      ? "SPECIAL"
+      : member.category_name?.toLowerCase().includes("other")
+      ? "OTHER"
+      : member.category === 1 || String(member.category) === "1"
+      ? "NORMAL"
+      : "");
+
   const categoryDetails: RegistrationCategoryState | null =
     member.category
       ? {
           id: member.category,
           name: member.category_name,
-          code: "",
+          code: categoryCode,
         }
       : null;
 

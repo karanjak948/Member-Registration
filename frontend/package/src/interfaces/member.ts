@@ -11,6 +11,8 @@ export interface Member {
 
   category_name: string;
 
+  category_code?: string;
+
   first_name: string;
 
   other_names: string;

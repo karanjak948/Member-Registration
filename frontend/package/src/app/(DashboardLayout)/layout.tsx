@@ -1,10 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
-
 import { styled, Container, Box, CircularProgress } from "@mui/material";
 
 import Header from "@/app/(DashboardLayout)/layout/header/Header";
@@ -31,11 +29,9 @@ interface Props {
 
 export default function RootLayout({ children }: Props) {
   const router = useRouter();
-
   const { status } = useSession();
 
   const [isSidebarOpen] = useState(true);
-
   const [isMobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
   useEffect(() => {
@@ -73,9 +69,10 @@ export default function RootLayout({ children }: Props) {
         <Header toggleMobileSidebar={() => setMobileSidebarOpen(true)} />
 
         <Container
+          maxWidth={false}
           sx={{
-            pt: 3,
-            maxWidth: "1200px",
+            pt: 2,
+            px: { xs: 1.5, sm: 2.5, md: 3.5 },
           }}
         >
           <Box

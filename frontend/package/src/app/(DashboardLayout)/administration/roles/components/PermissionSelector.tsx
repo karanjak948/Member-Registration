@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useState } from "react";
-
 import {
   Accordion,
   AccordionDetails,
@@ -20,12 +19,10 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import SearchIcon from "@mui/icons-material/Search";
 import SelectAllIcon from "@mui/icons-material/SelectAll";
 import ClearIcon from "@mui/icons-material/Clear";
-
 import { Permission } from "@/types/role";
 
 interface PermissionSelectorProps {
@@ -46,15 +43,15 @@ export default function PermissionSelector({
   loading = false,
 }: PermissionSelectorProps) {
   const [search, setSearch] = useState("");
-  // Initialize expandedModules with a lazy initializer
   const [expandedModules, setExpandedModules] = useState<Set<string>>(
-    () => new Set()
+    () => new Set(["Members", "Loans", "Roles", "Users"])
   );
 
-  // Group permissions by module
+  // Group permissions by normalized module name
   const groupedPermissions = useMemo(() => {
     const grouped = permissions.reduce<GroupedPermissions>((acc, permission) => {
-      const module = permission.module || "Other";
+      const rawModule = (permission.module || "General").trim();
+      const module = rawModule.charAt(0).toUpperCase() + rawModule.slice(1).toLowerCase();
       if (!acc[module]) {
         acc[module] = [];
       }
@@ -62,7 +59,6 @@ export default function PermissionSelector({
       return acc;
     }, {});
 
-    // Sort permissions within each module
     Object.keys(grouped).forEach((module) => {
       grouped[module].sort((a, b) => a.name.localeCompare(b.name));
     });
@@ -70,7 +66,7 @@ export default function PermissionSelector({
     return grouped;
   }, [permissions]);
 
-  // Filter permissions by search
+  // Filter permissions by search query
   const filteredGroupedPermissions = useMemo(() => {
     if (!search.trim()) {
       return groupedPermissions;
@@ -84,7 +80,7 @@ export default function PermissionSelector({
         (permission) =>
           permission.name.toLowerCase().includes(keyword) ||
           permission.code.toLowerCase().includes(keyword) ||
-          permission.module.toLowerCase().includes(keyword)
+          permission.module?.toLowerCase().includes(keyword)
       );
 
       if (filtered.length > 0) {
@@ -92,7 +88,6 @@ export default function PermissionSelector({
       }
     });
 
-    // Sort modules alphabetically
     const sortedResult: GroupedPermissions = {};
     Object.keys(result)
       .sort((a, b) => a.localeCompare(b))
@@ -103,19 +98,10 @@ export default function PermissionSelector({
     return sortedResult;
   }, [groupedPermissions, search]);
 
-  // Get all permission IDs
   const allPermissionIds = useMemo(() => {
     return permissions.map((p) => p.id);
   }, [permissions]);
 
-  // Get selected IDs for a module
-  const getModuleSelectedIds = (modulePermissions: Permission[]) => {
-    return modulePermissions
-      .filter((p) => value.includes(p.id))
-      .map((p) => p.id);
-  };
-
-  // Toggle a single permission
   const togglePermission = (permissionId: number) => {
     if (value.includes(permissionId)) {
       onChange(value.filter((id) => id !== permissionId));
@@ -124,41 +110,40 @@ export default function PermissionSelector({
     }
   };
 
-  // Select all permissions in a module
+  const getModulePermissionIds = (modulePermissions: Permission[]) => {
+    return modulePermissions.map((p) => p.id);
+  };
+
   const selectModule = (modulePermissions: Permission[]) => {
-    const moduleIds = modulePermissions.map((p) => p.id);
-    const newSelection = [...value];
-    moduleIds.forEach((id) => {
-      if (!newSelection.includes(id)) {
-        newSelection.push(id);
-      }
-    });
-    onChange(newSelection);
+    const moduleIds = getModulePermissionIds(modulePermissions);
+    const newSelected = Array.from(new Set([...value, ...moduleIds]));
+    onChange(newSelected);
   };
 
-  // Clear all permissions in a module
   const clearModule = (modulePermissions: Permission[]) => {
-    const moduleIds = modulePermissions.map((p) => p.id);
-    onChange(value.filter((id) => !moduleIds.includes(id)));
+    const moduleIds = getModulePermissionIds(modulePermissions);
+    const newSelected = value.filter((id) => !moduleIds.includes(id));
+    onChange(newSelected);
   };
 
-  // Select all permissions
+  const getModuleSelectedIds = (modulePermissions: Permission[]) => {
+    const moduleIds = getModulePermissionIds(modulePermissions);
+    return moduleIds.filter((id) => value.includes(id));
+  };
+
   const selectAll = () => {
     onChange(allPermissionIds);
   };
 
-  // Clear all permissions
   const clearAll = () => {
     onChange([]);
   };
 
-  // Check if all permissions in a module are selected
   const isModuleFullySelected = (modulePermissions: Permission[]) => {
     const moduleIds = modulePermissions.map((p) => p.id);
-    return moduleIds.every((id) => value.includes(id));
+    return moduleIds.length > 0 && moduleIds.every((id) => value.includes(id));
   };
 
-  // Check if some permissions in a module are selected
   const isModulePartiallySelected = (modulePermissions: Permission[]) => {
     const moduleIds = modulePermissions.map((p) => p.id);
     const selectedInModule = moduleIds.filter((id) => value.includes(id));
@@ -187,34 +172,17 @@ export default function PermissionSelector({
 
   const totalSelected = value.length;
 
-  // Helper to highlight search matches
-  const highlightText = (text: string, query: string) => {
-    if (!query.trim()) return text;
-    const regex = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
-    const parts = text.split(regex);
-    return parts.map((part, index) =>
-      regex.test(part) ? (
-        <Box component="span" key={index} sx={{ bgcolor: "warning.light", fontWeight: 600 }}>
-          {part}
-        </Box>
-      ) : (
-        part
-      )
-    );
-  };
-
   if (loading) {
     return (
       <Stack spacing={2}>
-        <Typography variant="h6" fontWeight={600}>
-          Permissions
+        <Typography variant="subtitle2" fontWeight={700}>
+          ASSIGNED PERMISSIONS
         </Typography>
-        <Paper variant="outlined" sx={{ p: 1, borderRadius: 2 }}>
-          <Stack spacing={1}>
-            <Skeleton variant="rounded" height={48} />
-            <Skeleton variant="rounded" height={48} />
-            <Skeleton variant="rounded" height={48} />
-            <Skeleton variant="rounded" height={48} />
+        <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
+          <Stack spacing={1.5}>
+            <Skeleton variant="rounded" height={44} />
+            <Skeleton variant="rounded" height={44} />
+            <Skeleton variant="rounded" height={44} />
           </Stack>
         </Paper>
       </Stack>
@@ -226,121 +194,105 @@ export default function PermissionSelector({
 
   return (
     <Stack spacing={2}>
-      {/* Sticky Header */}
-      <Box
-        sx={{
-          position: "sticky",
-          top: 0,
-          zIndex: 2,
-          bgcolor: "background.paper",
-          pt: 0,
-          pb: 2,
-        }}
+      {/* Header and Controls */}
+      <Stack
+        direction={{ xs: "column", sm: "row" }}
+        justifyContent="space-between"
+        alignItems={{ xs: "flex-start", sm: "center" }}
+        spacing={2}
       >
-        {/* Header */}
-        <Stack
-          direction="row"
-          justifyContent="space-between"
-          alignItems="center"
-          flexWrap="wrap"
-          gap={1}
-          sx={{ mb: 2 }}
-        >
-          <Typography variant="h6" fontWeight={600}>
-            Permissions
+        <Box>
+          <Typography variant="subtitle2" fontWeight={700} color="text.secondary">
+            ASSIGNED PERMISSIONS MATRIX
           </Typography>
+          <Typography variant="caption" color="text.secondary">
+            Toggle modules or individual permissions to grant operational rights
+          </Typography>
+        </Box>
 
-          <Chip
-            color="primary"
+        <Chip
+          color={totalSelected > 0 ? "primary" : "default"}
+          size="small"
+          label={`${totalSelected} of ${permissions.length} Selected`}
+          sx={{ fontWeight: 700 }}
+        />
+      </Stack>
+
+      {/* Search and Action Bar */}
+      <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} alignItems="center">
+        <TextField
+          size="small"
+          placeholder="Filter permissions by name or code..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          slotProps={{
+            input: {
+              startAdornment: <SearchIcon sx={{ mr: 1, color: "text.secondary", fontSize: 20 }} />,
+              endAdornment: search && (
+                <Box
+                  component="button"
+                  onClick={() => setSearch("")}
+                  sx={{
+                    background: "none",
+                    border: "none",
+                    cursor: "pointer",
+                    display: "flex",
+                    color: "text.secondary",
+                  }}
+                >
+                  <ClearIcon fontSize="small" />
+                </Box>
+              ),
+            },
+          }}
+          sx={{ flex: 1, width: { xs: "100%", sm: "auto" } }}
+        />
+
+        <Stack direction="row" spacing={1} sx={{ alignSelf: { xs: "stretch", sm: "auto" } }}>
+          <Button
+            size="small"
             variant="outlined"
+            startIcon={<SelectAllIcon />}
+            onClick={selectAll}
+            disabled={!hasPermissions}
+            sx={{ textTransform: "none", fontWeight: 600, flex: 1 }}
+          >
+            Select All
+          </Button>
+          <Button
             size="small"
-            label={`${totalSelected} of ${permissions.length} selected`}
-          />
+            variant="outlined"
+            color="inherit"
+            startIcon={<ClearIcon />}
+            onClick={clearAll}
+            disabled={!hasPermissions || totalSelected === 0}
+            sx={{ textTransform: "none", fontWeight: 600, flex: 1 }}
+          >
+            Clear All
+          </Button>
         </Stack>
+      </Stack>
 
-        {/* Search and Actions */}
-        <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap">
-          <TextField
-            size="small"
-            placeholder="Search permissions..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            slotProps={{
-              input: {
-                startAdornment: <SearchIcon sx={{ mr: 1, color: "text.secondary" }} />,
-                endAdornment: search && (
-                  <Box
-                    component="button"
-                    onClick={() => setSearch("")}
-                    sx={{
-                      background: "none",
-                      border: "none",
-                      cursor: "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      color: "text.secondary",
-                      p: 0.5,
-                      borderRadius: "50%",
-                      "&:hover": {
-                        bgcolor: "action.hover",
-                      },
-                    }}
-                  >
-                    <ClearIcon fontSize="small" />
-                  </Box>
-                ),
-              },
-            }}
-            sx={{ flex: 1, minWidth: 200 }}
-          />
-
-          <Stack direction="row" spacing={1}>
-            <Button
-              size="small"
-              variant="outlined"
-              startIcon={<SelectAllIcon />}
-              onClick={selectAll}
-              disabled={!hasPermissions}
-            >
-              Select All
-            </Button>
-            <Button
-              size="small"
-              variant="outlined"
-              color="inherit"
-              startIcon={<ClearIcon />}
-              onClick={clearAll}
-              disabled={!hasPermissions}
-            >
-              Clear All
-            </Button>
-          </Stack>
-        </Stack>
-      </Box>
-
-      {/* Permission List */}
+      {/* Permission List Accordions */}
       <Paper
-        variant="outlined"
+        elevation={0}
         sx={{
-          maxHeight: 420,
+          maxHeight: 440,
           overflow: "auto",
           borderRadius: 2,
+          border: "1px solid #e2e8f0",
         }}
       >
         {!hasPermissions ? (
           <Box py={6} textAlign="center">
             <Typography variant="body2" color="text.secondary">
-              No permissions available.
+              No permissions available in catalogue.
             </Typography>
           </Box>
         ) : !hasSearchResults ? (
           <Box py={6} textAlign="center">
-            <SearchIcon sx={{ fontSize: 40, color: "text.secondary", mb: 1 }} />
-            <Typography variant="body1" fontWeight={500}>
-              No permissions match "{search}"
-            </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-              Try another search term.
+            <Typography variant="body2" color="text.secondary">
+              No permissions match "{search}".
             </Typography>
           </Box>
         ) : (
@@ -359,17 +311,15 @@ export default function PermissionSelector({
                   disableGutters
                   elevation={0}
                   sx={{
-                    "&:before": {
-                      display: "none",
-                    },
-                    borderBottom: "1px solid",
-                    borderColor: "divider",
+                    "&:before": { display: "none" },
+                    borderBottom: "1px solid #f1f5f9",
                   }}
                 >
                   <AccordionSummary
                     expandIcon={<ExpandMoreIcon />}
                     sx={{
-                      minHeight: 44,
+                      minHeight: 48,
+                      bgcolor: isExpanded ? "#f8fafc" : "#ffffff",
                       "& .MuiAccordionSummary-content": {
                         alignItems: "center",
                         my: 0.5,
@@ -379,30 +329,36 @@ export default function PermissionSelector({
                     <Stack
                       direction="row"
                       alignItems="center"
-                      spacing={1}
-                      sx={{ width: "100%" }}
+                      justifyContent="space-between"
+                      sx={{ width: "100%", pr: 1 }}
                     >
-                      <Checkbox
+                      <Stack direction="row" alignItems="center" spacing={1}>
+                        <Checkbox
+                          size="small"
+                          checked={fullySelected}
+                          indeterminate={partiallySelected}
+                          onChange={(e) => {
+                            e.stopPropagation();
+                            toggleModule(modulePermissions);
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                        <Typography fontWeight={700} variant="body2">
+                          {module} Module
+                        </Typography>
+                      </Stack>
+
+                      <Chip
                         size="small"
-                        checked={fullySelected}
-                        indeterminate={partiallySelected}
-                        onChange={(e) => {
-                          e.stopPropagation();
-                          toggleModule(modulePermissions);
-                        }}
-                        onClick={(e) => e.stopPropagation()}
-                        sx={{ mr: 1 }}
+                        label={`${selectedCount} / ${modulePermissions.length} selected`}
+                        color={selectedCount > 0 ? "primary" : "default"}
+                        variant={selectedCount > 0 ? "filled" : "outlined"}
+                        sx={{ fontSize: "0.7rem", height: 22, fontWeight: 700 }}
                       />
-                      <Typography fontWeight={600} variant="body1">
-                        {module}
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary" sx={{ ml: 1 }}>
-                        {modulePermissions.length} permissions • {selectedCount} selected
-                      </Typography>
                     </Stack>
                   </AccordionSummary>
 
-                  <AccordionDetails sx={{ p: 0 }}>
+                  <AccordionDetails sx={{ p: 0, bgcolor: "#ffffff" }}>
                     <List disablePadding dense>
                       {modulePermissions.map((permission) => {
                         const checked = value.includes(permission.id);
@@ -412,14 +368,17 @@ export default function PermissionSelector({
                             key={permission.id}
                             onClick={() => togglePermission(permission.id)}
                             sx={{
-                              pl: 6,
+                              pl: 5,
+                              pr: 2,
+                              py: 0.8,
+                              bgcolor: checked ? "rgba(37, 99, 235, 0.04)" : "transparent",
                               "&:hover": {
-                                backgroundColor: "action.hover",
+                                bgcolor: checked ? "rgba(37, 99, 235, 0.08)" : "#f8fafc",
                               },
                             }}
                             dense
                           >
-                            <ListItemIcon sx={{ minWidth: 36 }}>
+                            <ListItemIcon sx={{ minWidth: 34 }}>
                               <Checkbox
                                 edge="start"
                                 checked={checked}
@@ -427,21 +386,27 @@ export default function PermissionSelector({
                               />
                             </ListItemIcon>
                             <ListItemText
-                              primary={
-                                search.trim() ? (
-                                  highlightText(permission.name, search)
-                                ) : (
-                                  permission.name
-                                )
-                              }
-                              secondary={permission.code}
+                              primary={permission.name}
+                              secondary={permission.description || permission.code}
                               primaryTypographyProps={{
                                 variant: "body2",
-                                fontWeight: 500,
+                                fontWeight: checked ? 700 : 500,
+                                color: checked ? "primary.main" : "text.primary",
                               }}
                               secondaryTypographyProps={{
                                 variant: "caption",
                                 color: "text.secondary",
+                              }}
+                            />
+                            <Chip
+                              label={permission.code}
+                              size="small"
+                              variant="outlined"
+                              sx={{
+                                fontSize: "0.68rem",
+                                height: 20,
+                                color: "text.secondary",
+                                borderColor: "#e2e8f0",
                               }}
                             />
                           </ListItemButton>

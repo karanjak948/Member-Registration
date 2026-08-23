@@ -72,11 +72,23 @@ class OrganizationAPIView(APIView):
     ]
 
     def get_object(self, user):
-        return (
+        org = (
             Organization.objects
             .filter(owner=user)
             .first()
         )
+        if not org:
+            membership = (
+                OrganizationUser.objects
+                .filter(user=user)
+                .select_related("organization")
+                .first()
+            )
+            if membership:
+                org = membership.organization
+        if not org:
+            org = Organization.objects.first()
+        return org
 
     def get(self, request):
         organization = self.get_object(
@@ -222,11 +234,23 @@ class OrganizationLogoUploadView(APIView):
     MAX_FILE_SIZE = 2 * 1024 * 1024
 
     def get_object(self, user):
-        return (
+        org = (
             Organization.objects
             .filter(owner=user)
             .first()
         )
+        if not org:
+            membership = (
+                OrganizationUser.objects
+                .filter(user=user)
+                .select_related("organization")
+                .first()
+            )
+            if membership:
+                org = membership.organization
+        if not org:
+            org = Organization.objects.first()
+        return org
 
     def patch(self, request):
         organization = self.get_object(
@@ -279,7 +303,9 @@ class OrganizationLogoUploadView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        old_logo = organization.logo
+        old_logo_name = None
+        if organization.logo:
+            old_logo_name = organization.logo.name
 
         organization.logo = logo_file
         organization.save(
@@ -289,10 +315,13 @@ class OrganizationLogoUploadView(APIView):
             ]
         )
 
-        if old_logo:
-            old_logo.delete(
-                save=False
-            )
+        if old_logo_name and old_logo_name != organization.logo.name:
+            try:
+                from django.core.files.storage import default_storage
+                if default_storage.exists(old_logo_name):
+                    default_storage.delete(old_logo_name)
+            except Exception:
+                pass
 
         serializer = OrganizationSerializer(
             organization,

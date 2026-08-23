@@ -14,6 +14,13 @@ export const PERMISSIONS = {
 
   MANAGE_USERS: "manage_users",
   MANAGE_ROLES: "manage_roles",
+
+  // Loan Permissions
+  APPLY_LOANS: "apply_loans",
+  APPROVE_LOANS: "approve_loans",
+  DISBURSE_LOANS: "disburse_loans",
+  REJECT_LOANS: "reject_loans",
+  DELETE_LOANS: "delete_loans",
 } as const;
 
 export type Permission = typeof PERMISSIONS[keyof typeof PERMISSIONS];

@@ -1,25 +1,12 @@
 "use client";
 
 import { useMemo } from "react";
-
-import {
-  DataGrid,
-  GridActionsCellItem,
-  GridColDef,
-} from "@mui/x-data-grid";
-
-import {
-  Chip,
-  Paper,
-  Typography,
-  Box,
-} from "@mui/material";
-
+import { DataGrid, GridActionsCellItem, GridColDef } from "@mui/x-data-grid";
+import { Chip, Paper, Typography, Box, Stack } from "@mui/material";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import LockIcon from "@mui/icons-material/Lock";
-
 import { Role } from "@/types/role";
 
 interface RoleDataGridProps {
@@ -39,15 +26,12 @@ function NoRowsOverlay() {
       justifyContent="center"
       flexDirection="column"
       gap={1}
+      py={6}
     >
-      <Typography variant="h6">
+      <Typography variant="h6" fontWeight={700}>
         No Roles Found
       </Typography>
-
-      <Typography
-        variant="body2"
-        color="text.secondary"
-      >
+      <Typography variant="body2" color="text.secondary">
         Create your first role to start assigning permissions.
       </Typography>
     </Box>
@@ -65,14 +49,15 @@ export default function RoleDataGrid({
     () => [
       {
         field: "name",
-        headerName: "Role",
+        headerName: "Role Name",
         flex: 1,
-        minWidth: 220,
-
+        minWidth: 200,
         renderCell: ({ row }) => (
-          <Typography fontWeight={700}>
-            {row.name}
-          </Typography>
+          <Stack direction="row" spacing={1.5} alignItems="center" sx={{ height: "100%" }}>
+            <Typography fontWeight={700} color="text.primary">
+              {row.name}
+            </Typography>
+          </Stack>
         ),
       },
 
@@ -80,44 +65,50 @@ export default function RoleDataGrid({
         field: "description",
         headerName: "Description",
         flex: 2,
-        minWidth: 320,
-
+        minWidth: 300,
         renderCell: ({ row }) => (
-          <Typography
-            variant="body2"
-            noWrap
-            title={row.description ?? ""}
-          >
-            {row.description || "-"}
+          <Typography variant="body2" color="text.secondary" noWrap title={row.description ?? ""}>
+            {row.description || "Custom organization role"}
           </Typography>
         ),
       },
 
       {
         field: "permissions",
-        headerName: "Permissions",
-        width: 140,
+        headerName: "Assigned Rights",
+        width: 170,
         sortable: false,
-
         renderCell: ({ row }) => (
           <Chip
             size="small"
-            color="primary"
-            label={row.permissions.length}
+            label={`${row.permissions?.length || 0} Permissions`}
+            sx={{
+              bgcolor: "rgba(37, 99, 235, 0.1)",
+              color: "#2563eb",
+              fontWeight: 700,
+              border: "1px solid rgba(37, 99, 235, 0.25)",
+              borderRadius: 1.5,
+            }}
           />
         ),
       },
 
       {
         field: "is_system_role",
-        headerName: "Type",
-        width: 140,
-
+        headerName: "Role Classification",
+        width: 170,
         renderCell: ({ value }) => (
           <Chip
             size="small"
-            color={value ? "warning" : "primary"}
-            label={value ? "System" : "Organization"}
+            icon={value ? <LockIcon style={{ fontSize: 14, color: "#d97706" }} /> : undefined}
+            label={value ? "System Core" : "Organization"}
+            sx={{
+              bgcolor: value ? "rgba(245, 158, 11, 0.12)" : "rgba(13, 148, 136, 0.12)",
+              color: value ? "#b45309" : "#0d9488",
+              fontWeight: 700,
+              border: value ? "1px solid rgba(245, 158, 11, 0.3)" : "1px solid rgba(13, 148, 136, 0.3)",
+              borderRadius: 1.5,
+            }}
           />
         ),
       },
@@ -126,14 +117,13 @@ export default function RoleDataGrid({
         field: "actions",
         type: "actions",
         headerName: "Actions",
-        width: 90,
-
+        width: 100,
         getActions: ({ row }) => {
           const actions = [
             <GridActionsCellItem
               key="view"
-              icon={<VisibilityIcon />}
-              label="View"
+              icon={<VisibilityIcon sx={{ fontSize: 19 }} />}
+              label="View Details"
               showInMenu
               onClick={() => onView(row)}
             />,
@@ -143,8 +133,8 @@ export default function RoleDataGrid({
             actions.push(
               <GridActionsCellItem
                 key="protected"
-                icon={<LockIcon />}
-                label="Protected Role"
+                icon={<LockIcon sx={{ fontSize: 19 }} />}
+                label="Protected (Immutable)"
                 disabled
                 showInMenu
                 onClick={() => {}}
@@ -154,8 +144,8 @@ export default function RoleDataGrid({
             actions.push(
               <GridActionsCellItem
                 key="edit"
-                icon={<EditIcon />}
-                label="Edit"
+                icon={<EditIcon sx={{ fontSize: 19 }} />}
+                label="Edit Role"
                 showInMenu
                 onClick={() => onEdit(row)}
               />
@@ -164,8 +154,8 @@ export default function RoleDataGrid({
             actions.push(
               <GridActionsCellItem
                 key="delete"
-                icon={<DeleteOutlineIcon />}
-                label="Delete"
+                icon={<DeleteOutlineIcon sx={{ fontSize: 19, color: "error.main" }} />}
+                label="Delete Role"
                 showInMenu
                 onClick={() => onDelete(row)}
               />
@@ -183,9 +173,8 @@ export default function RoleDataGrid({
     <Paper
       elevation={0}
       sx={{
-        borderRadius: 3,
-        border: (theme) =>
-          `1px solid ${theme.palette.divider}`,
+        borderRadius: 2,
+        border: (theme) => `1px solid ${theme.palette.divider}`,
         overflow: "hidden",
       }}
     >
@@ -193,24 +182,16 @@ export default function RoleDataGrid({
         rows={roles}
         columns={columns}
         loading={loading}
-        density="compact"
+        density="standard"
         disableRowSelectionOnClick
-        rowHeight={60}
-        pageSizeOptions={[10, 20, 50, 100]}
+        rowHeight={56}
+        pageSizeOptions={[10, 20, 50]}
         initialState={{
           sorting: {
-            sortModel: [
-              {
-                field: "name",
-                sort: "asc",
-              },
-            ],
+            sortModel: [{ field: "name", sort: "asc" }],
           },
           pagination: {
-            paginationModel: {
-              page: 0,
-              pageSize: 10,
-            },
+            paginationModel: { page: 0, pageSize: 10 },
           },
         }}
         slots={{
@@ -218,26 +199,23 @@ export default function RoleDataGrid({
         }}
         sx={{
           border: 0,
-
           "& .MuiDataGrid-columnHeaders": {
             backgroundColor: "#f8fafc",
-            borderBottom: "1px solid #e5e7eb",
+            borderBottom: "1px solid #e2e8f0",
           },
-
           "& .MuiDataGrid-columnHeaderTitle": {
             fontWeight: 700,
+            fontSize: "0.82rem",
+            color: "#475569",
           },
-
           "& .MuiDataGrid-row:hover": {
             backgroundColor: "#f8fbff",
           },
-
           "& .MuiDataGrid-cell": {
             borderBottom: "1px solid #f1f5f9",
           },
-
           "& .MuiDataGrid-footerContainer": {
-            borderTop: "1px solid #e5e7eb",
+            borderTop: "1px solid #e2e8f0",
           },
         }}
       />

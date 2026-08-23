@@ -27,9 +27,13 @@ load_dotenv(BASE_DIR / ".env")
 SECRET_KEY = os.getenv("SECRET_KEY")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.getenv("DEBUG") == "True"
+DEBUG = os.getenv("DEBUG", "True").lower() in ("true", "1", "yes")
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = (
+    os.getenv("ALLOWED_HOSTS", "*").split(",")
+    if os.getenv("ALLOWED_HOSTS")
+    else ["*"]
+)
 
 
 # Application definition
@@ -149,11 +153,14 @@ AUTH_PASSWORD_VALIDATORS = [
 AUTH_USER_MODEL = "authentication.User"
 
 
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",
-    "http://localhost:3001",
-]
+CORS_ALLOWED_ORIGINS = (
+    os.getenv(
+        "CORS_ALLOWED_ORIGINS",
+        "http://localhost:3000,http://localhost:3001,http://127.0.0.1:3000,https://v1.royalltd.co.ke",
+    ).split(",")
+)
 
+CORS_ALLOW_ALL_ORIGINS = os.getenv("CORS_ALLOW_ALL_ORIGINS", "True") == "True"
 CORS_ALLOW_CREDENTIALS = True
 
 # Internationalization

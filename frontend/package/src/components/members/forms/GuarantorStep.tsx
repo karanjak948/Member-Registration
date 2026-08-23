@@ -1,75 +1,101 @@
 "use client";
 
-import { useState } from "react";
-
+import { ChangeEvent, useState } from "react";
 import {
   Alert,
   Box,
   Button,
   CircularProgress,
   Grid,
+  InputAdornment,
+  Paper,
+  Stack,
   TextField,
+  Typography,
 } from "@mui/material";
-
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
-
 import { setGuarantor } from "@/store/registration/registrationSlice";
+import {
+  IconShieldCheck,
+  IconUser,
+  IconId,
+  IconPhone,
+  IconHeartHandshake,
+  IconArrowLeft,
+  IconArrowRight,
+} from "@tabler/icons-react";
 
 interface GuarantorStepProps {
-  required?: boolean;
-  onBack: () => void;
   onComplete: () => void;
+  onBack: () => void;
   onSkip?: () => void;
+  required?: boolean;
 }
 
 export default function GuarantorStep({
-  required = true,
-  onBack,
   onComplete,
-  onSkip,
+  onBack,
+  required = true,
 }: GuarantorStepProps) {
   const dispatch = useAppDispatch();
-
-  const existingGuarantor = useAppSelector(
-    (state) => state.registration.guarantor,
-  );
-
-  const [loading, setLoading] = useState(false);
-
-  const [error, setError] = useState("");
+  const guarantor = useAppSelector((state) => state.registration.guarantor);
 
   const [form, setForm] = useState({
-    first_name: existingGuarantor?.first_name ?? "",
-    other_names: existingGuarantor?.other_names ?? "",
-    national_id: existingGuarantor?.national_id ?? "",
-    phone_number: existingGuarantor?.phone_number ?? "",
-    relationship: existingGuarantor?.relationship ?? "",
-    guarantor_member: existingGuarantor?.guarantor_member?.toString() ?? "",
+    first_name: guarantor.first_name || "",
+    other_names: guarantor.other_names || "",
+    national_id: guarantor.national_id || "",
+    phone_number: guarantor.phone_number || "",
+    relationship: guarantor.relationship || "",
+    guarantor_member: guarantor.guarantor_member ?? "",
   });
 
-  function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const { name, value } = e.target;
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
+  function handleChange(e: ChangeEvent<HTMLInputElement>) {
+    const { name, value } = e.target;
     setForm((prev) => ({
       ...prev,
       [name]: value,
     }));
+    if (error) setError("");
   }
 
-  async function handleSubmit() {
-    if (required) {
+  function handleSkip() {
+    dispatch(
+      setGuarantor({
+        first_name: "",
+        other_names: "",
+        national_id: "",
+        phone_number: "",
+        relationship: "",
+        guarantor_member: null,
+      }),
+    );
+    onComplete();
+  }
+
+  function handleSubmit() {
+    const hasAnyValue = Object.values(form).some(
+      (v) => String(v).trim().length > 0,
+    );
+
+    if (!required && !hasAnyValue) {
+      handleSkip();
+      return;
+    }
+
+    if (required || hasAnyValue) {
       if (!form.first_name.trim()) {
-        setError("First name is required.");
+        setError("Guarantor first name is required.");
         return;
       }
-
       if (!form.national_id.trim()) {
-        setError("National ID is required.");
+        setError("Guarantor National ID / Passport Number is required to verify adult status.");
         return;
       }
-
       if (!form.phone_number.trim()) {
-        setError("Phone number is required.");
+        setError("Guarantor phone number is required.");
         return;
       }
     }
@@ -98,100 +124,318 @@ export default function GuarantorStep({
 
   return (
     <Box>
-      <Grid container spacing={3}>
-        <Grid size={{ xs: 12, md: 6 }}>
-          <TextField
-            fullWidth
-            required={required}
-            label="First Name"
-            name="first_name"
-            value={form.first_name}
-            onChange={handleChange}
-          />
+      <Paper
+        elevation={0}
+        sx={{
+          p: { xs: 2.5, sm: 3.5 },
+          borderRadius: 3.5,
+          border: "1px solid #e2e8f0",
+          borderLeft: "6px solid #2563eb",
+          bgcolor: "#ffffff",
+          boxShadow: "0 4px 20px -4px rgba(37, 99, 235, 0.08)",
+        }}
+      >
+        <Stack direction="row" spacing={1.5} alignItems="center" mb={3} pb={2} borderBottom="1px solid #f1f5f9">
+          <Box
+            sx={{
+              width: 44,
+              height: 44,
+              bgcolor: "#eff6ff",
+              color: "#2563eb",
+              borderRadius: 2.5,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              boxShadow: "0 2px 8px rgba(37, 99, 235, 0.15)",
+            }}
+          >
+            <IconShieldCheck size={24} />
+          </Box>
+          <Box>
+            <Typography variant="h6" fontWeight={900} sx={{ color: "#0f172a", fontSize: "1.15rem" }}>
+              Guarantor &amp; Financial Security
+            </Typography>
+            <Typography variant="caption" sx={{ color: "#64748b", fontWeight: 600 }}>
+              {required
+                ? "Mandatory registered SACCO endorsing guarantor for member liability"
+                : "Optional SACCO guarantor endorsement"}
+            </Typography>
+          </Box>
+        </Stack>
+
+        {error && (
+          <Alert severity="error" sx={{ mb: 3, borderRadius: 2, fontWeight: 700 }}>
+            {error}
+          </Alert>
+        )}
+
+        <Grid container spacing={3}>
+          {/* First Name */}
+          <Grid size={{ xs: 12, md: 6 }}>
+            <Box>
+              <Typography variant="subtitle2" fontWeight={800} sx={{ mb: 0.8, color: "#1e293b", fontSize: "0.875rem" }}>
+                Guarantor First Name {required && <span style={{ color: "#e11d48", fontWeight: 800 }}>*</span>}
+              </Typography>
+              <TextField
+                fullWidth
+                name="first_name"
+                placeholder="e.g. Peter"
+                value={form.first_name}
+                onChange={handleChange}
+                disabled={loading}
+                slotProps={{
+                  input: {
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <IconUser size={18} style={{ color: "#2563eb" }} />
+                      </InputAdornment>
+                    ),
+                    sx: {
+                      borderRadius: 2,
+                      fontWeight: 600,
+                      "& .MuiOutlinedInput-notchedOutline": { borderColor: "#cbd5e1" },
+                      "&:hover .MuiOutlinedInput-notchedOutline": { borderColor: "#2563eb" },
+                      "&.Mui-focused .MuiOutlinedInput-notchedOutline": { borderColor: "#2563eb", borderWidth: 2 },
+                    },
+                  },
+                }}
+              />
+            </Box>
+          </Grid>
+
+          {/* Other Names */}
+          <Grid size={{ xs: 12, md: 6 }}>
+            <Box>
+              <Typography variant="subtitle2" fontWeight={800} sx={{ mb: 0.8, color: "#1e293b", fontSize: "0.875rem" }}>
+                Other / Middle Names
+              </Typography>
+              <TextField
+                fullWidth
+                name="other_names"
+                placeholder="e.g. Otieno"
+                value={form.other_names}
+                onChange={handleChange}
+                disabled={loading}
+                slotProps={{
+                  input: {
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <IconUser size={18} style={{ color: "#2563eb" }} />
+                      </InputAdornment>
+                    ),
+                    sx: {
+                      borderRadius: 2,
+                      fontWeight: 600,
+                      "& .MuiOutlinedInput-notchedOutline": { borderColor: "#cbd5e1" },
+                      "&:hover .MuiOutlinedInput-notchedOutline": { borderColor: "#2563eb" },
+                      "&.Mui-focused .MuiOutlinedInput-notchedOutline": { borderColor: "#2563eb", borderWidth: 2 },
+                    },
+                  },
+                }}
+              />
+            </Box>
+          </Grid>
+
+          {/* National ID */}
+          <Grid size={{ xs: 12, md: 6 }}>
+            <Box>
+              <Typography variant="subtitle2" fontWeight={800} sx={{ mb: 0.8, color: "#1e293b", fontSize: "0.875rem" }}>
+                National ID / Passport Number {required && <span style={{ color: "#e11d48", fontWeight: 800 }}>*</span>}
+              </Typography>
+              <TextField
+                fullWidth
+                name="national_id"
+                placeholder="e.g. 23456789"
+                value={form.national_id}
+                onChange={handleChange}
+                disabled={loading}
+                slotProps={{
+                  input: {
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <IconId size={18} style={{ color: "#2563eb" }} />
+                      </InputAdornment>
+                    ),
+                    sx: {
+                      borderRadius: 2,
+                      fontWeight: 600,
+                      "& .MuiOutlinedInput-notchedOutline": { borderColor: "#cbd5e1" },
+                      "&:hover .MuiOutlinedInput-notchedOutline": { borderColor: "#2563eb" },
+                      "&.Mui-focused .MuiOutlinedInput-notchedOutline": { borderColor: "#2563eb", borderWidth: 2 },
+                    },
+                  },
+                }}
+              />
+            </Box>
+          </Grid>
+
+          {/* Phone Number */}
+          <Grid size={{ xs: 12, md: 6 }}>
+            <Box>
+              <Typography variant="subtitle2" fontWeight={800} sx={{ mb: 0.8, color: "#1e293b", fontSize: "0.875rem" }}>
+                Phone Number {required && <span style={{ color: "#e11d48", fontWeight: 800 }}>*</span>}
+              </Typography>
+              <TextField
+                fullWidth
+                name="phone_number"
+                placeholder="e.g. 0733000000"
+                value={form.phone_number}
+                onChange={handleChange}
+                disabled={loading}
+                slotProps={{
+                  input: {
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <IconPhone size={18} style={{ color: "#2563eb" }} />
+                      </InputAdornment>
+                    ),
+                    sx: {
+                      borderRadius: 2,
+                      fontWeight: 600,
+                      "& .MuiOutlinedInput-notchedOutline": { borderColor: "#cbd5e1" },
+                      "&:hover .MuiOutlinedInput-notchedOutline": { borderColor: "#2563eb" },
+                      "&.Mui-focused .MuiOutlinedInput-notchedOutline": { borderColor: "#2563eb", borderWidth: 2 },
+                    },
+                  },
+                }}
+              />
+            </Box>
+          </Grid>
+
+          {/* Relationship */}
+          <Grid size={{ xs: 12, md: 6 }}>
+            <Box>
+              <Typography variant="subtitle2" fontWeight={800} sx={{ mb: 0.8, color: "#1e293b", fontSize: "0.875rem" }}>
+                Relationship / Association
+              </Typography>
+              <TextField
+                fullWidth
+                name="relationship"
+                placeholder="e.g. Colleague, Brother, Sacco Member"
+                value={form.relationship}
+                onChange={handleChange}
+                disabled={loading}
+                slotProps={{
+                  input: {
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <IconHeartHandshake size={18} style={{ color: "#2563eb" }} />
+                      </InputAdornment>
+                    ),
+                    sx: {
+                      borderRadius: 2,
+                      fontWeight: 600,
+                      "& .MuiOutlinedInput-notchedOutline": { borderColor: "#cbd5e1" },
+                      "&:hover .MuiOutlinedInput-notchedOutline": { borderColor: "#2563eb" },
+                      "&.Mui-focused .MuiOutlinedInput-notchedOutline": { borderColor: "#2563eb", borderWidth: 2 },
+                    },
+                  },
+                }}
+              />
+            </Box>
+          </Grid>
+
+          {/* Linked Member ID */}
+          <Grid size={{ xs: 12, md: 6 }}>
+            <Box>
+              <Typography variant="subtitle2" fontWeight={800} sx={{ mb: 0.8, color: "#1e293b", fontSize: "0.875rem" }}>
+                Linked Existing Member ID
+              </Typography>
+              <TextField
+                fullWidth
+                type="number"
+                name="guarantor_member"
+                placeholder="e.g. 104"
+                value={form.guarantor_member}
+                onChange={handleChange}
+                disabled={loading}
+                helperText="If the guarantor is already an active SACCO member"
+                slotProps={{
+                  input: {
+                    sx: {
+                      borderRadius: 2,
+                      fontWeight: 600,
+                      "& .MuiOutlinedInput-notchedOutline": { borderColor: "#cbd5e1" },
+                      "&:hover .MuiOutlinedInput-notchedOutline": { borderColor: "#2563eb" },
+                      "&.Mui-focused .MuiOutlinedInput-notchedOutline": { borderColor: "#2563eb", borderWidth: 2 },
+                    },
+                  },
+                }}
+              />
+            </Box>
+          </Grid>
         </Grid>
+      </Paper>
 
-        <Grid size={{ xs: 12, md: 6 }}>
-          <TextField
-            fullWidth
-            label="Other Names"
-            name="other_names"
-            value={form.other_names}
-            onChange={handleChange}
-          />
-        </Grid>
-
-        <Grid size={{ xs: 12, md: 6 }}>
-          <TextField
-            fullWidth
-            required={required}
-            label="National ID"
-            name="national_id"
-            value={form.national_id}
-            onChange={handleChange}
-          />
-        </Grid>
-
-        <Grid size={{ xs: 12, md: 6 }}>
-          <TextField
-            fullWidth
-            required={required}
-            label="Phone Number"
-            name="phone_number"
-            value={form.phone_number}
-            onChange={handleChange}
-          />
-        </Grid>
-
-        <Grid size={{ xs: 12 }}>
-          <TextField
-            fullWidth
-            label="Relationship"
-            name="relationship"
-            value={form.relationship}
-            onChange={handleChange}
-          />
-        </Grid>
-
-        <Grid size={{ xs: 12 }}>
-          <TextField
-            fullWidth
-            type="number"
-            label="Guarantor Member ID (Optional)"
-            name="guarantor_member"
-            value={form.guarantor_member}
-            onChange={handleChange}
-          />
-        </Grid>
-      </Grid>
-
-      {error && (
-        <Alert severity="error" sx={{ mt: 3 }}>
-          {error}
-        </Alert>
-      )}
-
-      <Box mt={4} display="flex" justifyContent="space-between">
-        <Button variant="outlined" onClick={onBack} disabled={loading}>
+      {/* Navigation Buttons */}
+      <Box
+        mt={4}
+        pt={2.5}
+        sx={{
+          borderTop: "1px solid #e2e8f0",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+        }}
+      >
+        <Button
+          variant="outlined"
+          startIcon={<IconArrowLeft size={18} />}
+          onClick={onBack}
+          disabled={loading}
+          sx={{
+            px: 3,
+            py: 1.2,
+            fontWeight: 700,
+            textTransform: "none",
+            borderColor: "#cbd5e1",
+            color: "#334155",
+          }}
+        >
           Back
         </Button>
 
-        <Box display="flex" gap={2}>
+        <Stack direction="row" spacing={1.5}>
           {!required && (
-            <Button variant="text" onClick={onSkip} disabled={loading}>
-              Skip
+            <Button
+              variant="text"
+              onClick={handleSkip}
+              disabled={loading}
+              sx={{
+                px: 2.5,
+                fontWeight: 700,
+                color: "#64748b",
+                textTransform: "none",
+              }}
+            >
+              Skip Step
             </Button>
           )}
 
-          <Button variant="contained" onClick={handleSubmit} disabled={loading}>
+          <Button
+            variant="contained"
+            endIcon={loading ? undefined : <IconArrowRight size={18} />}
+            onClick={handleSubmit}
+            disabled={loading}
+            sx={{
+              bgcolor: "#064e3b",
+              color: "#ffffff",
+              fontWeight: 700,
+              px: 4,
+              py: 1.2,
+              borderRadius: 2.5,
+              textTransform: "none",
+              boxShadow: "0 6px 18px rgba(6, 78, 59, 0.35)",
+              "&:hover": { bgcolor: "#047857" },
+            }}
+          >
             {loading ? (
-              <CircularProgress size={22} color="inherit" />
-            ) : required ? (
-              "Next"
+              <CircularProgress size={20} color="inherit" />
             ) : (
-              "Save & Continue"
+              "Continue to Review"
             )}
           </Button>
-        </Box>
+        </Stack>
       </Box>
     </Box>
   );

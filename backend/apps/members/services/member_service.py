@@ -382,9 +382,6 @@ class MemberService:
             "first_name":
                 member.first_name,
 
-            "other_names":
-                member.other_names,
-
             "national_id":
                 member.national_id,
 
@@ -478,6 +475,14 @@ class MemberService:
         """
         Activate member.
         """
+
+        if member.registration_stage not in (
+            Member.RegistrationStage.APPROVED,
+            Member.RegistrationStage.ACTIVE,
+        ):
+            raise ValidationError(
+                "Member must be APPROVED before their account can be activated."
+            )
 
         old_data = deepcopy(
             MemberService._member_to_dict(
@@ -573,6 +578,11 @@ class MemberService:
         - Sets member status to ACTIVE
         - Creates audit and workflow history records
         """
+
+        if member.registration_stage != Member.RegistrationStage.APPROVED:
+            raise ValidationError(
+                "Member must be in APPROVED stage before registration can be completed."
+            )
 
         MemberService._validate_completion(
             member

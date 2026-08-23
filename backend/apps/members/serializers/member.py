@@ -22,6 +22,11 @@ class MemberSerializer(serializers.ModelSerializer):
         read_only=True,
     )
 
+    category_code = serializers.CharField(
+        source="category.code",
+        read_only=True,
+    )
+
     created_by_username = serializers.CharField(
         source="created_by.username",
         read_only=True,
@@ -71,6 +76,7 @@ class MemberSerializer(serializers.ModelSerializer):
 
             "category",
             "category_name",
+            "category_code",
 
             "first_name",
             "other_names",
