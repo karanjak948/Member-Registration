@@ -257,6 +257,29 @@ export default function WorkflowToolbar({
                 </Button>
               )}
 
+              {can(PERMISSIONS.DEACTIVATE_MEMBERS) && member.status === "ACTIVE" && (
+                <Button
+                  variant="outlined"
+                  startIcon={<IconUserX size={18} />}
+                  onClick={onDeactivate}
+                  sx={{
+                    borderColor: "#f59e0b",
+                    color: "#d97706",
+                    fontWeight: 800,
+                    fontSize: "0.9rem",
+                    px: 2.5,
+                    py: 1,
+                    borderRadius: 2.5,
+                    "&:hover": {
+                      borderColor: "#d97706",
+                      bgcolor: "#fffbeb",
+                    },
+                  }}
+                >
+                  Deactivate Account
+                </Button>
+              )}
+
               {can(PERMISSIONS.ACTIVATE_MEMBERS) && member.status === "INACTIVE" && (
                 <Button
                   variant="contained"

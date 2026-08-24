@@ -15,7 +15,6 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-import { LoadingButton } from "@mui/lab";
 import {
   IconUserX,
   IconId,
@@ -60,17 +59,13 @@ export default function DeactivateMemberDialog({
   async function handleDeactivate() {
     if (!member) return;
 
-    if (!remarks.trim()) {
-      setInternalError("Please provide a reason for deactivating this member account.");
-      return;
-    }
-
     try {
       setInternalError("");
+      const deactivationRemarks = remarks.trim() || "Deactivated by administrator";
       if (onDeactivate) {
-        await onDeactivate(remarks);
+        await onDeactivate(deactivationRemarks);
       } else {
-        await workflow.deactivate(member.id, remarks);
+        await workflow.deactivate(member.id, deactivationRemarks);
       }
       if (onSuccess) {
         onSuccess();
@@ -202,7 +197,7 @@ export default function DeactivateMemberDialog({
           {/* Reason Field */}
           <Box>
             <Typography variant="subtitle2" fontWeight={800} sx={{ mb: 0.8, color: "#1e293b" }}>
-              Deactivation Reason <span style={{ color: "#b45309" }}>*</span>
+              Deactivation Reason <span style={{ color: "#64748b", fontWeight: 500 }}>(Optional)</span>
             </Typography>
             <TextField
               fullWidth
@@ -259,7 +254,7 @@ export default function DeactivateMemberDialog({
           Cancel
         </Button>
 
-        <LoadingButton
+        <Button
           variant="contained"
           onClick={handleDeactivate}
           loading={isLoading}
@@ -276,7 +271,7 @@ export default function DeactivateMemberDialog({
           }}
         >
           Deactivate Member
-        </LoadingButton>
+        </Button>
       </DialogActions>
     </Dialog>
   );

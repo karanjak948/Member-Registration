@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import {
   Alert,
   Box,
+  Button,
   Chip,
   CircularProgress,
   Container,
@@ -19,14 +20,18 @@ import {
 import {
   IconUsers,
   IconUserCheck,
+  IconUserX,
   IconClockHour4,
   IconCategory,
   IconFilter,
+  IconX,
 } from "@tabler/icons-react";
 
 import memberService from "@/services/member.service";
 import { Member } from "@/interfaces/member";
 import { useMembers } from "@/hooks/useMembers";
+import { usePermissions } from "@/hooks/usePermissions";
+import { PERMISSIONS } from "@/constants/permissions";
 
 import MemberToolbar from "@/components/members/MemberToolbar";
 import MemberDataGrid from "@/components/members/MemberDataGrid";
@@ -37,10 +42,13 @@ import ActivateMemberDialog from "@/components/members/ActivateMemberDialog";
 import DeactivateMemberDialog from "@/components/members/DeactivateMemberDialog";
 import CompleteRegistrationDialog from "@/components/members/CompleteRegistrationDialog";
 import DeleteMemberDialog from "@/components/members/DeleteMemberDialog";
+import BulkActivateMembersDialog from "@/components/members/BulkActivateMembersDialog";
+import BulkDeactivateMembersDialog from "@/components/members/BulkDeactivateMembersDialog";
 
 export default function MembersPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { can } = usePermissions();
 
   const { members, loading, error, refresh } = useMembers();
 
@@ -50,6 +58,7 @@ export default function MembersPage() {
   const [categoryFilter, setCategoryFilter] = useState("");
 
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
+  const [selectedRowIds, setSelectedRowIds] = useState<number[]>([]);
 
   // Sync category filter from URL search params on mount or param change
   useEffect(() => {
@@ -86,6 +95,8 @@ export default function MembersPage() {
   const [deactivateOpen, setDeactivateOpen] = useState(false);
   const [completeRegistrationOpen, setCompleteRegistrationOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [bulkActivateOpen, setBulkActivateOpen] = useState(false);
+  const [bulkDeactivateOpen, setBulkDeactivateOpen] = useState(false);
 
   // ----------------------------------------------------
   // Action State (for delete only)
@@ -107,6 +118,11 @@ export default function MembersPage() {
     setSnackbarSeverity(severity);
     setSnackbarOpen(true);
   };
+
+  // Selected Members object list
+  const selectedMembers = useMemo(() => {
+    return members.filter((m) => selectedRowIds.includes(m.id));
+  }, [members, selectedRowIds]);
 
   // ----------------------------------------------------
   // Filtering
@@ -152,6 +168,8 @@ export default function MembersPage() {
     setDeactivateOpen(false);
     setCompleteRegistrationOpen(false);
     setDeleteOpen(false);
+    setBulkActivateOpen(false);
+    setBulkDeactivateOpen(false);
 
     setSelectedMember(null);
     setActionError("");
@@ -337,6 +355,113 @@ export default function MembersPage() {
           </Box>
         )}
 
+        {/* Bulk Action Toolbar */}
+        {selectedRowIds.length > 0 && (
+          <Paper
+            elevation={0}
+            sx={{
+              p: 2,
+              mb: 2,
+              borderRadius: 2.5,
+              background: "linear-gradient(135deg, #0f172a 0%, #1e293b 100%)",
+              color: "#ffffff",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              flexWrap: "wrap",
+              gap: 1.5,
+              boxShadow: "0 10px 25px -5px rgba(15, 23, 42, 0.35)",
+              border: "1px solid #334155",
+            }}
+          >
+            <Stack direction="row" spacing={1.5} alignItems="center">
+              <Box
+                sx={{
+                  width: 34,
+                  height: 34,
+                  borderRadius: 2,
+                  bgcolor: "rgba(16, 185, 129, 0.2)",
+                  border: "1px solid rgba(16, 185, 129, 0.4)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  color: "#34d399",
+                }}
+              >
+                <IconUsers size={20} />
+              </Box>
+              <Box>
+                <Typography variant="subtitle2" fontWeight={800} sx={{ color: "#f8fafc" }}>
+                  {selectedRowIds.length} {selectedRowIds.length === 1 ? "member" : "members"} selected
+                </Typography>
+                <Typography variant="caption" sx={{ color: "#94a3b8", fontWeight: 600 }}>
+                  Choose a batch action to apply across all selected accounts
+                </Typography>
+              </Box>
+            </Stack>
+
+            <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap">
+              {can(PERMISSIONS.ACTIVATE_MEMBERS) && (
+                <Button
+                  variant="contained"
+                  size="small"
+                  startIcon={<IconUserCheck size={18} />}
+                  onClick={() => setBulkActivateOpen(true)}
+                  sx={{
+                    bgcolor: "#059669",
+                    color: "#ffffff",
+                    fontWeight: 800,
+                    borderRadius: 2,
+                    px: 2,
+                    py: 0.75,
+                    boxShadow: "0 4px 12px rgba(5, 150, 105, 0.3)",
+                    "&:hover": { bgcolor: "#047857" },
+                  }}
+                >
+                  Bulk Activate
+                </Button>
+              )}
+
+              {can(PERMISSIONS.DEACTIVATE_MEMBERS) && (
+                <Button
+                  variant="contained"
+                  size="small"
+                  startIcon={<IconUserX size={18} />}
+                  onClick={() => setBulkDeactivateOpen(true)}
+                  sx={{
+                    bgcolor: "#b45309",
+                    color: "#ffffff",
+                    fontWeight: 800,
+                    borderRadius: 2,
+                    px: 2,
+                    py: 0.75,
+                    boxShadow: "0 4px 12px rgba(180, 83, 9, 0.3)",
+                    "&:hover": { bgcolor: "#92400e" },
+                  }}
+                >
+                  Bulk Deactivate
+                </Button>
+              )}
+
+              <Button
+                variant="outlined"
+                size="small"
+                startIcon={<IconX size={16} />}
+                onClick={() => setSelectedRowIds([])}
+                sx={{
+                  color: "#cbd5e1",
+                  borderColor: "#475569",
+                  fontWeight: 700,
+                  borderRadius: 2,
+                  "&:hover": { borderColor: "#94a3b8", bgcolor: "rgba(255, 255, 255, 0.05)" },
+                }}
+              >
+                Clear Selection
+              </Button>
+            </Stack>
+          </Paper>
+        )}
+
         <Box>
           {loading ? (
             <Box display="flex" justifyContent="center" py={8}>
@@ -348,6 +473,8 @@ export default function MembersPage() {
             <MemberDataGrid
               members={filteredMembers}
               loading={loading}
+              selectedRowIds={selectedRowIds}
+              onSelectionChange={setSelectedRowIds}
               onView={(member) => router.push(`/members/${member.id}`)}
               onEdit={(member) => router.push(`/members/${member.id}/edit`)}
               onApprove={openApprove}
@@ -457,6 +584,38 @@ export default function MembersPage() {
         onClose={closeDialogs}
         onDelete={handleDelete}
       />
+
+      <BulkActivateMembersDialog
+        open={bulkActivateOpen}
+        selectedMembers={selectedMembers}
+        onClose={closeDialogs}
+        onSuccess={async (activatedCount, skippedCount) => {
+          setSelectedRowIds([]);
+          await refresh();
+          const message =
+            skippedCount > 0
+              ? `Successfully activated ${activatedCount} member(s). ${skippedCount} skipped.`
+              : `Successfully activated ${activatedCount} member(s).`;
+          showSnackbar(message, "success");
+          closeDialogs();
+        }}
+      />
+
+      <BulkDeactivateMembersDialog
+        open={bulkDeactivateOpen}
+        selectedMembers={selectedMembers}
+        onClose={closeDialogs}
+        onSuccess={async (deactivatedCount) => {
+          setSelectedRowIds([]);
+          await refresh();
+          showSnackbar(
+            `Successfully deactivated ${deactivatedCount} member(s).`,
+            "success",
+          );
+          closeDialogs();
+        }}
+      />
     </>
   );
 }
+

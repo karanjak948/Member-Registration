@@ -1,7 +1,12 @@
 "use client";
 
 import { useMemo } from "react";
-import { DataGrid, GridActionsCellItem, GridColDef } from "@mui/x-data-grid";
+import {
+  DataGrid,
+  GridActionsCellItem,
+  GridColDef,
+  GridRowSelectionModel,
+} from "@mui/x-data-grid";
 import { Avatar, Box, Chip, Stack, Typography } from "@mui/material";
 import {
   IconEye,
@@ -28,6 +33,9 @@ import { getMediaUrl } from "@/utils/media";
 interface MemberDataGridProps {
   members: Member[];
   loading?: boolean;
+  checkboxSelection?: boolean;
+  selectedRowIds?: number[];
+  onSelectionChange?: (selectedIds: number[]) => void;
   onView: (member: Member) => void;
   onEdit: (member: Member) => void;
   onApprove: (member: Member) => void;
@@ -41,6 +49,9 @@ interface MemberDataGridProps {
 export default function MemberDataGrid({
   members,
   loading = false,
+  checkboxSelection = true,
+  selectedRowIds = [],
+  onSelectionChange,
   onView,
   onEdit,
   onApprove,
@@ -479,7 +490,7 @@ export default function MemberDataGrid({
             }
           }
 
-          // 4. STAGE 2: APPROVED -> Can Complete Registration and/or Activate
+          // 4. Complete Registration (Available when in APPROVED stage)
           if (member.registration_stage === "APPROVED") {
             if (can(PERMISSIONS.COMPLETE_REGISTRATION)) {
               actions.push(
@@ -492,22 +503,13 @@ export default function MemberDataGrid({
                 />,
               );
             }
-
-            if (can(PERMISSIONS.ACTIVATE_MEMBERS) && member.status === "INACTIVE") {
-              actions.push(
-                <GridActionsCellItem
-                  key="activate"
-                  icon={<IconUserCheck size={18} color="#059669" />}
-                  label="Activate Account"
-                  onClick={() => onActivate(member)}
-                  showInMenu={true}
-                />,
-              );
-            }
           }
 
-          // 5. STAGE 3: ACTIVE (Completed) -> Can Deactivate or Reactivate Account
-          if (member.registration_stage === "ACTIVE") {
+          // 5. Account Lifecycle Actions (Deactivate active accounts / Reactivate inactive accounts)
+          if (
+            member.registration_stage === "APPROVED" ||
+            member.registration_stage === "ACTIVE"
+          ) {
             if (can(PERMISSIONS.DEACTIVATE_MEMBERS) && member.status === "ACTIVE") {
               actions.push(
                 <GridActionsCellItem
@@ -561,6 +563,13 @@ export default function MemberDataGrid({
     ],
   );
 
+  const rowSelectionModel = useMemo<GridRowSelectionModel>(() => {
+    return {
+      type: "include",
+      ids: new Set(selectedRowIds),
+    };
+  }, [selectedRowIds]);
+
   return (
     <Box
       sx={{
@@ -587,6 +596,15 @@ export default function MemberDataGrid({
         "& .MuiDataGrid-cell": {
           borderBottom: "none",
         },
+        "& .MuiCheckbox-root": {
+          color: "#94a3b8",
+          "&.Mui-checked": {
+            color: "#059669",
+          },
+          "&.MuiCheckbox-indeterminate": {
+            color: "#059669",
+          },
+        },
       }}
     >
       <DataGrid
@@ -596,6 +614,17 @@ export default function MemberDataGrid({
         autoHeight
         rowHeight={64}
         columnHeaderHeight={52}
+        checkboxSelection={checkboxSelection}
+        rowSelectionModel={rowSelectionModel}
+        onRowSelectionModelChange={(newModel) => {
+          if (!onSelectionChange) return;
+          if (newModel.type === "include") {
+            onSelectionChange(Array.from(newModel.ids).map(Number));
+          } else {
+            const allIds = members.map((m) => m.id);
+            onSelectionChange(allIds.filter((id) => !newModel.ids.has(id)));
+          }
+        }}
         pageSizeOptions={[10, 25, 50]}
         initialState={{
           pagination: {

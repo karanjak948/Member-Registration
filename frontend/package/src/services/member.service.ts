@@ -155,6 +155,35 @@ class MemberService {
 
     return data;
   }
+
+  /**
+   * Bulk activate members.
+   */
+  async bulkActivate(
+    memberIds: number[]
+  ): Promise<{ activated_count: number; activated_ids: number[]; skipped: Array<{ id: number; name: string; reason: string }> }> {
+    const { data } = await api.post(
+      `/members/bulk-activate/`,
+      { member_ids: memberIds }
+    );
+
+    return data;
+  }
+
+  /**
+   * Bulk deactivate members.
+   */
+  async bulkDeactivate(
+    memberIds: number[],
+    reason = ""
+  ): Promise<{ deactivated_count: number; deactivated_ids: number[] }> {
+    const { data } = await api.post(
+      `/members/bulk-deactivate/`,
+      { member_ids: memberIds, reason }
+    );
+
+    return data;
+  }
 }
 
 export default new MemberService();
