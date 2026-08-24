@@ -194,3 +194,54 @@ class MemberViewSet(OrganizationScopedViewSet):
             self.get_serializer(member).data,
             status=status.HTTP_200_OK,
         )
+
+    @action(
+        detail=False,
+        methods=["post"],
+        url_path="bulk-activate",
+    )
+    def bulk_activate(self, request):
+        member_ids = request.data.get("member_ids", [])
+        if not isinstance(member_ids, list) or not member_ids:
+            return Response(
+                {"detail": "member_ids must be a non-empty list of integers."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        result = MemberService.bulk_activate_members(
+            member_ids=member_ids,
+            user=request.user,
+            organization=self.get_organization(),
+        )
+
+        return Response(
+            result,
+            status=status.HTTP_200_OK,
+        )
+
+    @action(
+        detail=False,
+        methods=["post"],
+        url_path="bulk-deactivate",
+    )
+    def bulk_deactivate(self, request):
+        member_ids = request.data.get("member_ids", [])
+        reason = request.data.get("reason", "")
+
+        if not isinstance(member_ids, list) or not member_ids:
+            return Response(
+                {"detail": "member_ids must be a non-empty list of integers."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        result = MemberService.bulk_deactivate_members(
+            member_ids=member_ids,
+            user=request.user,
+            organization=self.get_organization(),
+            reason=reason,
+        )
+
+        return Response(
+            result,
+            status=status.HTTP_200_OK,
+        )

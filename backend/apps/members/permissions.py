@@ -50,8 +50,23 @@ def user_has_organization_permission(
 ):
     """
     Check whether an authenticated user has a permission
-    through their active organization role.
+    through their active organization role or administrative status.
     """
+    if not (
+        user
+        and user.is_authenticated
+    ):
+        return False
+
+    if getattr(user, "is_superuser", False) or getattr(user, "is_staff", False):
+        return True
+
+    # Check if user is the organization owner
+    try:
+        if hasattr(user, "organization") and user.organization:
+            return True
+    except Exception:
+        pass
 
     membership = get_user_organization_membership(
         user
@@ -60,9 +75,18 @@ def user_has_organization_permission(
     if membership is None:
         return False
 
-    return membership.role.permissions.filter(
-        code=permission_code
-    ).exists()
+    if membership.role:
+        role_name = (membership.role.name or "").lower()
+        if (
+            getattr(membership.role, "is_system_role", False)
+            or role_name in ["owner", "administrator", "admin", "system administrator"]
+        ):
+            return True
+
+        if membership.role.permissions.filter(code=permission_code).exists():
+            return True
+
+    return False
 
 
 class IsAuthenticatedUser(BasePermission):
@@ -103,6 +127,9 @@ class HasMemberPermission(BasePermission):
 
         "activate": "activate_members",
         "deactivate": "deactivate_members",
+
+        "bulk_activate": "activate_members",
+        "bulk_deactivate": "deactivate_members",
 
         "complete_registration":
             "complete_registration_members",

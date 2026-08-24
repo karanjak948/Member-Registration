@@ -644,3 +644,132 @@ class MemberService:
         )
 
         return member
+
+    @staticmethod
+    @transaction.atomic
+    def bulk_activate_members(
+        member_ids,
+        user,
+        organization,
+    ):
+        """
+        Bulk activate multiple members belonging to the organization.
+        Enforces stage checks (APPROVED or ACTIVE) and logs audits.
+        """
+        members = Member.objects.filter(
+            id__in=member_ids,
+            organization=organization,
+        )
+
+        activated_ids = []
+        skipped = []
+
+        for member in members:
+            if member.registration_stage not in (
+                Member.RegistrationStage.APPROVED,
+                Member.RegistrationStage.ACTIVE,
+            ):
+                skipped.append({
+                    "id": member.id,
+                    "name": f"{member.first_name or ''} {member.other_names or ''}".strip(),
+                    "reason": "Member must be in APPROVED stage before activation.",
+                })
+                continue
+
+            if member.status == Member.MemberStatus.ACTIVE:
+                continue
+
+            old_data = deepcopy(
+                MemberService._member_to_dict(member)
+            )
+
+            member.status = Member.MemberStatus.ACTIVE
+            member.activated_by = user
+            member.activated_at = timezone.now()
+            member.updated_by = user
+
+            member.save(
+                update_fields=[
+                    "status",
+                    "activated_by",
+                    "activated_at",
+                    "updated_by",
+                ]
+            )
+
+            MemberService._create_audit_log(
+                member=member,
+                action=MemberAudit.Action.ACTIVATE,
+                user=user,
+                old_data=old_data,
+                new_data=MemberService._member_to_dict(member),
+            )
+
+            activated_ids.append(member.id)
+
+        return {
+            "activated_count": len(activated_ids),
+            "activated_ids": activated_ids,
+            "skipped": skipped,
+        }
+
+    @staticmethod
+    @transaction.atomic
+    def bulk_deactivate_members(
+        member_ids,
+        user,
+        organization,
+        reason="",
+    ):
+        """
+        Bulk deactivate multiple members belonging to the organization.
+        Logs audits and workflow history.
+        """
+        members = Member.objects.filter(
+            id__in=member_ids,
+            organization=organization,
+        )
+
+        deactivated_ids = []
+
+        for member in members:
+            if member.status == Member.MemberStatus.INACTIVE:
+                continue
+
+            old_data = deepcopy(
+                MemberService._member_to_dict(member)
+            )
+
+            member.status = Member.MemberStatus.INACTIVE
+            member.updated_by = user
+
+            member.save(
+                update_fields=[
+                    "status",
+                    "updated_by",
+                ]
+            )
+
+            MemberService._create_audit_log(
+                member=member,
+                action=MemberAudit.Action.DEACTIVATE,
+                user=user,
+                old_data=old_data,
+                new_data=MemberService._member_to_dict(member),
+            )
+
+            if reason:
+                MemberService._create_workflow_history(
+                    member=member,
+                    previous_stage=member.registration_stage,
+                    current_stage=member.registration_stage,
+                    user=user,
+                    remarks=f"Bulk Deactivation: {reason}",
+                )
+
+            deactivated_ids.append(member.id)
+
+        return {
+            "deactivated_count": len(deactivated_ids),
+            "deactivated_ids": deactivated_ids,
+        }
