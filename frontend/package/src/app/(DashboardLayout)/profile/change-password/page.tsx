@@ -1,15 +1,13 @@
 "use client";
 
 import { ChangeEvent, FormEvent, useMemo, useState } from "react";
-
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 import {
   Alert,
   Box,
   Button,
-  Card,
-  CardContent,
   Chip,
   CircularProgress,
   Container,
@@ -18,19 +16,28 @@ import {
   IconButton,
   InputAdornment,
   LinearProgress,
+  Paper,
   Snackbar,
   Stack,
   TextField,
   Typography,
 } from "@mui/material";
 
-import ArrowBackIcon from "@mui/icons-material/ArrowBack";
-import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
-import CloseIcon from "@mui/icons-material/Close";
-import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
-import SaveOutlinedIcon from "@mui/icons-material/SaveOutlined";
-import VisibilityIcon from "@mui/icons-material/Visibility";
-import VisibilityOffIcon from "@mui/icons-material/VisibilityOff";
+import {
+  IconArrowLeft,
+  IconLock,
+  IconCheck,
+  IconX,
+  IconEye,
+  IconEyeOff,
+  IconDeviceFloppy,
+  IconShieldLock,
+  IconKey,
+  IconShieldCheck,
+  IconAlertCircle,
+  IconUser,
+  IconBuildingBank,
+} from "@tabler/icons-react";
 
 import api from "@/services/api";
 
@@ -62,7 +69,6 @@ export default function ChangePasswordPage() {
   });
 
   const [errors, setErrors] = useState<PasswordErrors>({});
-
   const [visibility, setVisibility] = useState<PasswordVisibility>({
     current: false,
     new: false,
@@ -70,23 +76,16 @@ export default function ChangePasswordPage() {
   });
 
   const [loading, setLoading] = useState(false);
-
   const [error, setError] = useState("");
-
   const [success, setSuccess] = useState(false);
 
   const requirements = useMemo(() => {
     const password = form.new_password;
-
     return {
       length: password.length >= 8,
-
       uppercase: /[A-Z]/.test(password),
-
       lowercase: /[a-z]/.test(password),
-
       number: /\d/.test(password),
-
       special: /[^A-Za-z0-9]/.test(password),
     };
   }, [form.new_password]);
@@ -97,8 +96,9 @@ export default function ChangePasswordPage() {
     if (form.new_password.length === 0) {
       return {
         score: 0,
-        label: "Not entered",
+        label: "Awaiting Input",
         color: "inherit" as const,
+        barColor: "#e2e8f0",
       };
     }
 
@@ -107,6 +107,7 @@ export default function ChangePasswordPage() {
         score: 25,
         label: "Weak",
         color: "error" as const,
+        barColor: "#ef4444",
       };
     }
 
@@ -115,6 +116,7 @@ export default function ChangePasswordPage() {
         score: 50,
         label: "Fair",
         color: "warning" as const,
+        barColor: "#f59e0b",
       };
     }
 
@@ -123,13 +125,15 @@ export default function ChangePasswordPage() {
         score: 75,
         label: "Good",
         color: "info" as const,
+        barColor: "#0284c7",
       };
     }
 
     return {
       score: 100,
-      label: "Strong",
+      label: "Strong & Secure",
       color: "success" as const,
+      barColor: "#059669",
     };
   }, [form.new_password, requirements]);
 
@@ -139,17 +143,14 @@ export default function ChangePasswordPage() {
 
   function handleChange(e: ChangeEvent<HTMLInputElement>) {
     const { name, value } = e.target;
-
     setForm((previous) => ({
       ...previous,
       [name]: value,
     }));
-
     setErrors((previous) => ({
       ...previous,
       [name]: undefined,
     }));
-
     setError("");
   }
 
@@ -191,32 +192,21 @@ export default function ChangePasswordPage() {
     }
 
     setErrors(nextErrors);
-
     return Object.keys(nextErrors).length === 0;
   }
 
   function getBackendError(value: unknown): string | undefined {
-    if (!value) {
-      return undefined;
-    }
-
+    if (!value) return undefined;
     if (Array.isArray(value)) {
       return value.length > 0 ? String(value[0]) : undefined;
     }
-
     return String(value);
   }
 
   async function handleSubmit(e?: FormEvent<HTMLFormElement>) {
     e?.preventDefault();
-
-    if (loading) {
-      return;
-    }
-
-    if (!validateForm()) {
-      return;
-    }
+    if (loading) return;
+    if (!validateForm()) return;
 
     setLoading(true);
     setError("");
@@ -224,9 +214,7 @@ export default function ChangePasswordPage() {
     try {
       await api.post("/auth/change-password/", {
         current_password: form.current_password,
-
         new_password: form.new_password,
-
         confirm_password: form.confirm_password,
       });
 
@@ -235,9 +223,7 @@ export default function ChangePasswordPage() {
         new_password: "",
         confirm_password: "",
       });
-
       setErrors({});
-
       setVisibility({
         current: false,
         new: false,
@@ -245,31 +231,26 @@ export default function ChangePasswordPage() {
       });
 
       setSuccess(true);
-
       setTimeout(() => {
         router.push("/profile");
         router.refresh();
       }, 1500);
     } catch (err: any) {
       console.error("Password update failed:", err);
-
       const data = err?.response?.data;
 
       if (data && typeof data === "object") {
         const backendErrors: PasswordErrors = {
           current_password: getBackendError(data.current_password),
-
           new_password: getBackendError(data.new_password),
-
           confirm_password: getBackendError(data.confirm_password),
         };
 
         setErrors(backendErrors);
-
         setError(
           getBackendError(data.detail) ??
             getBackendError(data.non_field_errors) ??
-            "Unable to update your password. Check the information below.",
+            "Unable to update your password. Check the requirements below."
         );
       } else {
         setError("Unable to update your password. Please try again.");
@@ -282,7 +263,7 @@ export default function ChangePasswordPage() {
   const passwordAdornment = (
     visible: boolean,
     onToggle: () => void,
-    label: string,
+    label: string
   ) => (
     <InputAdornment position="end">
       <IconButton
@@ -290,380 +271,520 @@ export default function ChangePasswordPage() {
         onClick={onToggle}
         onMouseDown={(e) => e.preventDefault()}
         aria-label={label}
+        sx={{ color: "#64748b" }}
       >
-        {visible ? <VisibilityOffIcon /> : <VisibilityIcon />}
+        {visible ? <IconEyeOff size={18} /> : <IconEye size={18} />}
       </IconButton>
     </InputAdornment>
   );
 
-  const Requirement = ({
+  const RequirementItem = ({
     passed,
-    children,
+    label,
   }: {
     passed: boolean;
-    children: React.ReactNode;
+    label: string;
   }) => (
-    <Stack direction="row" spacing={1} alignItems="center">
-      {passed ? (
-        <CheckCircleOutlineIcon color="success" fontSize="small" />
-      ) : (
-        <CloseIcon color="disabled" fontSize="small" />
-      )}
-
-      <Typography
-        variant="body2"
-        color={passed ? "text.primary" : "text.secondary"}
+    <Box
+      sx={{
+        p: 1.2,
+        borderRadius: 2,
+        bgcolor: passed ? "#f0fdf4" : "#f8fafc",
+        border: `1px solid ${passed ? "#bbf7d0" : "#e2e8f0"}`,
+        display: "flex",
+        alignItems: "center",
+        gap: 1.2,
+        transition: "all 0.2s ease",
+      }}
+    >
+      <Box
+        sx={{
+          width: 20,
+          height: 20,
+          borderRadius: "50%",
+          bgcolor: passed ? "#ecfdf5" : "#e2e8f0",
+          color: passed ? "#059669" : "#94a3b8",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          flexShrink: 0,
+        }}
       >
-        {children}
+        {passed ? <IconCheck size={13} stroke={3} /> : <IconX size={13} stroke={2.5} />}
+      </Box>
+      <Typography
+        variant="caption"
+        sx={{
+          fontWeight: passed ? 800 : 600,
+          color: passed ? "#065f46" : "#64748b",
+        }}
+      >
+        {label}
       </Typography>
-    </Stack>
+    </Box>
   );
 
   return (
-    <Container maxWidth="md">
-      <Stack direction="row" spacing={2} alignItems="center" mb={1}>
-        <IconButton
-          onClick={() => router.push("/profile")}
-          aria-label="Back to profile"
-        >
-          <ArrowBackIcon />
-        </IconButton>
-
-        <Typography variant="h4" fontWeight={700}>
-          Change Password
-        </Typography>
-      </Stack>
-
-      <Typography
-        variant="body1"
-        color="text.secondary"
-        mb={4}
+    <Container maxWidth="xl" sx={{ mt: 1, mb: 6 }}>
+      {/* ------------------------------------------------------------- */}
+      {/* Header Banner */}
+      {/* ------------------------------------------------------------- */}
+      <Paper
+        elevation={0}
         sx={{
-          ml: {
-            xs: 0,
-            sm: 7,
-          },
+          p: { xs: 2.5, sm: 3.5 },
+          mb: 4,
+          borderRadius: 3.5,
+          background: "linear-gradient(135deg, #064e3b 0%, #047857 60%, #059669 100%)",
+          color: "#ffffff",
+          boxShadow: "0 10px 28px rgba(6, 78, 59, 0.22)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          flexWrap: "wrap",
+          gap: 2,
         }}
       >
-        Update your account password and keep your login credentials secure.
-      </Typography>
+        <Stack direction="row" spacing={2} alignItems="center">
+          <IconButton
+            onClick={() => router.push("/profile")}
+            aria-label="Back to profile"
+            sx={{
+              bgcolor: "rgba(255, 255, 255, 0.15)",
+              color: "#ffffff",
+              borderRadius: 2.5,
+              "&:hover": { bgcolor: "rgba(255, 255, 255, 0.25)" },
+            }}
+          >
+            <IconArrowLeft size={22} />
+          </IconButton>
+
+          <Box>
+            <Typography variant="h5" fontWeight={900} sx={{ color: "#ffffff", letterSpacing: "-0.4px" }}>
+              Change Account Password
+            </Typography>
+            <Typography variant="caption" sx={{ color: "#d1fae5", fontWeight: 600 }}>
+              Strengthen credential protection and refresh your login authentication
+            </Typography>
+          </Box>
+        </Stack>
+
+        <Chip
+          icon={<IconShieldLock size={16} color="#ffffff" />}
+          label="Security Vault"
+          size="small"
+          sx={{
+            bgcolor: "rgba(255, 255, 255, 0.2)",
+            color: "#ffffff",
+            fontWeight: 800,
+            borderRadius: 2,
+          }}
+        />
+      </Paper>
 
       {error && (
-        <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError("")}>
+        <Alert severity="error" sx={{ mb: 3, borderRadius: 2.5, fontWeight: 700 }} onClose={() => setError("")}>
           {error}
         </Alert>
       )}
 
-      <Card>
-        <CardContent
-          sx={{
-            p: {
-              xs: 2.5,
-              sm: 4,
-            },
-          }}
-        >
-          <Stack direction="row" spacing={2} alignItems="center">
-            <Box
+      {/* ------------------------------------------------------------- */}
+      {/* 2-Column Responsive Layout */}
+      {/* ------------------------------------------------------------- */}
+      <Grid container spacing={3}>
+        {/* LEFT COLUMN: Security Policy & Requirements Checklist */}
+        <Grid size={{ xs: 12, lg: 4 }}>
+          <Stack spacing={3}>
+            {/* Password Policy Card */}
+            <Paper
+              elevation={0}
               sx={{
-                width: 52,
-                height: 52,
-                borderRadius: 2,
-                bgcolor: "primary.main",
-                color: "primary.contrastText",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                flexShrink: 0,
+                p: 3.5,
+                borderRadius: 3,
+                border: "1px solid #e2e8f0",
+                bgcolor: "#ffffff",
+                boxShadow: "0 4px 16px rgba(15, 23, 42, 0.04)",
               }}
             >
-              <LockOutlinedIcon />
-            </Box>
-
-            <Box>
-              <Typography variant="h6" fontWeight={700}>
-                Password Security
-              </Typography>
-
-              <Typography variant="body2" color="text.secondary">
-                Enter your current password before choosing a new one.
-              </Typography>
-            </Box>
-          </Stack>
-
-          <Divider sx={{ my: 3 }} />
-
-          <Box component="form" onSubmit={handleSubmit} noValidate>
-            <Grid container spacing={3}>
-              <Grid size={{ xs: 12 }}>
-                <TextField
-                  fullWidth
-                  required
-                  type={visibility.current ? "text" : "password"}
-                  label="Current Password"
-                  name="current_password"
-                  value={form.current_password}
-                  onChange={handleChange}
-                  error={!!errors.current_password}
-                  helperText={
-                    errors.current_password ??
-                    "Enter the password you currently use to sign in."
-                  }
-                  disabled={loading}
-                  autoComplete="current-password"
-                  slotProps={{
-                    input: {
-                      endAdornment: passwordAdornment(
-                        visibility.current,
-                        () => toggleVisibility("current"),
-                        visibility.current
-                          ? "Hide current password"
-                          : "Show current password",
-                      ),
-                    },
+              <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mb: 1.5 }}>
+                <Box
+                  sx={{
+                    width: 38,
+                    height: 38,
+                    borderRadius: 2,
+                    bgcolor: "#ecfdf5",
+                    color: "#059669",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
                   }}
-                />
-              </Grid>
+                >
+                  <IconShieldCheck size={22} />
+                </Box>
+                <Box>
+                  <Typography variant="subtitle1" fontWeight={800} color="#0f172a">
+                    Security Requirements
+                  </Typography>
+                  <Typography variant="caption" color="#64748b" fontWeight={600}>
+                    Mandatory password complexity
+                  </Typography>
+                </Box>
+              </Stack>
 
-              <Grid size={{ xs: 12 }}>
-                <TextField
-                  fullWidth
-                  required
-                  type={visibility.new ? "text" : "password"}
-                  label="New Password"
-                  name="new_password"
-                  value={form.new_password}
-                  onChange={handleChange}
-                  error={!!errors.new_password}
-                  helperText={
-                    errors.new_password ??
-                    "Choose a strong password you have not used for this account."
-                  }
-                  disabled={loading}
-                  autoComplete="new-password"
-                  slotProps={{
-                    input: {
-                      endAdornment: passwordAdornment(
-                        visibility.new,
-                        () => toggleVisibility("new"),
-                        visibility.new
-                          ? "Hide new password"
-                          : "Show new password",
-                      ),
-                    },
+              <Divider sx={{ my: 2 }} />
+
+              {/* Requirements Checklist */}
+              <Stack spacing={1.2}>
+                <RequirementItem
+                  passed={requirements.length}
+                  label="Minimum 8 characters in length"
+                />
+                <RequirementItem
+                  passed={requirements.uppercase}
+                  label="At least 1 uppercase letter (A-Z)"
+                />
+                <RequirementItem
+                  passed={requirements.lowercase}
+                  label="At least 1 lowercase letter (a-z)"
+                />
+                <RequirementItem
+                  passed={requirements.number}
+                  label="At least 1 numerical digit (0-9)"
+                />
+                <RequirementItem
+                  passed={requirements.special}
+                  label="At least 1 special symbol (!@#$%^&*)"
+                />
+              </Stack>
+
+              {/* Password Matching Live Indicator */}
+              {form.confirm_password && (
+                <Box
+                  sx={{
+                    mt: 2.5,
+                    p: 1.5,
+                    borderRadius: 2,
+                    bgcolor: passwordsMatch ? "#f0fdf4" : "#fef2f2",
+                    border: `1px solid ${passwordsMatch ? "#bbf7d0" : "#fecaca"}`,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 1,
                   }}
-                />
-              </Grid>
-
-              {form.new_password && (
-                <Grid size={{ xs: 12 }}>
-                  <Box
-                    sx={{
-                      p: 2.5,
-                      border: "1px solid",
-                      borderColor: "divider",
-                      borderRadius: 2,
-                      bgcolor: "background.default",
-                    }}
+                >
+                  {passwordsMatch ? (
+                    <IconCheck size={16} color="#059669" stroke={3} />
+                  ) : (
+                    <IconX size={16} color="#dc2626" stroke={3} />
+                  )}
+                  <Typography
+                    variant="caption"
+                    fontWeight={800}
+                    color={passwordsMatch ? "#065f46" : "#991b1b"}
                   >
-                    <Stack
-                      direction="row"
-                      justifyContent="space-between"
-                      alignItems="center"
-                      mb={1}
-                    >
-                      <Typography variant="subtitle2" fontWeight={700}>
-                        Password Strength
-                      </Typography>
-
-                      <Chip
-                        size="small"
-                        label={strength.label}
-                        color={
-                          strength.color === "inherit"
-                            ? "default"
-                            : strength.color
-                        }
-                        variant={strength.score === 0 ? "outlined" : "filled"}
-                      />
-                    </Stack>
-
-                    <LinearProgress
-                      variant="determinate"
-                      value={strength.score}
-                      color={
-                        strength.color === "inherit"
-                          ? "primary"
-                          : strength.color
-                      }
-                      sx={{
-                        height: 7,
-                        borderRadius: 10,
-                        mb: 2.5,
-                      }}
-                    />
-
-                    <Grid container spacing={1.5}>
-                      <Grid
-                        size={{
-                          xs: 12,
-                          sm: 6,
-                        }}
-                      >
-                        <Requirement passed={requirements.length}>
-                          At least 8 characters
-                        </Requirement>
-                      </Grid>
-
-                      <Grid
-                        size={{
-                          xs: 12,
-                          sm: 6,
-                        }}
-                      >
-                        <Requirement passed={requirements.uppercase}>
-                          One uppercase letter
-                        </Requirement>
-                      </Grid>
-
-                      <Grid
-                        size={{
-                          xs: 12,
-                          sm: 6,
-                        }}
-                      >
-                        <Requirement passed={requirements.lowercase}>
-                          One lowercase letter
-                        </Requirement>
-                      </Grid>
-
-                      <Grid
-                        size={{
-                          xs: 12,
-                          sm: 6,
-                        }}
-                      >
-                        <Requirement passed={requirements.number}>
-                          One number
-                        </Requirement>
-                      </Grid>
-
-                      <Grid
-                        size={{
-                          xs: 12,
-                          sm: 6,
-                        }}
-                      >
-                        <Requirement passed={requirements.special}>
-                          One special character
-                        </Requirement>
-                      </Grid>
-                    </Grid>
-                  </Box>
-                </Grid>
+                    {passwordsMatch
+                      ? "Confirmation passwords match"
+                      : "Passwords do not match"}
+                  </Typography>
+                </Box>
               )}
+            </Paper>
 
-              <Grid size={{ xs: 12 }}>
-                <TextField
-                  fullWidth
-                  required
-                  type={visibility.confirm ? "text" : "password"}
-                  label="Confirm New Password"
-                  name="confirm_password"
-                  value={form.confirm_password}
-                  onChange={handleChange}
-                  error={
-                    !!errors.confirm_password ||
-                    (form.confirm_password.length > 0 && !passwordsMatch)
-                  }
-                  helperText={
-                    errors.confirm_password ??
-                    (form.confirm_password.length > 0
-                      ? passwordsMatch
-                        ? "Passwords match."
-                        : "Passwords do not match."
-                      : "Enter the new password again to confirm it.")
-                  }
-                  disabled={loading}
-                  autoComplete="new-password"
-                  slotProps={{
-                    input: {
-                      endAdornment: passwordAdornment(
-                        visibility.confirm,
-                        () => toggleVisibility("confirm"),
-                        visibility.confirm
-                          ? "Hide confirmation password"
-                          : "Show confirmation password",
-                      ),
-                    },
-                  }}
-                />
-              </Grid>
-            </Grid>
-
-            <Alert severity="info" sx={{ mt: 3 }}>
-              After changing your password, use the new password the next time
-              you sign in. Do not reuse a password from another account.
-            </Alert>
-
-            <Divider sx={{ my: 4 }} />
-
-            <Stack
-              direction={{
-                xs: "column-reverse",
-                sm: "row",
+            {/* Quick Best Practice Card */}
+            <Paper
+              elevation={0}
+              sx={{
+                p: 3,
+                borderRadius: 3,
+                border: "1px solid #bbf7d0",
+                bgcolor: "#f0fdf4",
               }}
-              justifyContent="space-between"
-              spacing={2}
             >
-              <Button
-                variant="outlined"
-                disabled={loading}
-                onClick={() => router.push("/profile")}
-              >
-                Cancel
-              </Button>
+              <Stack direction="row" spacing={1.5} alignItems="flex-start">
+                <IconAlertCircle size={20} color="#059669" style={{ marginTop: 2, flexShrink: 0 }} />
+                <Box>
+                  <Typography variant="subtitle2" fontWeight={800} color="#065f46">
+                    Security Recommendation
+                  </Typography>
+                  <Typography variant="caption" color="#047857" fontWeight={600} sx={{ display: "block", mt: 0.5, lineHeight: 1.5 }}>
+                    Never share your Royal SACCO login credentials with third parties. Use a unique password not shared with any external personal accounts.
+                  </Typography>
+                </Box>
+              </Stack>
+            </Paper>
+          </Stack>
+        </Grid>
 
-              <Button
-                type="submit"
-                variant="contained"
-                disabled={
-                  loading ||
-                  !form.current_password ||
-                  !form.new_password ||
-                  !form.confirm_password
-                }
-                startIcon={loading ? undefined : <SaveOutlinedIcon />}
-                sx={{
-                  minWidth: 180,
-                }}
-              >
-                {loading ? (
-                  <CircularProgress size={22} color="inherit" />
-                ) : (
-                  "Update Password"
+        {/* RIGHT COLUMN: Password Update Form */}
+        <Grid size={{ xs: 12, lg: 8 }}>
+          <Paper
+            elevation={0}
+            sx={{
+              p: { xs: 3, sm: 4.5 },
+              borderRadius: 3,
+              border: "1px solid #e2e8f0",
+              bgcolor: "#ffffff",
+              boxShadow: "0 4px 16px rgba(15, 23, 42, 0.04)",
+            }}
+          >
+            <Typography variant="h6" fontWeight={800} color="#0f172a">
+              Enter Credential Details
+            </Typography>
+            <Typography variant="caption" color="#64748b" fontWeight={600}>
+              Verify your current password to authorize setting the new credentials
+            </Typography>
+
+            <Divider sx={{ my: 3 }} />
+
+            <Box component="form" onSubmit={handleSubmit} noValidate>
+              <Grid container spacing={3}>
+                {/* Current Password */}
+                <Grid size={{ xs: 12 }}>
+                  <TextField
+                    fullWidth
+                    required
+                    type={visibility.current ? "text" : "password"}
+                    label="Current Password"
+                    name="current_password"
+                    value={form.current_password}
+                    onChange={handleChange}
+                    error={!!errors.current_password}
+                    helperText={
+                      errors.current_password ?? "Enter the existing password you currently use to sign in."
+                    }
+                    disabled={loading}
+                    autoComplete="current-password"
+                    slotProps={{
+                      input: {
+                        startAdornment: (
+                          <InputAdornment position="start">
+                            <IconKey size={18} color="#64748b" />
+                          </InputAdornment>
+                        ),
+                        endAdornment: passwordAdornment(
+                          visibility.current,
+                          () => toggleVisibility("current"),
+                          visibility.current ? "Hide password" : "Show password"
+                        ),
+                      },
+                    }}
+                    sx={{
+                      "& .MuiOutlinedInput-root": {
+                        borderRadius: 2.5,
+                        bgcolor: "#f8fafc",
+                        "&:hover fieldset": { borderColor: "#059669" },
+                        "&.Mui-focused fieldset": { borderColor: "#059669" },
+                      },
+                    }}
+                  />
+                </Grid>
+
+                {/* New Password */}
+                <Grid size={{ xs: 12 }}>
+                  <TextField
+                    fullWidth
+                    required
+                    type={visibility.new ? "text" : "password"}
+                    label="New Password"
+                    name="new_password"
+                    value={form.new_password}
+                    onChange={handleChange}
+                    error={!!errors.new_password}
+                    helperText={
+                      errors.new_password ?? "Choose a robust passphrase fulfilling the policy on the left."
+                    }
+                    disabled={loading}
+                    autoComplete="new-password"
+                    slotProps={{
+                      input: {
+                        startAdornment: (
+                          <InputAdornment position="start">
+                            <IconLock size={18} color="#64748b" />
+                          </InputAdornment>
+                        ),
+                        endAdornment: passwordAdornment(
+                          visibility.new,
+                          () => toggleVisibility("new"),
+                          visibility.new ? "Hide new password" : "Show new password"
+                        ),
+                      },
+                    }}
+                    sx={{
+                      "& .MuiOutlinedInput-root": {
+                        borderRadius: 2.5,
+                        bgcolor: "#f8fafc",
+                        "&:hover fieldset": { borderColor: "#059669" },
+                        "&.Mui-focused fieldset": { borderColor: "#059669" },
+                      },
+                    }}
+                  />
+                </Grid>
+
+                {/* Live Password Strength Meter */}
+                {form.new_password && (
+                  <Grid size={{ xs: 12 }}>
+                    <Box
+                      sx={{
+                        p: 2.5,
+                        borderRadius: 2.5,
+                        bgcolor: "#f8fafc",
+                        border: "1px solid #e2e8f0",
+                      }}
+                    >
+                      <Stack direction="row" justifyContent="space-between" alignItems="center" mb={1.2}>
+                        <Typography variant="caption" fontWeight={800} color="#334155" textTransform="uppercase">
+                          Calculated Strength
+                        </Typography>
+
+                        <Chip
+                          size="small"
+                          label={strength.label}
+                          color={strength.color === "inherit" ? "default" : strength.color}
+                          sx={{ fontWeight: 800, fontSize: "0.72rem", borderRadius: 1.5 }}
+                        />
+                      </Stack>
+
+                      <LinearProgress
+                        variant="determinate"
+                        value={strength.score}
+                        sx={{
+                          height: 8,
+                          borderRadius: 4,
+                          bgcolor: "#e2e8f0",
+                          "& .MuiLinearProgress-bar": {
+                            bgcolor: strength.barColor,
+                            borderRadius: 4,
+                          },
+                        }}
+                      />
+                    </Box>
+                  </Grid>
                 )}
-              </Button>
-            </Stack>
-          </Box>
-        </CardContent>
-      </Card>
 
+                {/* Confirm New Password */}
+                <Grid size={{ xs: 12 }}>
+                  <TextField
+                    fullWidth
+                    required
+                    type={visibility.confirm ? "text" : "password"}
+                    label="Confirm New Password"
+                    name="confirm_password"
+                    value={form.confirm_password}
+                    onChange={handleChange}
+                    error={
+                      !!errors.confirm_password ||
+                      (form.confirm_password.length > 0 && !passwordsMatch)
+                    }
+                    helperText={
+                      errors.confirm_password ??
+                      (form.confirm_password.length > 0
+                        ? passwordsMatch
+                          ? "Passwords match."
+                          : "Passwords do not match."
+                        : "Re-enter the new password to confirm.")
+                    }
+                    disabled={loading}
+                    autoComplete="new-password"
+                    slotProps={{
+                      input: {
+                        startAdornment: (
+                          <InputAdornment position="start">
+                            <IconLock size={18} color="#64748b" />
+                          </InputAdornment>
+                        ),
+                        endAdornment: passwordAdornment(
+                          visibility.confirm,
+                          () => toggleVisibility("confirm"),
+                          visibility.confirm ? "Hide confirmation" : "Show confirmation"
+                        ),
+                      },
+                    }}
+                    sx={{
+                      "& .MuiOutlinedInput-root": {
+                        borderRadius: 2.5,
+                        bgcolor: "#f8fafc",
+                        "&:hover fieldset": { borderColor: "#059669" },
+                        "&.Mui-focused fieldset": { borderColor: "#059669" },
+                      },
+                    }}
+                  />
+                </Grid>
+              </Grid>
+
+              <Alert severity="info" sx={{ mt: 3.5, borderRadius: 2.5, fontWeight: 600 }}>
+                After updating your password, you will use the new password on your next login session.
+              </Alert>
+
+              <Divider sx={{ my: 4 }} />
+
+              <Stack
+                direction={{ xs: "column-reverse", sm: "row" }}
+                justifyContent="space-between"
+                alignItems="center"
+                spacing={2}
+              >
+                <Button
+                  variant="outlined"
+                  disabled={loading}
+                  onClick={() => router.push("/profile")}
+                  sx={{
+                    fontWeight: 800,
+                    borderRadius: 2,
+                    px: 3,
+                    borderColor: "#cbd5e1",
+                    color: "#475569",
+                  }}
+                >
+                  Cancel
+                </Button>
+
+                <Button
+                  type="submit"
+                  variant="contained"
+                  disabled={
+                    loading ||
+                    !form.current_password ||
+                    !form.new_password ||
+                    !form.confirm_password
+                  }
+                  startIcon={loading ? undefined : <IconDeviceFloppy size={18} />}
+                  sx={{
+                    bgcolor: "#059669",
+                    color: "#ffffff",
+                    fontWeight: 800,
+                    borderRadius: 2,
+                    px: 4,
+                    py: 1.1,
+                    boxShadow: "0 4px 14px rgba(5, 150, 105, 0.35)",
+                    "&:hover": { bgcolor: "#047857" },
+                    minWidth: 180,
+                  }}
+                >
+                  {loading ? (
+                    <CircularProgress size={22} color="inherit" />
+                  ) : (
+                    "Update Password"
+                  )}
+                </Button>
+              </Stack>
+            </Box>
+          </Paper>
+        </Grid>
+      </Grid>
+
+      {/* Success Snackbar */}
       <Snackbar
         open={success}
         autoHideDuration={2500}
-        anchorOrigin={{
-          vertical: "bottom",
-          horizontal: "right",
-        }}
+        anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
         onClose={() => setSuccess(false)}
       >
         <Alert
           severity="success"
           variant="filled"
           onClose={() => setSuccess(false)}
+          sx={{ borderRadius: 2, fontWeight: 700 }}
         >
-          Password updated successfully.
+          Password updated successfully! Redirecting...
         </Alert>
       </Snackbar>
     </Container>
