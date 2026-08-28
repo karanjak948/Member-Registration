@@ -134,8 +134,10 @@ const createInitialState =
     member: createInitialMemberState(),
 
     nextOfKin: createInitialNextOfKinState(),
+    nextOfKins: [],
 
     vehicle: createInitialVehicleState(),
+    vehicles: [],
 
     guarantor: createInitialGuarantorState(),
   });
@@ -191,7 +193,7 @@ const registrationSlice = createSlice({
     },
 
     /* =====================================================
-       NEXT OF KIN
+       NEXT OF KIN (SINGLE & MULTI)
     ===================================================== */
 
     setNextOfKin(
@@ -218,8 +220,56 @@ const registrationSlice = createSlice({
         createInitialNextOfKinState();
     },
 
+    setNextOfKins(
+      state,
+      action: PayloadAction<NextOfKinState[]>,
+    ) {
+      state.nextOfKins = action.payload;
+      if (action.payload.length > 0) {
+        state.nextOfKin = action.payload[0];
+      }
+    },
+
+    addNextOfKin(
+      state,
+      action: PayloadAction<NextOfKinState>,
+    ) {
+      state.nextOfKins.push(action.payload);
+      if (state.nextOfKins.length === 1 || action.payload.is_primary) {
+        state.nextOfKin = action.payload;
+      }
+    },
+
+    updateNextOfKin(
+      state,
+      action: PayloadAction<{ index: number; data: NextOfKinState }>,
+    ) {
+      const { index, data } = action.payload;
+      if (index >= 0 && index < state.nextOfKins.length) {
+        state.nextOfKins[index] = data;
+        if (index === 0 || data.is_primary) {
+          state.nextOfKin = data;
+        }
+      }
+    },
+
+    removeNextOfKin(
+      state,
+      action: PayloadAction<number>,
+    ) {
+      const index = action.payload;
+      if (index >= 0 && index < state.nextOfKins.length) {
+        state.nextOfKins.splice(index, 1);
+        if (state.nextOfKins.length > 0) {
+          state.nextOfKin = state.nextOfKins[0];
+        } else {
+          state.nextOfKin = createInitialNextOfKinState();
+        }
+      }
+    },
+
     /* =====================================================
-       VEHICLE
+       VEHICLE (SINGLE & MULTI)
     ===================================================== */
 
     setVehicle(
@@ -244,6 +294,54 @@ const registrationSlice = createSlice({
     clearVehicle(state) {
       state.vehicle =
         createInitialVehicleState();
+    },
+
+    setVehicles(
+      state,
+      action: PayloadAction<VehicleState[]>,
+    ) {
+      state.vehicles = action.payload;
+      if (action.payload.length > 0) {
+        state.vehicle = action.payload[0];
+      }
+    },
+
+    addVehicle(
+      state,
+      action: PayloadAction<VehicleState>,
+    ) {
+      state.vehicles.push(action.payload);
+      if (state.vehicles.length === 1) {
+        state.vehicle = action.payload;
+      }
+    },
+
+    updateVehicle(
+      state,
+      action: PayloadAction<{ index: number; data: VehicleState }>,
+    ) {
+      const { index, data } = action.payload;
+      if (index >= 0 && index < state.vehicles.length) {
+        state.vehicles[index] = data;
+        if (index === 0) {
+          state.vehicle = data;
+        }
+      }
+    },
+
+    removeVehicle(
+      state,
+      action: PayloadAction<number>,
+    ) {
+      const index = action.payload;
+      if (index >= 0 && index < state.vehicles.length) {
+        state.vehicles.splice(index, 1);
+        if (state.vehicles.length > 0) {
+          state.vehicle = state.vehicles[0];
+        } else {
+          state.vehicle = createInitialVehicleState();
+        }
+      }
     },
 
     /* =====================================================
@@ -294,10 +392,18 @@ export const {
   setNextOfKin,
   replaceNextOfKin,
   clearNextOfKin,
+  setNextOfKins,
+  addNextOfKin,
+  updateNextOfKin,
+  removeNextOfKin,
 
   setVehicle,
   replaceVehicle,
   clearVehicle,
+  setVehicles,
+  addVehicle,
+  updateVehicle,
+  removeVehicle,
 
   setGuarantor,
   replaceGuarantor,

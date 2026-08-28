@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   Box,
   Button,
@@ -37,9 +38,22 @@ interface LoanItem {
 }
 
 export default function ReceivePaymentPage() {
+  return (
+    <Suspense fallback={<Box p={4} display="flex" justifyContent="center"><CircularProgress /></Box>}>
+      <ReceivePaymentContent />
+    </Suspense>
+  );
+}
+
+function ReceivePaymentContent() {
+  const searchParams = useSearchParams();
+  const initialLoanId = searchParams.get("loan_id") || searchParams.get("loanId") || "";
+
   const [loans, setLoans] = useState<LoanItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedLoanId, setSelectedLoanId] = useState<number | "">("");
+  const [selectedLoanId, setSelectedLoanId] = useState<number | "">(
+    initialLoanId ? Number(initialLoanId) : ""
+  );
   const [amountPaid, setAmountPaid] = useState("");
   const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split("T")[0]);
   const [paymentMode, setPaymentMode] = useState("MPESA");
@@ -68,7 +82,11 @@ export default function ReceivePaymentPage() {
         const list = Array.isArray(data) ? data : [];
         setLoans(list);
         if (list.length > 0) {
-          setSelectedLoanId(list[0].id);
+          if (initialLoanId && list.some((l: any) => l.id === Number(initialLoanId))) {
+            setSelectedLoanId(Number(initialLoanId));
+          } else if (!selectedLoanId) {
+            setSelectedLoanId(list[0].id);
+          }
         }
       }
     } catch (err) {

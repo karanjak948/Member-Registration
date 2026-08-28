@@ -111,7 +111,19 @@ export default function ReviewStep({
   const dispatch = useAppDispatch();
 
   const registration = useAppSelector((state) => state.registration);
-  const { member, nextOfKin, vehicle, guarantor } = registration;
+  const { member, nextOfKin, nextOfKins = [], vehicle, vehicles = [], guarantor } = registration;
+
+  const activeKins = useMemo(() => {
+    if (nextOfKins && nextOfKins.length > 0) return nextOfKins;
+    if (nextOfKin?.first_name) return [nextOfKin];
+    return [];
+  }, [nextOfKins, nextOfKin]);
+
+  const activeVehicles = useMemo(() => {
+    if (vehicles && vehicles.length > 0) return vehicles;
+    if (vehicle?.registration_number) return [vehicle];
+    return [];
+  }, [vehicles, vehicle]);
 
   const [loading, setLoading] = useState(false);
   const [categoriesLoading, setCategoriesLoading] = useState(true);
@@ -131,24 +143,8 @@ export default function ReviewStep({
     };
   }, []);
 
-  const hasNextOfKin = Boolean(
-    nextOfKin.first_name ||
-      nextOfKin.other_names ||
-      nextOfKin.phone_number ||
-      nextOfKin.relationship ||
-      nextOfKin.national_id ||
-      nextOfKin.physical_address,
-  );
-
-  const hasVehicle = Boolean(
-    vehicle.registration_number ||
-      vehicle.make ||
-      vehicle.model ||
-      vehicle.year ||
-      vehicle.color ||
-      vehicle.engine_number ||
-      vehicle.chassis_number,
-  );
+  const hasNextOfKin = activeKins.length > 0;
+  const hasVehicle = activeVehicles.length > 0;
 
   const hasGuarantor = Boolean(
     guarantor.first_name ||
@@ -318,48 +314,46 @@ export default function ReviewStep({
 
       const memberId = createdOrUpdatedMember.id;
 
-      // 1. Save Next of Kin
+      // 1. Save Next of Kin (All items)
       if (hasNextOfKin && memberId) {
         try {
-          const existingKin = await nextOfKinService.getByMember(memberId);
-          const kinPayload = {
-            member: memberId,
-            first_name: cleanString(nextOfKin.first_name),
-            other_names: cleanString(nextOfKin.other_names),
-            relationship: cleanString(nextOfKin.relationship),
-            national_id: cleanString(nextOfKin.national_id),
-            phone_number: cleanString(nextOfKin.phone_number),
-            physical_address: cleanString(nextOfKin.physical_address),
-            is_primary: Boolean(nextOfKin.is_primary ?? true),
-          };
-          if (existingKin?.id) {
-            await nextOfKinService.update(existingKin.id, kinPayload);
-          } else {
-            await nextOfKinService.create(kinPayload);
+          for (const kin of activeKins) {
+            if (cleanString(kin.first_name)) {
+              const kinPayload = {
+                member: memberId,
+                first_name: cleanString(kin.first_name),
+                other_names: cleanString(kin.other_names),
+                relationship: cleanString(kin.relationship),
+                national_id: cleanString(kin.national_id),
+                phone_number: cleanString(kin.phone_number),
+                physical_address: cleanString(kin.physical_address),
+                is_primary: Boolean(kin.is_primary),
+              };
+              await nextOfKinService.create(kinPayload);
+            }
           }
         } catch (err) {
           console.error("Next of Kin save error:", err);
         }
       }
 
-      // 2. Save Vehicle (if provided)
+      // 2. Save Vehicles (All items)
       if (hasVehicle && memberId) {
         try {
-          const existingVehicle = await vehicleService.getByMember(memberId);
-          const vehiclePayload = {
-            member: memberId,
-            registration_number: cleanString(vehicle.registration_number).toUpperCase(),
-            make: cleanString(vehicle.make),
-            model: cleanString(vehicle.model),
-            year: vehicle.year ? Number(vehicle.year) : null,
-            color: cleanString(vehicle.color),
-            engine_number: cleanString(vehicle.engine_number),
-            chassis_number: cleanString(vehicle.chassis_number),
-          };
-          if (existingVehicle?.id) {
-            await vehicleService.update(existingVehicle.id, vehiclePayload);
-          } else {
-            await vehicleService.create(vehiclePayload);
+          for (const veh of activeVehicles) {
+            if (cleanString(veh.registration_number)) {
+              const vehiclePayload = {
+                member: memberId,
+                registration_number: cleanString(veh.registration_number).toUpperCase(),
+                make: cleanString(veh.make),
+                model: cleanString(veh.model),
+                year: veh.year ? Number(veh.year) : null,
+                color: cleanString(veh.color),
+                engine_number: cleanString(veh.engine_number),
+                chassis_number: cleanString(veh.chassis_number),
+              };
+              await vehicleService.create(vehiclePayload);
+            }
           }
         } catch (err) {
           console.error("Vehicle save error:", err);
@@ -833,176 +827,170 @@ export default function ReviewStep({
 
           {/* 2. Next of Kin */}
           <ReviewModuleCard
-            title="2. Next of Kin & Beneficiary"
-            subtitle="Emergency contact person and primary nominated beneficiary"
+            title={`2. Next of Kin & Beneficiaries (${activeKins.length})`}
+            subtitle="Emergency contact persons and designated estate beneficiaries"
             icon={<IconHeartHandshake size={22} />}
             accentColor="#e11d48"
             headerBg="linear-gradient(135deg, #fff1f2 0%, #ffffff 100%)"
             completed={hasNextOfKin}
           >
-            <Grid container spacing={2}>
-              <DetailCell
-                label="Next of Kin First Name"
-                value={nextOfKin.first_name}
-                icon={<IconUser size={16} />}
-                accentColor="#e11d48"
-                valueColor="#9f1239"
-              />
-              <DetailCell
-                label="Other / Middle Names"
-                value={nextOfKin.other_names}
-                icon={<IconUser size={16} />}
-                accentColor="#e11d48"
-                valueColor="#9f1239"
-              />
-              <DetailCell
-                label="Relationship"
-                value={nextOfKin.relationship}
-                icon={<IconHeartHandshake size={16} />}
-                accentColor="#e11d48"
-                valueColor="#9f1239"
-                customBadge={
-                  nextOfKin.relationship ? (
-                    <Chip
-                      label={nextOfKin.relationship}
-                      size="small"
-                      sx={{
-                        bgcolor: "#ffe4e6",
-                        color: "#9f1239",
-                        fontWeight: 800,
-                        border: "1px solid #fecdd3",
-                        fontSize: "0.85rem",
-                      }}
-                    />
-                  ) : undefined
-                }
-              />
-              <DetailCell
-                label="National ID Number"
-                value={nextOfKin.national_id}
-                icon={<IconId size={16} />}
-                accentColor="#e11d48"
-                valueColor="#9f1239"
-              />
-              <DetailCell
-                label="Primary Phone Number"
-                value={nextOfKin.phone_number}
-                icon={<IconPhone size={16} />}
-                accentColor="#e11d48"
-                valueColor="#9f1239"
-              />
-              <DetailCell
-                label="Primary Beneficiary Status"
-                value={hasNextOfKin ? (nextOfKin.is_primary ? "Yes (Primary)" : "Secondary") : null}
-                icon={<IconCheck size={16} />}
-                accentColor="#059669"
-                valueColor="#065f46"
-                customBadge={
-                  hasNextOfKin ? (
-                    <Chip
-                      label={nextOfKin.is_primary ? "✓ Yes (Primary Beneficiary)" : "Secondary"}
-                      size="small"
-                      sx={{
-                        bgcolor: nextOfKin.is_primary ? "#ecfdf5" : "#f1f5f9",
-                        color: nextOfKin.is_primary ? "#065f46" : "#475569",
-                        fontWeight: 800,
-                        border: `1px solid ${nextOfKin.is_primary ? "#a7f3d0" : "#e2e8f0"}`,
-                        fontSize: "0.85rem",
-                      }}
-                    />
-                  ) : undefined
-                }
-              />
-              <DetailCell
-                label="Physical Residential Location"
-                value={nextOfKin.physical_address}
-                icon={<IconMapPin size={16} />}
-                accentColor="#e11d48"
-                valueColor="#9f1239"
-                fullWidth
-              />
-            </Grid>
+            {activeKins.length === 0 ? (
+              <Typography variant="body2" color="text.secondary">
+                No next of kin records captured.
+              </Typography>
+            ) : (
+              <Stack spacing={1.8}>
+                {activeKins.map((kin, idx) => (
+                  <Box
+                    key={idx}
+                    sx={{
+                      p: 2,
+                      borderRadius: 2.5,
+                      bgcolor: "#fff5f6",
+                      border: "1px solid #fecdd3",
+                    }}
+                  >
+                    <Grid container spacing={2} alignItems="center">
+                      <Grid size={{ xs: 12, sm: 4 }}>
+                        <Typography variant="caption" color="text.secondary" fontWeight={700}>
+                          BENEFICIARY #{idx + 1}
+                        </Typography>
+                        <Typography variant="subtitle1" fontWeight={800} color="#9f1239">
+                          {kin.first_name} {kin.other_names}
+                        </Typography>
+                      </Grid>
+                      <Grid size={{ xs: 6, sm: 3 }}>
+                        <Typography variant="caption" color="text.secondary" fontWeight={700}>
+                          RELATIONSHIP
+                        </Typography>
+                        <Box mt={0.5}>
+                          <Chip
+                            label={kin.relationship || "Not specified"}
+                            size="small"
+                            sx={{
+                              bgcolor: "#ffe4e6",
+                              color: "#9f1239",
+                              fontWeight: 800,
+                              fontSize: "0.8rem",
+                            }}
+                          />
+                        </Box>
+                      </Grid>
+                      <Grid size={{ xs: 6, sm: 3 }}>
+                        <Typography variant="caption" color="text.secondary" fontWeight={700}>
+                          PHONE / ID
+                        </Typography>
+                        <Typography variant="body2" fontWeight={700} color="#0f172a" fontFamily="monospace">
+                          {kin.phone_number || "—"}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          ID: {kin.national_id || "—"}
+                        </Typography>
+                      </Grid>
+                      <Grid size={{ xs: 12, sm: 2 }}>
+                        {kin.is_primary ? (
+                          <Chip
+                            icon={<IconCheck size={14} color="#059669" />}
+                            label="Primary"
+                            size="small"
+                            sx={{
+                              bgcolor: "#ecfdf5",
+                              color: "#059669",
+                              fontWeight: 800,
+                              border: "1px solid #a7f3d0",
+                            }}
+                          />
+                        ) : (
+                          <Chip
+                            label="Secondary"
+                            size="small"
+                            sx={{
+                              bgcolor: "#f1f5f9",
+                              color: "#64748b",
+                              fontWeight: 700,
+                            }}
+                          />
+                        )}
+                      </Grid>
+                    </Grid>
+                  </Box>
+                ))}
+              </Stack>
+            )}
           </ReviewModuleCard>
 
           {/* 3. Vehicle Asset */}
           <ReviewModuleCard
-            title="3. Vehicle Asset & Collateral"
+            title={`3. Vehicle Assets & Collateral (${activeVehicles.length})`}
             subtitle="Transport collateral asset registration and technical specifications"
             icon={<IconCar size={22} />}
             accentColor="#0d9488"
             headerBg="linear-gradient(135deg, #f0fdfa 0%, #ffffff 100%)"
             completed={hasVehicle}
           >
-            <Grid container spacing={2}>
-              <DetailCell
-                label="Registration Number Plate"
-                value={vehicle.registration_number}
-                icon={<IconNumber size={16} />}
-                accentColor="#0d9488"
-                valueColor="#0f766e"
-                customBadge={
-                  vehicle.registration_number ? (
-                    <Box
-                      sx={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        px: 1.5,
-                        py: 0.4,
-                        bgcolor: "#f0fdfa",
-                        border: "2px solid #0d9488",
-                        borderRadius: 1.5,
-                        fontWeight: 900,
-                        fontSize: "1rem",
-                        color: "#115e59",
-                        letterSpacing: "1px",
-                      }}
-                    >
-                      {vehicle.registration_number}
-                    </Box>
-                  ) : undefined
-                }
-              />
-              <DetailCell
-                label="Vehicle Make"
-                value={vehicle.make}
-                icon={<IconCar size={16} />}
-                accentColor="#0d9488"
-                valueColor="#0f766e"
-              />
-              <DetailCell
-                label="Vehicle Model"
-                value={vehicle.model}
-                icon={<IconCar size={16} />}
-                accentColor="#0d9488"
-                valueColor="#0f766e"
-              />
-              <DetailCell
-                label="Year of Manufacture"
-                value={vehicle.year}
-                icon={<IconCalendar size={16} />}
-                accentColor="#0d9488"
-                valueColor="#0f766e"
-              />
-              <DetailCell
-                label="Vehicle Color"
-                value={vehicle.color}
-                accentColor="#0d9488"
-                valueColor="#0f766e"
-              />
-              <DetailCell
-                label="Engine Number"
-                value={vehicle.engine_number}
-                accentColor="#0d9488"
-                valueColor="#0f766e"
-              />
-              <DetailCell
-                label="Chassis Number"
-                value={vehicle.chassis_number}
-                accentColor="#0d9488"
-                valueColor="#0f766e"
-                fullWidth
-              />
-            </Grid>
+            {activeVehicles.length === 0 ? (
+              <Typography variant="body2" color="text.secondary">
+                No vehicles registered.
+              </Typography>
+            ) : (
+              <Stack spacing={1.8}>
+                {activeVehicles.map((veh, idx) => (
+                  <Box
+                    key={idx}
+                    sx={{
+                      p: 2,
+                      borderRadius: 2.5,
+                      bgcolor: "#f0fdfa",
+                      border: "1px solid #99f6e4",
+                    }}
+                  >
+                    <Grid container spacing={2} alignItems="center">
+                      <Grid size={{ xs: 12, sm: 4 }}>
+                        <Typography variant="caption" color="text.secondary" fontWeight={700}>
+                          REGISTRATION PLATE
+                        </Typography>
+                        <Box mt={0.5}>
+                          <Chip
+                            label={veh.registration_number}
+                            sx={{
+                              fontWeight: 900,
+                              fontFamily: "monospace",
+                              fontSize: "0.95rem",
+                              bgcolor: "#0f172a",
+                              color: "#f8fafc",
+                            }}
+                          />
+                        </Box>
+                      </Grid>
+                      <Grid size={{ xs: 6, sm: 4 }}>
+                        <Typography variant="caption" color="text.secondary" fontWeight={700}>
+                          MAKE & MODEL
+                        </Typography>
+                        <Typography variant="body1" fontWeight={800} color="#115e59">
+                          {veh.make} {veh.model} {veh.year ? `(${veh.year})` : ""}
+                        </Typography>
+                        {veh.color && (
+                          <Typography variant="caption" color="text.secondary">
+                            Color: {veh.color}
+                          </Typography>
+                        )}
+                      </Grid>
+                      <Grid size={{ xs: 6, sm: 4 }}>
+                        <Typography variant="caption" color="text.secondary" fontWeight={700}>
+                          ENGINE / CHASSIS
+                        </Typography>
+                        <Typography variant="caption" display="block" color="#334155" fontFamily="monospace">
+                          Engine: {veh.engine_number || "—"}
+                        </Typography>
+                        <Typography variant="caption" display="block" color="#334155" fontFamily="monospace">
+                          Chassis: {veh.chassis_number || "—"}
+                        </Typography>
+                      </Grid>
+                    </Grid>
+                  </Box>
+                ))}
+              </Stack>
+            )}
           </ReviewModuleCard>
 
           {/* 4. Guarantor */}

@@ -15,6 +15,12 @@ import {
   Paper,
   Stack,
   Tab,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
   Tabs,
   Typography,
 } from "@mui/material";
@@ -97,7 +103,9 @@ export default function MemberDetails({ member, onRefresh }: Props) {
 
   // Related Modules State
   const [nextOfKin, setNextOfKin] = useState<NextOfKin | null>(null);
+  const [nextOfKins, setNextOfKins] = useState<NextOfKin[]>([]);
   const [vehicle, setVehicle] = useState<Vehicle | null>(null);
+  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [guarantor, setGuarantor] = useState<Guarantor | null>(null);
   const [loadingRelated, setLoadingRelated] = useState(true);
 
@@ -107,14 +115,22 @@ export default function MemberDetails({ member, onRefresh }: Props) {
       try {
         setLoadingRelated(true);
         const [kinData, vehicleData, guarantorData] = await Promise.allSettled([
-          nextOfKinService.getByMember(member.id),
-          vehicleService.getByMember(member.id),
+          nextOfKinService.getAllByMember(member.id),
+          vehicleService.getAllByMember(member.id),
           guarantorService.getByMember(member.id),
         ]);
 
-        if (kinData.status === "fulfilled") setNextOfKin(kinData.value);
-        if (vehicleData.status === "fulfilled") setVehicle(vehicleData.value);
-        if (guarantorData.status === "fulfilled") setGuarantor(guarantorData.value);
+        if (kinData.status === "fulfilled") {
+          setNextOfKins(kinData.value);
+          setNextOfKin(kinData.value.length > 0 ? kinData.value[0] : null);
+        }
+        if (vehicleData.status === "fulfilled") {
+          setVehicles(vehicleData.value);
+          setVehicle(vehicleData.value.length > 0 ? vehicleData.value[0] : null);
+        }
+        if (guarantorData.status === "fulfilled") {
+          setGuarantor(guarantorData.value);
+        }
       } catch (err) {
         console.error("Failed to load member related data:", err);
       } finally {
@@ -551,6 +567,54 @@ export default function MemberDetails({ member, onRefresh }: Props) {
               <Box display="flex" justifyContent="center" py={4}>
                 <CircularProgress color="success" size={32} />
               </Box>
+            ) : nextOfKins.length > 1 ? (
+              <TableContainer component={Paper} elevation={0} sx={{ border: "1px solid #e2e8f0", borderRadius: 2.5, overflow: "hidden" }}>
+                <Table>
+                  <TableHead sx={{ bgcolor: "#f8fafc" }}>
+                    <TableRow>
+                      <TableCell sx={{ fontWeight: 800, color: "#475569" }}>#</TableCell>
+                      <TableCell sx={{ fontWeight: 800, color: "#475569" }}>Full Name</TableCell>
+                      <TableCell sx={{ fontWeight: 800, color: "#475569" }}>Relationship</TableCell>
+                      <TableCell sx={{ fontWeight: 800, color: "#475569" }}>Phone Number</TableCell>
+                      <TableCell sx={{ fontWeight: 800, color: "#475569" }}>National ID</TableCell>
+                      <TableCell sx={{ fontWeight: 800, color: "#475569" }}>Address</TableCell>
+                      <TableCell sx={{ fontWeight: 800, color: "#475569" }}>Status</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {nextOfKins.map((kin, idx) => (
+                      <TableRow key={idx} hover>
+                        <TableCell sx={{ fontWeight: 700, color: "#64748b" }}>{idx + 1}</TableCell>
+                        <TableCell sx={{ fontWeight: 800, color: "#0f172a" }}>
+                          {kin.first_name} {kin.other_names}
+                        </TableCell>
+                        <TableCell>
+                          <Chip
+                            label={kin.relationship || "—"}
+                            size="small"
+                            sx={{ fontWeight: 700, bgcolor: "#ffe4e6", color: "#e11d48" }}
+                          />
+                        </TableCell>
+                        <TableCell sx={{ fontFamily: "monospace", fontWeight: 700, color: "#334155" }}>
+                          {kin.phone_number || "—"}
+                        </TableCell>
+                        <TableCell sx={{ fontFamily: "monospace", color: "#64748b" }}>
+                          {kin.national_id || "—"}
+                        </TableCell>
+                        <TableCell sx={{ color: "#64748b" }}>{kin.physical_address || "—"}</TableCell>
+                        <TableCell>
+                          <Chip
+                            label={kin.is_primary ? "Primary Beneficiary" : "Secondary"}
+                            size="small"
+                            color={kin.is_primary ? "error" : "default"}
+                            sx={{ fontWeight: 800 }}
+                          />
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
             ) : nextOfKin ? (
               <Grid container spacing={2.5}>
                 <Grid size={{ xs: 12, sm: 6 }}>
@@ -721,6 +785,54 @@ export default function MemberDetails({ member, onRefresh }: Props) {
               <Box display="flex" justifyContent="center" py={4}>
                 <CircularProgress color="success" size={32} />
               </Box>
+            ) : vehicles.length > 1 ? (
+              <TableContainer component={Paper} elevation={0} sx={{ border: "1px solid #e2e8f0", borderRadius: 2.5, overflow: "hidden" }}>
+                <Table>
+                  <TableHead sx={{ bgcolor: "#f8fafc" }}>
+                    <TableRow>
+                      <TableCell sx={{ fontWeight: 800, color: "#475569" }}>#</TableCell>
+                      <TableCell sx={{ fontWeight: 800, color: "#475569" }}>Plate Number</TableCell>
+                      <TableCell sx={{ fontWeight: 800, color: "#475569" }}>Make & Model</TableCell>
+                      <TableCell sx={{ fontWeight: 800, color: "#475569" }}>Year</TableCell>
+                      <TableCell sx={{ fontWeight: 800, color: "#475569" }}>Color</TableCell>
+                      <TableCell sx={{ fontWeight: 800, color: "#475569" }}>Engine No.</TableCell>
+                      <TableCell sx={{ fontWeight: 800, color: "#475569" }}>Chassis No.</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {vehicles.map((veh, idx) => (
+                      <TableRow key={idx} hover>
+                        <TableCell sx={{ fontWeight: 700, color: "#64748b" }}>{idx + 1}</TableCell>
+                        <TableCell>
+                          <Chip
+                            label={veh.registration_number || "—"}
+                            size="small"
+                            sx={{
+                              fontWeight: 900,
+                              fontFamily: "monospace",
+                              bgcolor: "#0f172a",
+                              color: "#f8fafc",
+                            }}
+                          />
+                        </TableCell>
+                        <TableCell sx={{ fontWeight: 800, color: "#0f172a" }}>
+                          {veh.make} {veh.model}
+                        </TableCell>
+                        <TableCell sx={{ color: "#475569", fontWeight: 600 }}>{veh.year || "—"}</TableCell>
+                        <TableCell>
+                          {veh.color ? (
+                            <Chip label={veh.color} size="small" sx={{ fontWeight: 700, bgcolor: "#f1f5f9" }} />
+                          ) : (
+                            "—"
+                          )}
+                        </TableCell>
+                        <TableCell sx={{ fontFamily: "monospace", color: "#64748b" }}>{veh.engine_number || "—"}</TableCell>
+                        <TableCell sx={{ fontFamily: "monospace", color: "#64748b" }}>{veh.chassis_number || "—"}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
             ) : vehicle ? (
               <Grid container spacing={2.5}>
                 <Grid size={{ xs: 12, sm: 6 }}>

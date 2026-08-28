@@ -68,6 +68,13 @@ def user_has_organization_permission(
     except Exception:
         pass
 
+    if hasattr(user, "owned_organization"):
+        try:
+            if user.owned_organization:
+                return True
+        except Exception:
+            pass
+
     membership = get_user_organization_membership(
         user
     )

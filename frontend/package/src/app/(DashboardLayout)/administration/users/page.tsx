@@ -263,7 +263,22 @@ export default function UsersPage() {
         </Grid>
 
         {error && (
-          <Alert severity="error" sx={{ mb: 3 }}>
+          <Alert
+            severity="warning"
+            sx={{ mb: 3 }}
+            action={
+              error.toLowerCase().includes("organization") ? (
+                <Button
+                  color="inherit"
+                  size="small"
+                  variant="outlined"
+                  onClick={() => router.push("/settings/organization")}
+                >
+                  Configure Organization
+                </Button>
+              ) : undefined
+            }
+          >
             {error}
           </Alert>
         )}

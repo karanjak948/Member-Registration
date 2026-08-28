@@ -146,15 +146,23 @@ class OrganizationAPIView(APIView):
         )
 
         if organization is None:
-            serializer.save(
+            organization = serializer.save(
                 owner=request.user
+            )
+            OrganizationAccessService.bootstrap_organization(
+                organization,
+                request.user
             )
 
             response_status = (
                 status.HTTP_201_CREATED
             )
         else:
-            serializer.save()
+            organization = serializer.save()
+            OrganizationAccessService.bootstrap_organization(
+                organization,
+                request.user
+            )
 
             response_status = status.HTTP_200_OK
 
@@ -185,15 +193,23 @@ class OrganizationAPIView(APIView):
         )
 
         if organization is None:
-            serializer.save(
+            organization = serializer.save(
                 owner=request.user
+            )
+            OrganizationAccessService.bootstrap_organization(
+                organization,
+                request.user
             )
 
             response_status = (
                 status.HTTP_201_CREATED
             )
         else:
-            serializer.save()
+            organization = serializer.save()
+            OrganizationAccessService.bootstrap_organization(
+                organization,
+                request.user
+            )
 
             response_status = status.HTTP_200_OK
 
@@ -679,38 +695,61 @@ class OrganizationUserListCreateView(APIView):
         )
 
         # ===================== UPDATED LOGIC =====================
-        # If the request contains a 'username' parameter and that user
-        # already exists, we assign them directly to the organization
-        # without requiring a password.
-        username = request.data.get('username')
+        # If the request matches an existing user (by username or email),
+        # assign them directly to the organization without requiring a new account.
+        username = (request.data.get('username') or '').strip()
+        email = (request.data.get('email') or '').strip()
+        role_id = request.data.get('role_id')
+
+        existing_user = None
         if username:
-            try:
-                existing_user = User.objects.get(username=username)
+            existing_user = User.objects.filter(username__iexact=username).first()
+        if not existing_user and email:
+            existing_user = User.objects.filter(email__iexact=email).first()
 
-                # Check if they are already a member of the organization
-                if OrganizationUser.objects.filter(organization=organization, user=existing_user).exists():
-                    return Response(
-                        {"detail": f"User '{username}' is already a member of this organization."},
-                        status=status.HTTP_400_BAD_REQUEST,
-                    )
-
-                # Assign the existing user directly
-                membership = OrganizationUser.objects.create(
-                    organization=organization,
-                    user=existing_user,
-                    role_id=request.data.get('role_id'),
-                    is_active=True,
+        if existing_user:
+            # Check if they are already a member of the organization
+            if OrganizationUser.objects.filter(organization=organization, user=existing_user).exists():
+                return Response(
+                    {"detail": f"User '{existing_user.username}' is already a member of this organization."},
+                    status=status.HTTP_400_BAD_REQUEST,
                 )
 
-                output = OrganizationUserSerializer(membership)
-                return Response(output.data, status=status.HTTP_201_CREATED)
+            # Validate role belongs to this organization
+            role = Role.objects.filter(pk=role_id, organization=organization).first()
+            if not role:
+                return Response(
+                    {"detail": "The selected role is invalid for this organization."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
 
-            except User.DoesNotExist:
-                # If the user doesn't exist, we let the serializer handle creation
-                pass
+            # Assign the existing user directly
+            membership = OrganizationUser.objects.create(
+                organization=organization,
+                user=existing_user,
+                role=role,
+                is_active=True,
+            )
+
+            # Update user's organization foreign key if unset
+            if not existing_user.organization:
+                existing_user.organization = organization
+                existing_user.save(update_fields=['organization'])
+
+            output = OrganizationUserSerializer(membership)
+            return Response(output.data, status=status.HTTP_201_CREATED)
         # ==========================================================
 
-        # Existing logic for creating a brand new user
+        # If no password was provided and existing user wasn't found:
+        password = request.data.get('password')
+        if not password:
+            identifier = username or email or "specified user"
+            return Response(
+                {"detail": f"No existing account found with username or email '{identifier}'. To create a new account, please fill in all details including a password."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Logic for creating a brand new user
         serializer = OrganizationUserCreateSerializer(
             data=request.data,
             context={

@@ -546,6 +546,7 @@ class OrganizationUserCreateSerializer(
         )
 
         user = User(
+            organization=organization,
             **validated_data
         )
 

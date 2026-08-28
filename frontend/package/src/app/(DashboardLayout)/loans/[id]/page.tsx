@@ -19,6 +19,10 @@ import {
   DialogContent,
   DialogContentText,
   DialogActions,
+  TextField,
+  MenuItem,
+  InputAdornment,
+  Tooltip,
 } from "@mui/material";
 import {
   IconArrowLeft,
@@ -134,15 +138,78 @@ export default function LoanDetailPage() {
   const [notFound, setNotFound] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
+  // Record Repayment Dialog States
+  const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
+  const [paymentAmount, setPaymentAmount] = useState("");
+  const [paymentMode, setPaymentMode] = useState("MPESA");
+  const [paymentMpesaRef, setPaymentMpesaRef] = useState("");
+  const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split("T")[0]);
+  const [paymentNotes, setPaymentNotes] = useState("");
+  const [paymentSubmitting, setPaymentSubmitting] = useState(false);
+
   const [snackbar, setSnackbar] = useState<{
     open: boolean;
     message: string;
-    severity: "success" | "error";
+    severity: "success" | "error" | "warning" | "info";
   }>({
     open: false,
     message: "",
     severity: "success",
   });
+
+  const handleRecordPaymentSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!loan || !paymentAmount || Number(paymentAmount) <= 0) {
+      setSnackbar({
+        open: true,
+        message: "Please enter a valid repayment amount.",
+        severity: "error",
+      });
+      return;
+    }
+
+    try {
+      setPaymentSubmitting(true);
+      const notesCombined = `${paymentMode} ${paymentMpesaRef ? `Ref: ${paymentMpesaRef} ` : ""}- ${paymentNotes}`.trim();
+      const res = await fetch(`/api/loans/${loan.id}/repayments`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          payment_date: paymentDate,
+          amount_paid: Number(paymentAmount),
+          notes: notesCombined,
+        }),
+      });
+
+      if (res.ok) {
+        setSnackbar({
+          open: true,
+          message: `Repayment of KES ${Number(paymentAmount).toLocaleString()} recorded successfully!`,
+          severity: "success",
+        });
+        setPaymentDialogOpen(false);
+        setPaymentAmount("");
+        setPaymentMpesaRef("");
+        setPaymentNotes("");
+        await loadLoan();
+      } else {
+        const err = await res.json().catch(() => ({}));
+        setSnackbar({
+          open: true,
+          message: err.detail || err.error || "Failed to record repayment on Loan Engine.",
+          severity: "error",
+        });
+      }
+    } catch (err: any) {
+      setSnackbar({
+        open: true,
+        message: "Network error occurred while submitting payment.",
+        severity: "error",
+      });
+    } finally {
+      setPaymentSubmitting(false);
+    }
+  };
 
   const loadLoan = async () => {
     try {
@@ -696,33 +763,92 @@ export default function LoanDetailPage() {
                     </>
                   )}
 
-                  {/* If Active: Option to close/clear upon full payment */}
-                  {isActive && canDisburseLoans && (
-                    <Button
-                      variant="outlined"
-                      startIcon={<IconCertificate size={18} />}
-                      disabled={actionLoading}
-                      onClick={() =>
-                        handleUpdateStatus("closed", {
-                          outstanding_balance: "0.00",
-                        })
-                      }
-                      sx={{
-                        borderColor: "#059669",
-                        color: "#059669",
-                        fontWeight: 800,
-                        fontSize: "0.9rem",
-                        px: 2.5,
-                        py: 1,
-                        borderRadius: 2.5,
-                        "&:hover": {
-                          borderColor: "#047857",
-                          bgcolor: "#ecfdf5",
-                        },
-                      }}
-                    >
-                      Mark as Fully Repaid
-                    </Button>
+                  {/* If Active: Record Repayment / Pay Loan & Option to close */}
+                  {isActive && (
+                    <>
+                      <Button
+                        variant="contained"
+                        startIcon={<IconCash size={18} />}
+                        disabled={actionLoading}
+                        onClick={() => {
+                          setPaymentAmount("");
+                          setPaymentDialogOpen(true);
+                        }}
+                        sx={{
+                          background: "linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)",
+                          color: "#ffffff",
+                          fontWeight: 800,
+                          fontSize: "0.9rem",
+                          px: 2.5,
+                          py: 1,
+                          borderRadius: 2.5,
+                          boxShadow: "0 4px 14px rgba(37, 99, 235, 0.35)",
+                          "&:hover": {
+                            background: "linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%)",
+                          },
+                        }}
+                      >
+                        Record Repayment
+                      </Button>
+
+                      {canDisburseLoans && (
+                        <Tooltip
+                          title={
+                            Number(loan.outstanding_balance || 0) > 0.01
+                              ? `Loan has an active balance of ${formatCurrency(
+                                  loan.outstanding_balance
+                                )}. Balance must be settled to Ksh 0.00 via repayments before closing.`
+                              : "Mark this loan as fully settled and closed."
+                          }
+                          arrow
+                        >
+                          <span>
+                            <Button
+                              variant="outlined"
+                              startIcon={<IconCertificate size={18} />}
+                              disabled={
+                                actionLoading ||
+                                Number(loan.outstanding_balance || 0) > 0.01
+                              }
+                              onClick={() => {
+                                if (Number(loan.outstanding_balance || 0) > 0.01) {
+                                  setSnackbar({
+                                    open: true,
+                                    message: `Cannot close loan: Outstanding balance is ${formatCurrency(
+                                      loan.outstanding_balance
+                                    )}. Please record repayments first.`,
+                                    severity: "warning",
+                                  });
+                                  return;
+                                }
+                                handleUpdateStatus("closed", {
+                                  outstanding_balance: "0.00",
+                                });
+                              }}
+                              sx={{
+                                borderColor: "#059669",
+                                color: "#059669",
+                                fontWeight: 800,
+                                fontSize: "0.9rem",
+                                px: 2.5,
+                                py: 1,
+                                borderRadius: 2.5,
+                                "&:hover": {
+                                  borderColor: "#047857",
+                                  bgcolor: "#ecfdf5",
+                                },
+                                "&.Mui-disabled": {
+                                  borderColor: "#cbd5e1",
+                                  color: "#94a3b8",
+                                },
+                              }}
+                            >
+                              Mark as Fully Repaid
+                            </Button>
+                          </span>
+                        </Tooltip>
+                      )}
+                    </>
                   )}
 
                   {/* If Rejected: Option to delete record */}
@@ -1271,6 +1397,165 @@ export default function LoanDetailPage() {
             Confirm Delete
           </Button>
         </DialogActions>
+      </Dialog>
+
+      {/* Record Repayment Modal Dialog */}
+      <Dialog
+        open={paymentDialogOpen}
+        onClose={() => !paymentSubmitting && setPaymentDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{
+          sx: { borderRadius: 3.5, p: 1 },
+        }}
+      >
+        <form onSubmit={handleRecordPaymentSubmit}>
+          <DialogTitle sx={{ fontWeight: 900, color: "#0f172a", pb: 1 }}>
+            Record Loan Repayment
+          </DialogTitle>
+          <DialogContent>
+            <DialogContentText sx={{ color: "#64748b", mb: 2.5, fontSize: "0.9rem" }}>
+              Posting repayment for credit facility <strong>{loan.loan_number}</strong>. This updates the borrower's outstanding balance immediately on the Loan Engine.
+            </DialogContentText>
+
+            <Paper
+              elevation={0}
+              sx={{
+                p: 2,
+                mb: 3,
+                bgcolor: "#f8fafc",
+                borderRadius: 2.5,
+                border: "1px solid #e2e8f0",
+              }}
+            >
+              <Stack direction="row" justifyContent="space-between" mb={1}>
+                <Typography variant="body2" color="text.secondary">
+                  Current Outstanding Balance:
+                </Typography>
+                <Typography variant="body2" fontWeight={800} color="error.main">
+                  KES {Number(loan.outstanding_balance || 0).toLocaleString()}
+                </Typography>
+              </Stack>
+              <Stack direction="row" justifyContent="space-between">
+                <Typography variant="body2" color="text.secondary">
+                  Borrower Member ID:
+                </Typography>
+                <Typography variant="body2" fontWeight={700}>
+                  Member #{loan.member_id}
+                </Typography>
+              </Stack>
+            </Paper>
+
+            <Stack spacing={2.5}>
+              <TextField
+                fullWidth
+                required
+                type="number"
+                label="Repayment Amount (KES) *"
+                placeholder="e.g. 5000"
+                value={paymentAmount}
+                onChange={(e) => setPaymentAmount(e.target.value)}
+                disabled={paymentSubmitting}
+                slotProps={{
+                  input: {
+                    startAdornment: (
+                      <InputAdornment position="start">KES</InputAdornment>
+                    ),
+                  },
+                }}
+                sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
+              />
+
+              <Grid container spacing={2}>
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <TextField
+                    fullWidth
+                    required
+                    type="date"
+                    label="Payment Date *"
+                    value={paymentDate}
+                    onChange={(e) => setPaymentDate(e.target.value)}
+                    disabled={paymentSubmitting}
+                    slotProps={{ inputLabel: { shrink: true } }}
+                    sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
+                  />
+                </Grid>
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <TextField
+                    select
+                    fullWidth
+                    label="Payment Mode"
+                    value={paymentMode}
+                    onChange={(e) => setPaymentMode(e.target.value)}
+                    disabled={paymentSubmitting}
+                    sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
+                  >
+                    <MenuItem value="MPESA">M-Pesa</MenuItem>
+                    <MenuItem value="BANK">Bank Transfer</MenuItem>
+                    <MenuItem value="CASH">Cash Deposit</MenuItem>
+                    <MenuItem value="CHEQUE">Cheque</MenuItem>
+                  </TextField>
+                </Grid>
+              </Grid>
+
+              {paymentMode === "MPESA" && (
+                <TextField
+                  fullWidth
+                  label="M-Pesa Transaction Reference"
+                  placeholder="e.g. QHX78291KL"
+                  value={paymentMpesaRef}
+                  onChange={(e) => setPaymentMpesaRef(e.target.value)}
+                  disabled={paymentSubmitting}
+                  sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
+                />
+              )}
+
+              <TextField
+                fullWidth
+                multiline
+                rows={2}
+                label="Payment Notes / Remarks"
+                placeholder="Optional remarks or installment details..."
+                value={paymentNotes}
+                onChange={(e) => setPaymentNotes(e.target.value)}
+                disabled={paymentSubmitting}
+                sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
+              />
+            </Stack>
+          </DialogContent>
+
+          <DialogActions sx={{ px: 3, pb: 2.5, pt: 1 }}>
+            <Button
+              onClick={() => setPaymentDialogOpen(false)}
+              disabled={paymentSubmitting}
+              sx={{ fontWeight: 700, color: "#64748b" }}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              variant="contained"
+              disabled={paymentSubmitting || !paymentAmount}
+              startIcon={
+                paymentSubmitting ? (
+                  <CircularProgress size={18} color="inherit" />
+                ) : (
+                  <IconCash size={18} />
+                )
+              }
+              sx={{
+                background: "linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)",
+                color: "#ffffff",
+                fontWeight: 800,
+                borderRadius: 2,
+                px: 3,
+                py: 1,
+              }}
+            >
+              {paymentSubmitting ? "Posting Repayment..." : "Post Repayment"}
+            </Button>
+          </DialogActions>
+        </form>
       </Dialog>
 
       {/* Action Notification Snackbar */}

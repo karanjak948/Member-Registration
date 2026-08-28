@@ -9,17 +9,20 @@ class NextOfKinService {
   }
 
   async getByMember(memberId: number): Promise<NextOfKin | null> {
+    const records = await this.getAllByMember(memberId);
+    return records.length > 0 ? records[0] : null;
+  }
+
+  async getAllByMember(memberId: number): Promise<NextOfKin[]> {
     const { data } = await api.get(
       `/next-of-kin/?member=${memberId}`
     );
-
-    console.log("Next Of Kin API Response:", data);
 
     const records = Array.isArray(data)
       ? data
       : data.results ?? [];
 
-    return records.length > 0 ? records[0] : null;
+    return records;
   }
 
   async create(payload: Partial<NextOfKin>): Promise<NextOfKin> {

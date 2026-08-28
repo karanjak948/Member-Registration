@@ -136,8 +136,10 @@ export interface RegistrationState {
   member: MemberState;
 
   nextOfKin: NextOfKinState;
+  nextOfKins: NextOfKinState[];
 
   vehicle: VehicleState;
+  vehicles: VehicleState[];
 
   guarantor: GuarantorState;
 }

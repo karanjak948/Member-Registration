@@ -97,7 +97,7 @@ class LoanService {
       const response = await loanApi.put(`/loans/${loanId}`, data);
       return response.data;
     } catch (error: any) {
-      console.error(`Failed to update loan ${loanId}:`, error);
+      console.warn(`Loan update failed for #${loanId}:`, error?.response?.data?.detail || error?.message);
       throw error;
     }
   }

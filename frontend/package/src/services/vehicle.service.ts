@@ -9,17 +9,20 @@ class VehicleService {
   }
 
   async getByMember(memberId: number): Promise<Vehicle | null> {
+    const records = await this.getAllByMember(memberId);
+    return records.length > 0 ? records[0] : null;
+  }
+
+  async getAllByMember(memberId: number): Promise<Vehicle[]> {
     const { data } = await api.get(
       `/vehicles/?member=${memberId}`
     );
-
-    console.log("Vehicle API Response:", data);
 
     const records = Array.isArray(data)
       ? data
       : data.results ?? [];
 
-    return records.length > 0 ? records[0] : null;
+    return records;
   }
 
   async create(payload: Partial<Vehicle>): Promise<Vehicle> {

@@ -189,7 +189,21 @@ class RegistrationService {
   async createRegistration(
     registration: RegistrationState
   ): Promise<RegistrationResult> {
-    const { member, nextOfKin, vehicle, guarantor } = registration;
+    const { member, nextOfKin, nextOfKins = [], vehicle, vehicles = [], guarantor } = registration;
+
+    const activeKins =
+      nextOfKins.length > 0
+        ? nextOfKins
+        : this.hasData(nextOfKin?.first_name)
+        ? [nextOfKin]
+        : [];
+
+    const activeVehicles =
+      vehicles.length > 0
+        ? vehicles
+        : this.hasData(vehicle?.registration_number)
+        ? [vehicle]
+        : [];
 
     // 1. Create the primary member
     const formData = this.buildMemberFormData(registration);
@@ -204,25 +218,29 @@ class RegistrationService {
     const memberId = createdMember.id;
     const secondaryFailures: string[] = [];
 
-    // 2. Create Next of Kin
-    if (this.hasData(nextOfKin.first_name)) {
-      try {
-        const payload = this.buildNextOfKinPayload(nextOfKin, memberId);
-        await nextOfKinService.create(payload);
-      } catch (err) {
-        console.error("Next of Kin creation failed:", err);
-        secondaryFailures.push("Next of Kin");
+    // 2. Create Next of Kin records
+    for (const kin of activeKins) {
+      if (this.hasData(kin.first_name)) {
+        try {
+          const payload = this.buildNextOfKinPayload(kin, memberId);
+          await nextOfKinService.create(payload);
+        } catch (err) {
+          console.error("Next of Kin creation failed:", err);
+          secondaryFailures.push("Next of Kin");
+        }
       }
     }
 
-    // 3. Create Vehicle
-    if (this.hasData(vehicle.registration_number)) {
-      try {
-        const payload = this.buildVehiclePayload(vehicle, memberId);
-        await vehicleService.create(payload);
-      } catch (err) {
-        console.error("Vehicle creation failed:", err);
-        secondaryFailures.push("Vehicle");
+    // 3. Create Vehicle records
+    for (const veh of activeVehicles) {
+      if (this.hasData(veh.registration_number)) {
+        try {
+          const payload = this.buildVehiclePayload(veh, memberId);
+          await vehicleService.create(payload);
+        } catch (err) {
+          console.error("Vehicle creation failed:", err);
+          secondaryFailures.push("Vehicle");
+        }
       }
     }
 
@@ -255,16 +273,25 @@ class RegistrationService {
     const {
       member,
       nextOfKin,
+      nextOfKins = [],
       vehicle,
+      vehicles = [],
       guarantor,
     } = registration;
 
-    console.log("Member:", member);
-    console.log("Next Of Kin object:", nextOfKin);
-    console.log("Next Of Kin id:", nextOfKin.id);
-    console.log("Next Of Kin member:", nextOfKin.member);
-    console.log("Vehicle:", vehicle);
-    console.log("Guarantor:", guarantor);
+    const activeKins =
+      nextOfKins.length > 0
+        ? nextOfKins
+        : this.hasData(nextOfKin?.first_name)
+        ? [nextOfKin]
+        : [];
+
+    const activeVehicles =
+      vehicles.length > 0
+        ? vehicles
+        : this.hasData(vehicle?.registration_number)
+        ? [vehicle]
+        : [];
 
     if (!member.id) {
       throw new Error("Member ID is required for update.");
@@ -277,40 +304,37 @@ class RegistrationService {
     const formData = this.buildMemberFormData(registration);
     await memberService.update(memberId, formData);
 
-    // 2. Handle Next of Kin (update or create)
-    if (this.hasData(nextOfKin.first_name)) {
-      try {
-        const payload = this.buildNextOfKinPayload(nextOfKin, memberId);
-        console.log("Next Of Kin payload:", payload);
-
-        console.log("Checking nextOfKin.id =", nextOfKin.id);
-
-        if (nextOfKin.id) {
-          console.log("Updating existing Next Of Kin");
-          await nextOfKinService.update(nextOfKin.id, payload);
-        } else {
-          console.log("Creating new Next Of Kin");
-          await nextOfKinService.create(payload);
+    // 2. Handle Next of Kin records
+    for (const kin of activeKins) {
+      if (this.hasData(kin.first_name)) {
+        try {
+          const payload = this.buildNextOfKinPayload(kin, memberId);
+          if (kin.id) {
+            await nextOfKinService.update(kin.id, payload);
+          } else {
+            await nextOfKinService.create(payload);
+          }
+        } catch (err) {
+          console.error("Next of Kin update failed:", err);
+          secondaryFailures.push("Next of Kin");
         }
-      } catch (err) {
-        console.error("Next of Kin update failed:", err);
-        secondaryFailures.push("Next of Kin");
       }
     }
 
-    // 3. Handle Vehicle (update or create)
-    if (this.hasData(vehicle.registration_number)) {
-      try {
-        const payload = this.buildVehiclePayload(vehicle, memberId);
-
-        if (vehicle.id) {
-          await vehicleService.update(vehicle.id, payload);
-        } else {
-          await vehicleService.create(payload);
+    // 3. Handle Vehicle records
+    for (const veh of activeVehicles) {
+      if (this.hasData(veh.registration_number)) {
+        try {
+          const payload = this.buildVehiclePayload(veh, memberId);
+          if (veh.id) {
+            await vehicleService.update(veh.id, payload);
+          } else {
+            await vehicleService.create(payload);
+          }
+        } catch (err) {
+          console.error("Vehicle update failed:", err);
+          secondaryFailures.push("Vehicle");
         }
-      } catch (err) {
-        console.error("Vehicle update failed:", err);
-        secondaryFailures.push("Vehicle");
       }
     }
 
