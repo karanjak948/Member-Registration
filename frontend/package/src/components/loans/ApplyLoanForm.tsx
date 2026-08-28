@@ -140,14 +140,7 @@ export default function ApplyLoanForm() {
         delete (payload as any).disbursement_date;
       }
 
-      if (payload.security_provided_value !== null && payload.security_provided_value !== undefined) {
-        const val = Number(payload.security_provided_value);
-        if (isNaN(val) || val <= 0) {
-          delete (payload as any).security_provided_value;
-        } else {
-          payload.security_provided_value = val;
-        }
-      } else {
+      if (payload.security_provided_value === null) {
         delete (payload as any).security_provided_value;
       }
 
@@ -172,7 +165,7 @@ export default function ApplyLoanForm() {
 
       setSnackbar({
         open: true,
-        message: "Loan application submitted successfully to the SACCO registry!",
+        message: "Loan application submitted successfully to the SACCO Registry!",
         severity: "success",
       });
 

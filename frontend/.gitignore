@@ -41,3 +41,5 @@ desktop.ini
 
 # Old/nested Git metadata backups
 .git-old/
+
+Dockerfile
