@@ -12,7 +12,9 @@ from .views import (
     MemberWorkflowHistoryViewSet,
     NextOfKinViewSet,
     VehicleViewSet,
+    SendSMSAPIView,
 )
+
 
 
 router = DefaultRouter()
@@ -70,5 +72,7 @@ router.register(
 
 
 urlpatterns = [
+    path("sms/send", SendSMSAPIView.as_view(), name="send-sms-no-slash"),
+    path("sms/send/", SendSMSAPIView.as_view(), name="send-sms"),
     path("", include(router.urls)),
 ]

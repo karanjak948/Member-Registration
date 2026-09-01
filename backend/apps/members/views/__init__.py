@@ -7,6 +7,7 @@ from .field_configuration import FieldConfigurationViewSet
 from .member_configuration import MemberConfigurationViewSet
 from .member_workflow_history import MemberWorkflowHistoryViewSet
 from .member_audit import MemberAuditViewSet
+from .sms import SendSMSAPIView
 
 __all__ = [
     "MemberViewSet",
@@ -18,4 +19,5 @@ __all__ = [
     "MemberConfigurationViewSet",
     "MemberWorkflowHistoryViewSet",
     "MemberAuditViewSet",
+    "SendSMSAPIView",
 ]

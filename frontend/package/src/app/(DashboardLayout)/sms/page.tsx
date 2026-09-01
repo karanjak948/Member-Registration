@@ -34,6 +34,7 @@ import {
   IconBroadcast,
   IconPhone,
 } from "@tabler/icons-react";
+import api from "@/services/api";
 import memberService from "@/services/member.service";
 import { Member } from "@/interfaces/member";
 
@@ -53,7 +54,7 @@ export default function SMSPage() {
   const [history, setHistory] = useState([
     {
       id: 1,
-      recipient: "Member: Kelvin Karanja (254769150421)",
+      recipient: "Member: Kelvin Karanja (254712345678)",
       message: "Welcome to Royal SACCO, Kelvin Karanja! Your member registration is complete. Your Membership No. is RC-000001.",
       time: "Today 10:30 AM",
       status: "Delivered",
@@ -106,22 +107,16 @@ export default function SMSPage() {
 
         if (targetContacts.length === 0) {
           // Fallback test number if no member phones loaded
-          targetContacts = ["254769150421"];
+          targetContacts = ["254712345678"];
         }
       }
 
-      const res = await fetch("/api/sms/send", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contacts: targetContacts,
-          message: message.trim(),
-        }),
+      const { data: resData } = await api.post("/sms/send/", {
+        contacts: targetContacts,
+        message: message.trim(),
       });
 
-      const resData = await res.json();
-
-      if (res.ok && resData.success) {
+      if (resData.success) {
         setToast({
           open: true,
           message: `SMS Sent Successfully via Gateway! (${targetContacts.length} recipients)`,
@@ -351,7 +346,7 @@ export default function SMSPage() {
                       <TextField
                         fullWidth
                         label="Recipient Phone Number *"
-                        placeholder="e.g. 0769150421 or 254769150421"
+                        placeholder="e.g. 0712345678 or 254712345678"
                         value={customPhone}
                         onChange={(e) => setCustomPhone(e.target.value)}
                         required
