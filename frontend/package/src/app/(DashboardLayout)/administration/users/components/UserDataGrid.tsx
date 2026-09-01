@@ -18,7 +18,9 @@ import { OrganizationUser } from "@/types/user";
 import ViewUserDialog from "./ViewUserDialog";
 import UserDialog from "./UserDialog";
 import ActivateUserDialog from "./ActivateUserDialog";
+import ResetPasswordDialog from "./ResetPasswordDialog";
 import userService from "@/services/user.service";
+import KeyIcon from "@mui/icons-material/VpnKey";
 
 export default function UserDataGrid({
   users,
@@ -35,13 +37,15 @@ export default function UserDataGrid({
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<OrganizationUser | null>(null);
 
+  const [resetPasswordDialogOpen, setResetPasswordDialogOpen] = useState(false);
+  const [resetUser, setResetUser] = useState<OrganizationUser | null>(null);
+
   const [activateDialogOpen, setActivateDialogOpen] = useState(false);
   const [statusLoading, setStatusLoading] = useState(false);
 
   const handleUserStatus = async () => {
     if (!selectedUser) return;
 
-    // Frontend guard: prevent deactivation of Owner account
     if (
       selectedUser?.role?.is_system_role &&
       selectedUser?.role?.name === "Owner"
@@ -193,7 +197,7 @@ export default function UserDataGrid({
             <GridActionsCellItem
               key="view"
               icon={<VisibilityIcon />}
-              label="View"
+              label="View Profile"
               showInMenu
               onClick={() => {
                 setSelectedUser(row);
@@ -207,11 +211,25 @@ export default function UserDataGrid({
             <GridActionsCellItem
               key="edit"
               icon={<EditIcon />}
-              label="Edit"
+              label="Edit Details"
               showInMenu
               onClick={() => {
                 setEditingUser(row);
                 setEditDialogOpen(true);
+              }}
+            />
+          );
+
+          // Reset Password
+          actions.push(
+            <GridActionsCellItem
+              key="reset_password"
+              icon={<KeyIcon />}
+              label="Reset Password"
+              showInMenu
+              onClick={() => {
+                setResetUser(row);
+                setResetPasswordDialogOpen(true);
               }}
             />
           );
@@ -222,7 +240,7 @@ export default function UserDataGrid({
               <GridActionsCellItem
                 key="status"
                 icon={<DeleteIcon />}
-                label={row.is_active ? "Deactivate" : "Activate"}
+                label={row.is_active ? "Deactivate Account" : "Activate Account"}
                 showInMenu
                 onClick={() => {
                   setSelectedUser(row);
@@ -349,6 +367,20 @@ export default function UserDataGrid({
           setSelectedUser(null);
         }}
         onConfirm={handleUserStatus}
+      />
+
+      <ResetPasswordDialog
+        open={resetPasswordDialogOpen}
+        user={resetUser}
+        onClose={() => {
+          setResetPasswordDialogOpen(false);
+          setResetUser(null);
+        }}
+        onSuccess={async () => {
+          setResetPasswordDialogOpen(false);
+          setResetUser(null);
+          await onRefresh();
+        }}
       />
     </>
   );

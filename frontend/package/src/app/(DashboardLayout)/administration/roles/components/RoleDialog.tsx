@@ -58,7 +58,6 @@ export default function RoleDialog({
 
   const isEdit = mode === "edit";
 
-  // Reset form when dialog opens
   useEffect(() => {
     if (!open) return;
 
@@ -84,7 +83,7 @@ export default function RoleDialog({
       setPermissions(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error("Failed to load permissions:", error);
-      setApiError("Unable to load permissions. Please try again.");
+      setApiError("Unable to load permission catalogue. Please try again.");
     } finally {
       setPermissionsLoading(false);
     }
@@ -131,7 +130,7 @@ export default function RoleDialog({
         }
         setApiError(responseData.detail ?? JSON.stringify(responseData));
       } else {
-        setApiError("Unable to save role.");
+        setApiError("Unable to save role definition.");
       }
     } finally {
       setLoading(false);
@@ -146,82 +145,92 @@ export default function RoleDialog({
       maxWidth="lg"
       PaperProps={{
         sx: {
-          borderRadius: 3,
+          borderRadius: 3.5,
           overflow: "hidden",
+          boxShadow: "0 20px 40px rgba(0, 0, 0, 0.25)",
         },
       }}
     >
-      {/* Executive Header */}
+      {/* Executive Indigo Header */}
       <DialogTitle
         sx={{
-          p: 2.5,
-          bgcolor: isEdit ? "#f8fafc" : "#ffffff",
+          p: 3,
+          background: "linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #4338ca 100%)",
+          color: "#ffffff",
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
         }}
       >
-        <Stack direction="row" spacing={1.5} alignItems="center">
+        <Stack direction="row" spacing={2} alignItems="center">
           <Box
             sx={{
-              p: 1,
-              borderRadius: 2,
-              bgcolor: isEdit ? "rgba(79, 70, 229, 0.1)" : "rgba(16, 185, 129, 0.1)",
-              color: isEdit ? "#4f46e5" : "#059669",
+              p: 1.25,
+              borderRadius: 2.5,
+              bgcolor: "rgba(255, 255, 255, 0.15)",
+              color: "#a5b4fc",
               display: "flex",
+              backdropFilter: "blur(6px)",
             }}
           >
-            {isEdit ? <IconShieldLock size={26} /> : <IconShieldPlus size={26} />}
+            {isEdit ? <IconShieldLock size={28} /> : <IconShieldPlus size={28} />}
           </Box>
           <Box>
-            <Typography variant="h6" fontWeight={800} color="text.primary">
+            <Typography variant="h5" fontWeight={900} sx={{ color: "#ffffff", letterSpacing: "-0.5px" }}>
               {isEdit ? `Edit Role: ${role?.name}` : "Create New Authorization Role"}
             </Typography>
-            <Typography variant="caption" color="text.secondary">
+            <Typography variant="body2" sx={{ color: "#c7d2fe", fontWeight: 500, mt: 0.3 }}>
               Define the security tier, write policy description, and assign modular permissions
             </Typography>
           </Box>
         </Stack>
 
         {!loading && (
-          <IconButton size="small" onClick={onClose} sx={{ color: "text.secondary" }}>
+          <IconButton
+            size="small"
+            onClick={onClose}
+            sx={{
+              color: "#ffffff",
+              bgcolor: "rgba(255, 255, 255, 0.15)",
+              "&:hover": { bgcolor: "rgba(255, 255, 255, 0.25)" },
+            }}
+          >
             <CloseIcon fontSize="small" />
           </IconButton>
         )}
       </DialogTitle>
 
-      <Divider />
-
-      <DialogContent sx={{ p: 3 }}>
+      <DialogContent sx={{ p: { xs: 2.5, md: 3.5 }, bgcolor: "#f8fafc" }}>
         {apiError && (
-          <Alert severity="error" sx={{ mb: 3 }} onClose={() => setApiError(null)}>
+          <Alert severity="error" sx={{ mb: 3, borderRadius: 2, fontWeight: 700 }} onClose={() => setApiError(null)}>
             {apiError}
           </Alert>
         )}
 
         <Stack spacing={3}>
-          {/* Role Metadata Inputs */}
+          {/* General Details Card */}
           <Paper
             elevation={0}
             sx={{
               p: 3,
-              borderRadius: 2.5,
+              borderRadius: 3,
               border: "1px solid #e2e8f0",
               bgcolor: "#ffffff",
+              boxShadow: "0 2px 8px rgba(0,0,0,0.02)",
             }}
           >
-            <Typography variant="subtitle2" fontWeight={700} color="text.secondary" mb={2}>
-              ROLE GENERAL DETAILS
+            <Typography variant="caption" sx={{ fontWeight: 800, color: "#4338ca", letterSpacing: "0.5px", display: "block", mb: 2 }}>
+              ROLE IDENTITY &amp; GENERAL SCOPE
             </Typography>
 
             <Stack spacing={2.5}>
               <TextField
-                label="Role Name"
-                placeholder="e.g. Loan Underwriter, Operations Manager"
+                label="Role Name *"
+                placeholder="e.g. Loan Underwriter, Operations Manager, Credit Officer"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 error={!!errors.name}
-                helperText={errors.name || "Unique identifier for this organizational role"}
+                helperText={errors.name || "Unique title for this organizational authorization role"}
                 fullWidth
                 required
                 disabled={loading}
@@ -229,35 +238,42 @@ export default function RoleDialog({
                   input: {
                     startAdornment: (
                       <InputAdornment position="start">
-                        <IconShieldCheck size={18} style={{ color: "#94a3b8" }} />
+                        <IconShieldCheck size={18} style={{ color: "#4f46e5" }} />
                       </InputAdornment>
                     ),
+                    sx: { borderRadius: 2.5, fontWeight: 700 },
                   },
                 }}
               />
 
               <TextField
                 label="Role Description"
-                placeholder="Describe operational responsibilities and permission scope..."
+                placeholder="Describe operational responsibilities and permission boundaries..."
                 multiline
                 minRows={2}
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 fullWidth
                 disabled={loading}
-                helperText="Clear summary visible to administrators during user role assignment"
+                helperText="Summary visible to administrators during user role assignment"
+                slotProps={{
+                  input: {
+                    sx: { borderRadius: 2.5 },
+                  },
+                }}
               />
             </Stack>
           </Paper>
 
-          {/* Granular Permissions Selector */}
+          {/* Permission Matrix Component */}
           <Paper
             elevation={0}
             sx={{
               p: 3,
-              borderRadius: 2.5,
+              borderRadius: 3,
               border: "1px solid #e2e8f0",
               bgcolor: "#ffffff",
+              boxShadow: "0 2px 8px rgba(0,0,0,0.02)",
             }}
           >
             <PermissionSelector
@@ -272,12 +288,20 @@ export default function RoleDialog({
 
       <Divider />
 
-      <DialogActions sx={{ p: 2.5, gap: 1.5 }}>
+      <DialogActions sx={{ p: 2.5, px: 3.5, gap: 1.5, bgcolor: "#ffffff" }}>
         <Button
           variant="outlined"
           onClick={onClose}
           disabled={loading}
-          sx={{ px: 3, fontWeight: 600, textTransform: "none" }}
+          sx={{
+            px: 3,
+            py: 1,
+            fontWeight: 800,
+            borderRadius: 2.5,
+            borderColor: "#cbd5e1",
+            color: "#475569",
+            "&:hover": { bgcolor: "#f1f5f9" },
+          }}
         >
           Cancel
         </Button>
@@ -288,11 +312,17 @@ export default function RoleDialog({
           onClick={handleSubmit}
           startIcon={<IconDeviceFloppy size={18} />}
           sx={{
-            px: 3.5,
-            fontWeight: 700,
-            textTransform: "none",
-            bgcolor: "#4f46e5",
-            "&:hover": { bgcolor: "#4338ca" },
+            px: 4,
+            py: 1,
+            fontWeight: 900,
+            fontSize: "0.95rem",
+            borderRadius: 2.5,
+            background: "linear-gradient(135deg, #4f46e5 0%, #4338ca 100%)",
+            color: "#ffffff",
+            boxShadow: "0 4px 14px rgba(79, 70, 229, 0.4)",
+            "&:hover": {
+              background: "linear-gradient(135deg, #4338ca 0%, #3730a3 100%)",
+            },
           }}
         >
           {mode === "create" ? "Create Role" : "Save Changes"}

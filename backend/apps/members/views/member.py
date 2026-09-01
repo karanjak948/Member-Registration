@@ -55,6 +55,7 @@ class MemberViewSet(OrganizationScopedViewSet):
             .filter(
                 organization=organization,
             )
+            .order_by("-created_at", "-id")
         )
 
     def perform_create(self, serializer):

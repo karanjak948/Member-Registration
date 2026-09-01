@@ -36,19 +36,26 @@ class RegistrationService {
   ): Promise<RegistrationData> {
     const member = await memberService.getById(memberId);
 
+    const categoryId = typeof member.category === "object" ? (member.category as any)?.id : member.category;
+
     const [
-      category,
-      nextOfKin,
-      vehicle,
-      guarantor,
-    ] = await Promise.all([
-      member.category
-        ? categoryService.getById(member.category)
+      categoryRes,
+      nextOfKinRes,
+      vehicleRes,
+      guarantorRes,
+    ] = await Promise.allSettled([
+      categoryId
+        ? categoryService.getById(Number(categoryId)).catch(() => null)
         : Promise.resolve(null),
-      nextOfKinService.getByMember(memberId),
-      vehicleService.getByMember(memberId),
-      guarantorService.getByMember(memberId),
+      nextOfKinService.getByMember(memberId).catch(() => null),
+      vehicleService.getByMember(memberId).catch(() => null),
+      guarantorService.getByMember(memberId).catch(() => null),
     ]);
+
+    const category = categoryRes.status === "fulfilled" ? categoryRes.value : null;
+    const nextOfKin = nextOfKinRes.status === "fulfilled" ? nextOfKinRes.value : null;
+    const vehicle = vehicleRes.status === "fulfilled" ? vehicleRes.value : null;
+    const guarantor = guarantorRes.status === "fulfilled" ? guarantorRes.value : null;
 
     return {
       member,

@@ -341,6 +341,7 @@ export default function MembersPage() {
           category={categoryFilter}
           onCategoryChange={setCategoryFilter}
           onRefresh={refresh}
+          members={filteredMembers}
         />
 
         {categoryFilter && (

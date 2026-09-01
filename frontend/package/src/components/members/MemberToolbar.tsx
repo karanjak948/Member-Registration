@@ -23,6 +23,9 @@ import {
   IconProgress,
 } from "@tabler/icons-react";
 
+import ExportButton from "@/components/common/ExportButton";
+import { Member } from "@/interfaces/member";
+
 interface MemberToolbarProps {
   search: string;
   onSearchChange: (value: string) => void;
@@ -33,6 +36,7 @@ interface MemberToolbarProps {
   category?: string;
   onCategoryChange?: (value: string) => void;
   onRefresh: () => void | Promise<void>;
+  members?: Member[];
 }
 
 export default function MemberToolbar({
@@ -45,7 +49,19 @@ export default function MemberToolbar({
   category = "",
   onCategoryChange,
   onRefresh,
+  members = [],
 }: MemberToolbarProps) {
+  const exportColumns = [
+    { header: "Membership No", accessor: (m: Member) => m.membership_number || "—" },
+    { header: "Full Name", accessor: (m: Member) => `${m.first_name || ""} ${m.other_names || ""}`.trim() || "—" },
+    { header: "National ID", accessor: (m: Member) => m.national_id || "—" },
+    { header: "Phone Number", accessor: (m: Member) => m.phone_number || "—" },
+    { header: "Email", accessor: (m: Member) => m.email || "—" },
+    { header: "Category", accessor: (m: Member) => m.category_name || "Normal Member" },
+    { header: "Status", accessor: (m: Member) => m.status },
+    { header: "Registration Stage", accessor: (m: Member) => m.registration_stage },
+  ];
+
   return (
     <Paper
       elevation={0}
@@ -192,6 +208,13 @@ export default function MemberToolbar({
 
         {/* Action Buttons */}
         <Stack direction="row" spacing={1.5} sx={{ alignSelf: { xs: "stretch", xl: "auto" } }}>
+          <ExportButton
+            data={members}
+            columns={exportColumns as any}
+            filename="sacco_members_directory"
+            title="Export"
+          />
+
           <Button
             variant="outlined"
             startIcon={<IconRefresh size={18} />}

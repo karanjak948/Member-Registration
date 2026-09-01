@@ -458,11 +458,15 @@ class RoleListCreateAPIView(
         if organization is None:
             return Role.objects.none()
 
-        return (
-            Role.objects
-            .filter(
-                organization=organization
+        roles = Role.objects.filter(organization=organization)
+        if not roles.exists():
+            OrganizationAccessService.bootstrap_organization(
+                organization, self.request.user
             )
+            roles = Role.objects.filter(organization=organization)
+
+        return (
+            roles
             .prefetch_related(
                 "permissions"
             )

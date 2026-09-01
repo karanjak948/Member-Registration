@@ -32,6 +32,23 @@ class GuarantorSerializer(serializers.ModelSerializer):
             "guarantor_number",
         )
 
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        if instance.guarantor_member:
+            g_mem = instance.guarantor_member
+            data["guarantor_member_name"] = f"{g_mem.first_name} {g_mem.other_names}".strip()
+            data["guarantor_member_phone"] = g_mem.phone_number
+            data["guarantor_member_national_id"] = g_mem.national_id
+            if not data.get("first_name"):
+                data["first_name"] = g_mem.first_name
+            if not data.get("other_names"):
+                data["other_names"] = g_mem.other_names
+            if not data.get("phone_number"):
+                data["phone_number"] = g_mem.phone_number
+            if not data.get("national_id"):
+                data["national_id"] = g_mem.national_id
+        return data
+
     def _validate_owned_member(
         self,
         member,

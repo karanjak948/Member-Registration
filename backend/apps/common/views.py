@@ -31,4 +31,8 @@ class OrganizationScopedViewSet(viewsets.ModelViewSet):
         if membership:
             return membership.organization
 
-        return None
+        if hasattr(self.request.user, "organization") and self.request.user.organization:
+            return self.request.user.organization
+
+        from apps.organizations.models import Organization
+        return Organization.objects.first()

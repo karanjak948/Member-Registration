@@ -49,6 +49,8 @@ export interface Loan {
   member_id: number;
   loan_product_id: number;
   guarantor_member_id: number | null;
+  guarantor_name?: string | null;
+  guarantor_phone?: string | null;
   principal_amount: string;
   security_provided_value: string | null;
   security_provided_notes: string | null;

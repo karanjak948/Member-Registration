@@ -199,6 +199,18 @@ class MemberService:
             ),
         )
 
+        if member.phone_number:
+            try:
+                from apps.common.sms_service import BulkSMSService
+                name = f"{member.first_name or ''} {member.other_names or ''}".strip()
+                BulkSMSService.send_welcome_sms(
+                    member_name=name,
+                    membership_number=member.membership_number or "PENDING",
+                    phone_number=member.phone_number,
+                )
+            except Exception as exc:
+                print(f"SMS notification warning: {exc}")
+
         return member
 
     @staticmethod

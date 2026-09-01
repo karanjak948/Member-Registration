@@ -41,9 +41,14 @@ import {
   IconClock,
   IconExternalLink,
   IconCertificate,
+  IconPlus,
 } from "@tabler/icons-react";
 import loanService from "@/services/loan.service";
+import memberService from "@/services/member.service";
+import guarantorService from "@/services/guarantor.service";
 import { Loan } from "@/interfaces/loan";
+import { Member } from "@/interfaces/member";
+import { Guarantor } from "@/interfaces/guarantor";
 import { usePermissions } from "@/hooks/usePermissions";
 import { PERMISSIONS } from "@/constants/permissions";
 
@@ -132,6 +137,9 @@ export default function LoanDetailPage() {
   const hasAnyGovernanceAction = canApproveLoans || canDisburseLoans || canRejectLoans || canDeleteLoans;
 
   const [loan, setLoan] = useState<Loan | null>(null);
+  const [borrowerMember, setBorrowerMember] = useState<Member | null>(null);
+  const [guarantorMember, setGuarantorMember] = useState<Member | null>(null);
+  const [guarantorRecord, setGuarantorRecord] = useState<Guarantor | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState("");
@@ -227,6 +235,14 @@ export default function LoanDetailPage() {
 
       const data = await loanService.getById(loanId);
       setLoan(data);
+
+      if (data.member_id) {
+        memberService.getById(data.member_id).then(setBorrowerMember).catch(() => null);
+        guarantorService.getByMember(data.member_id).then(setGuarantorRecord).catch(() => null);
+      }
+      if (data.guarantor_member_id) {
+        memberService.getById(data.guarantor_member_id).then(setGuarantorMember).catch(() => null);
+      }
     } catch (err: any) {
       console.error("Failed to load loan details:", err);
 
@@ -1134,88 +1150,177 @@ export default function LoanDetailPage() {
           </Stack>
 
           <Grid container spacing={3}>
-            <Grid size={{ xs: 12, sm: 6 }}>
-              <Typography variant="caption" sx={{ color: "#64748b", fontWeight: 700, textTransform: "uppercase" }}>
-                Borrower Member ID
-              </Typography>
-              <Box sx={{ mt: 0.8, display: "flex", alignItems: "center", gap: 1.5 }}>
-                <Chip
-                  label={`Member Account #${loan.member_id}`}
-                  sx={{
-                    fontWeight: 800,
-                    fontSize: "0.85rem",
-                    bgcolor: "#f0fdfa",
-                    color: "#0f766e",
-                    border: "1px solid #99f6e4",
-                    px: 1,
-                  }}
-                />
-                <Button
-                  size="small"
-                  variant="outlined"
-                  endIcon={<IconExternalLink size={14} />}
-                  onClick={() => router.push(`/members/${loan.member_id}`)}
-                  sx={{
-                    fontWeight: 800,
-                    borderRadius: 2,
-                    fontSize: "0.75rem",
-                    color: "#0f766e",
-                    borderColor: "#99f6e4",
-                    "&:hover": { bgcolor: "#f0fdfa", borderColor: "#0d9488" },
-                  }}
-                >
-                  View Member Profile
-                </Button>
-              </Box>
+            {/* Borrower Card */}
+            <Grid size={{ xs: 12, md: 6 }}>
+              <Paper
+                elevation={0}
+                sx={{
+                  p: 2.5,
+                  borderRadius: 3,
+                  border: "1px solid #99f6e4",
+                  bgcolor: "#f0fdfa",
+                }}
+              >
+                <Stack direction="row" justifyContent="space-between" alignItems="center" mb={1.5}>
+                  <Typography variant="caption" sx={{ color: "#0f766e", fontWeight: 800, textTransform: "uppercase" }}>
+                    BORROWER MEMBER PROFILE
+                  </Typography>
+                  <Button
+                    size="small"
+                    variant="contained"
+                    color="primary"
+                    endIcon={<IconExternalLink size={14} />}
+                    onClick={() => router.push(`/members/${loan.member_id}`)}
+                    sx={{
+                      fontWeight: 800,
+                      borderRadius: 2,
+                      fontSize: "0.75rem",
+                      bgcolor: "#0d9488",
+                      color: "#ffffff",
+                      "&:hover": { bgcolor: "#0f766e" },
+                    }}
+                  >
+                    View Dossier
+                  </Button>
+                </Stack>
+
+                {borrowerMember ? (
+                  <Stack spacing={1}>
+                    <Typography variant="h6" fontWeight={900} color="#0f172a">
+                      {borrowerMember.first_name} {borrowerMember.other_names}
+                    </Typography>
+                    <Stack direction="row" spacing={1} flexWrap="wrap" gap={1}>
+                      <Chip
+                        label={`No: ${borrowerMember.membership_number}`}
+                        size="small"
+                        sx={{ fontWeight: 800, fontFamily: "monospace", bgcolor: "#ccfbf1", color: "#0f766e" }}
+                      />
+                      <Chip
+                        label={`Phone: ${borrowerMember.phone_number}`}
+                        size="small"
+                        sx={{ fontWeight: 700, bgcolor: "#ffffff", color: "#0f766e", border: "1px solid #99f6e4" }}
+                      />
+                      {borrowerMember.national_id && (
+                        <Chip
+                          label={`ID: ${borrowerMember.national_id}`}
+                          size="small"
+                          sx={{ fontWeight: 700, bgcolor: "#ffffff", color: "#0f766e", border: "1px solid #99f6e4" }}
+                        />
+                      )}
+                    </Stack>
+                  </Stack>
+                ) : (
+                  <Typography variant="body2" fontWeight={800} color="#0f766e">
+                    Member Account #{loan.member_id}
+                  </Typography>
+                )}
+              </Paper>
             </Grid>
 
-            <Grid size={{ xs: 12, sm: 6 }}>
-              <Typography variant="caption" sx={{ color: "#64748b", fontWeight: 700, textTransform: "uppercase" }}>
-                Endorsing Guarantor Member
-              </Typography>
-              <Box sx={{ mt: 0.8, display: "flex", alignItems: "center", gap: 1.5 }}>
-                {loan.guarantor_member_id ? (
-                  <>
-                    <Chip
-                      label={`Guarantor Member #${loan.guarantor_member_id}`}
-                      sx={{
-                        fontWeight: 800,
-                        fontSize: "0.85rem",
-                        bgcolor: "#eff6ff",
-                        color: "#1d4ed8",
-                        border: "1px solid #bfdbfe",
-                        px: 1,
-                      }}
-                    />
+            {/* Guarantor Card */}
+            <Grid size={{ xs: 12, md: 6 }}>
+              <Paper
+                elevation={0}
+                sx={{
+                  p: 2.5,
+                  borderRadius: 3,
+                  border: "1px solid #bfdbfe",
+                  bgcolor: "#eff6ff",
+                }}
+              >
+                <Stack direction="row" justifyContent="space-between" alignItems="center" mb={1.5}>
+                  <Typography variant="caption" sx={{ color: "#1d4ed8", fontWeight: 800, textTransform: "uppercase" }}>
+                    ENDORSING GUARANTOR PROFILE
+                  </Typography>
+                  {loan.guarantor_member_id && (
                     <Button
                       size="small"
-                      variant="outlined"
+                      variant="contained"
                       endIcon={<IconExternalLink size={14} />}
                       onClick={() => router.push(`/members/${loan.guarantor_member_id}`)}
                       sx={{
                         fontWeight: 800,
                         borderRadius: 2,
                         fontSize: "0.75rem",
-                        color: "#1d4ed8",
-                        borderColor: "#bfdbfe",
-                        "&:hover": { bgcolor: "#eff6ff", borderColor: "#2563eb" },
+                        bgcolor: "#2563eb",
+                        color: "#ffffff",
+                        "&:hover": { bgcolor: "#1d4ed8" },
                       }}
                     >
                       View Guarantor
                     </Button>
-                  </>
+                  )}
+                </Stack>
+
+                {guarantorMember ? (
+                  <Stack spacing={1}>
+                    <Typography variant="h6" fontWeight={900} color="#0f172a">
+                      {guarantorMember.first_name} {guarantorMember.other_names}
+                    </Typography>
+                    <Stack direction="row" spacing={1} flexWrap="wrap" gap={1}>
+                      <Chip
+                        label={`No: ${guarantorMember.membership_number}`}
+                        size="small"
+                        sx={{ fontWeight: 800, fontFamily: "monospace", bgcolor: "#dbeafe", color: "#1e40af" }}
+                      />
+                      <Chip
+                        label={`Phone: ${guarantorMember.phone_number}`}
+                        size="small"
+                        sx={{ fontWeight: 700, bgcolor: "#ffffff", color: "#1d4ed8", border: "1px solid #bfdbfe" }}
+                      />
+                      {guarantorMember.national_id && (
+                        <Chip
+                          label={`ID: ${guarantorMember.national_id}`}
+                          size="small"
+                          sx={{ fontWeight: 700, bgcolor: "#ffffff", color: "#1d4ed8", border: "1px solid #bfdbfe" }}
+                        />
+                      )}
+                    </Stack>
+                  </Stack>
+                ) : guarantorRecord ? (
+                  <Stack spacing={1}>
+                    <Typography variant="h6" fontWeight={900} color="#0f172a">
+                      {guarantorRecord.first_name} {guarantorRecord.other_names}
+                    </Typography>
+                    <Stack direction="row" spacing={1} flexWrap="wrap" gap={1}>
+                      <Chip
+                        label={`Phone: ${guarantorRecord.phone_number}`}
+                        size="small"
+                        sx={{ fontWeight: 700, bgcolor: "#ffffff", color: "#1d4ed8", border: "1px solid #bfdbfe" }}
+                      />
+                      {guarantorRecord.national_id && (
+                        <Chip
+                          label={`ID: ${guarantorRecord.national_id}`}
+                          size="small"
+                          sx={{ fontWeight: 700, bgcolor: "#ffffff", color: "#1d4ed8", border: "1px solid #bfdbfe" }}
+                        />
+                      )}
+                      {guarantorRecord.relationship && (
+                        <Chip
+                          label={`Relation: ${guarantorRecord.relationship}`}
+                          size="small"
+                          sx={{ fontWeight: 700, bgcolor: "#dbeafe", color: "#1e40af" }}
+                        />
+                      )}
+                    </Stack>
+                  </Stack>
+                ) : loan.guarantor_name ? (
+                  <Stack spacing={1}>
+                    <Typography variant="h6" fontWeight={900} color="#0f172a">
+                      {loan.guarantor_name}
+                    </Typography>
+                    {loan.guarantor_phone && (
+                      <Typography variant="body2" fontWeight={700} color="#1d4ed8">
+                        Phone: {loan.guarantor_phone}
+                      </Typography>
+                    )}
+                  </Stack>
                 ) : (
-                  <Chip
-                    label="No Guarantor Assigned (Unsecured)"
-                    sx={{
-                      fontWeight: 700,
-                      fontSize: "0.8rem",
-                      bgcolor: "#f1f5f9",
-                      color: "#64748b",
-                    }}
-                  />
+                  <Typography variant="body2" color="#64748b" fontWeight={700}>
+                    No Guarantor Assigned (Unsecured / Personal Credit)
+                  </Typography>
                 )}
-              </Box>
+              </Paper>
             </Grid>
           </Grid>
         </Paper>

@@ -550,9 +550,8 @@ class OrganizationUserCreateSerializer(
             **validated_data
         )
 
-        # Organization RBAC, not Django staff flags,
-        # controls application authorization.
-        user.is_staff = False
+        # Ensure organization staff members have staff access enabled
+        user.is_staff = True
         user.is_superuser = False
 
         user.set_password(

@@ -24,6 +24,13 @@ import SearchIcon from "@mui/icons-material/Search";
 import SelectAllIcon from "@mui/icons-material/SelectAll";
 import ClearIcon from "@mui/icons-material/Clear";
 import { Permission } from "@/types/role";
+import {
+  IconUsers,
+  IconCoins,
+  IconShieldCheck,
+  IconBuildingBank,
+  IconReceipt,
+} from "@tabler/icons-react";
 
 interface PermissionSelectorProps {
   permissions: Permission[];
@@ -36,6 +43,14 @@ interface GroupedPermissions {
   [module: string]: Permission[];
 }
 
+const moduleConfig: Record<string, { color: string; bg: string; border: string; icon: any }> = {
+  Members: { color: "#059669", bg: "#ecfdf5", border: "#a7f3d0", icon: IconUsers },
+  Loans: { color: "#2563eb", bg: "#eff6ff", border: "#bfdbfe", icon: IconCoins },
+  Roles: { color: "#7c3aed", bg: "#f5f3ff", border: "#ddd6fe", icon: IconShieldCheck },
+  Users: { color: "#d97706", bg: "#fffbeb", border: "#fde68a", icon: IconBuildingBank },
+  Collections: { color: "#0d9488", bg: "#f0fdfa", border: "#99f6e4", icon: IconReceipt },
+};
+
 export default function PermissionSelector({
   permissions,
   value,
@@ -44,10 +59,9 @@ export default function PermissionSelector({
 }: PermissionSelectorProps) {
   const [search, setSearch] = useState("");
   const [expandedModules, setExpandedModules] = useState<Set<string>>(
-    () => new Set(["Members", "Loans", "Roles", "Users"])
+    () => new Set(["Members", "Loans", "Roles", "Users", "Collections"])
   );
 
-  // Group permissions by normalized module name
   const groupedPermissions = useMemo(() => {
     const grouped = permissions.reduce<GroupedPermissions>((acc, permission) => {
       const rawModule = (permission.module || "General").trim();
@@ -66,7 +80,6 @@ export default function PermissionSelector({
     return grouped;
   }, [permissions]);
 
-  // Filter permissions by search query
   const filteredGroupedPermissions = useMemo(() => {
     if (!search.trim()) {
       return groupedPermissions;
@@ -88,14 +101,7 @@ export default function PermissionSelector({
       }
     });
 
-    const sortedResult: GroupedPermissions = {};
-    Object.keys(result)
-      .sort((a, b) => a.localeCompare(b))
-      .forEach((module) => {
-        sortedResult[module] = result[module];
-      });
-
-    return sortedResult;
+    return result;
   }, [groupedPermissions, search]);
 
   const allPermissionIds = useMemo(() => {
@@ -175,10 +181,10 @@ export default function PermissionSelector({
   if (loading) {
     return (
       <Stack spacing={2}>
-        <Typography variant="subtitle2" fontWeight={700}>
-          ASSIGNED PERMISSIONS
+        <Typography variant="caption" fontWeight={800} color="#4338ca">
+          ASSIGNED PERMISSIONS MATRIX
         </Typography>
-        <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
+        <Paper variant="outlined" sx={{ p: 2, borderRadius: 3 }}>
           <Stack spacing={1.5}>
             <Skeleton variant="rounded" height={44} />
             <Skeleton variant="rounded" height={44} />
@@ -193,7 +199,7 @@ export default function PermissionSelector({
   const hasSearchResults = Object.keys(filteredGroupedPermissions).length > 0;
 
   return (
-    <Stack spacing={2}>
+    <Stack spacing={2.5}>
       {/* Header and Controls */}
       <Stack
         direction={{ xs: "column", sm: "row" }}
@@ -202,19 +208,27 @@ export default function PermissionSelector({
         spacing={2}
       >
         <Box>
-          <Typography variant="subtitle2" fontWeight={700} color="text.secondary">
+          <Typography variant="caption" sx={{ fontWeight: 800, color: "#4338ca", letterSpacing: "0.5px" }}>
             ASSIGNED PERMISSIONS MATRIX
           </Typography>
-          <Typography variant="caption" color="text.secondary">
-            Toggle modules or individual permissions to grant operational rights
+          <Typography variant="body2" color="#64748b" fontWeight={500}>
+            Toggle modules or individual rights to grant operational capabilities
           </Typography>
         </Box>
 
         <Chip
-          color={totalSelected > 0 ? "primary" : "default"}
+          color={totalSelected > 0 ? "indigo" as any : "default"}
           size="small"
           label={`${totalSelected} of ${permissions.length} Selected`}
-          sx={{ fontWeight: 700 }}
+          sx={{
+            fontWeight: 900,
+            fontSize: "0.82rem",
+            bgcolor: totalSelected > 0 ? "#e0e7ff" : "#f1f5f9",
+            color: totalSelected > 0 ? "#4338ca" : "#64748b",
+            border: `1px solid ${totalSelected > 0 ? "#c7d2fe" : "#cbd5e1"}`,
+            py: 0.5,
+            px: 1,
+          }}
         />
       </Stack>
 
@@ -227,7 +241,7 @@ export default function PermissionSelector({
           onChange={(e) => setSearch(e.target.value)}
           slotProps={{
             input: {
-              startAdornment: <SearchIcon sx={{ mr: 1, color: "text.secondary", fontSize: 20 }} />,
+              startAdornment: <SearchIcon sx={{ mr: 1, color: "#4f46e5", fontSize: 20 }} />,
               endAdornment: search && (
                 <Box
                   component="button"
@@ -243,6 +257,7 @@ export default function PermissionSelector({
                   <ClearIcon fontSize="small" />
                 </Box>
               ),
+              sx: { borderRadius: 2.5, fontWeight: 600 },
             },
           }}
           sx={{ flex: 1, width: { xs: "100%", sm: "auto" } }}
@@ -255,7 +270,14 @@ export default function PermissionSelector({
             startIcon={<SelectAllIcon />}
             onClick={selectAll}
             disabled={!hasPermissions}
-            sx={{ textTransform: "none", fontWeight: 600, flex: 1 }}
+            sx={{
+              textTransform: "none",
+              fontWeight: 800,
+              borderRadius: 2,
+              color: "#4338ca",
+              borderColor: "#c7d2fe",
+              "&:hover": { bgcolor: "#e0e7ff" },
+            }}
           >
             Select All
           </Button>
@@ -266,7 +288,7 @@ export default function PermissionSelector({
             startIcon={<ClearIcon />}
             onClick={clearAll}
             disabled={!hasPermissions || totalSelected === 0}
-            sx={{ textTransform: "none", fontWeight: 600, flex: 1 }}
+            sx={{ textTransform: "none", fontWeight: 800, borderRadius: 2 }}
           >
             Clear All
           </Button>
@@ -277,21 +299,22 @@ export default function PermissionSelector({
       <Paper
         elevation={0}
         sx={{
-          maxHeight: 440,
-          overflow: "auto",
-          borderRadius: 2,
+          maxHeight: 460,
+          overflowY: "auto",
+          borderRadius: 3,
           border: "1px solid #e2e8f0",
+          bgcolor: "#ffffff",
         }}
       >
         {!hasPermissions ? (
           <Box py={6} textAlign="center">
-            <Typography variant="body2" color="text.secondary">
+            <Typography variant="body2" color="text.secondary" fontWeight={600}>
               No permissions available in catalogue.
             </Typography>
           </Box>
         ) : !hasSearchResults ? (
           <Box py={6} textAlign="center">
-            <Typography variant="body2" color="text.secondary">
+            <Typography variant="body2" color="text.secondary" fontWeight={600}>
               No permissions match "{search}".
             </Typography>
           </Box>
@@ -302,6 +325,8 @@ export default function PermissionSelector({
               const fullySelected = isModuleFullySelected(modulePermissions);
               const partiallySelected = isModulePartiallySelected(modulePermissions);
               const selectedCount = getModuleSelectedIds(modulePermissions).length;
+              const cfg = moduleConfig[module] || { color: "#4f46e5", bg: "#f5f3ff", border: "#ddd6fe", icon: IconShieldCheck };
+              const ModuleIcon = cfg.icon;
 
               return (
                 <Accordion
@@ -316,9 +341,9 @@ export default function PermissionSelector({
                   }}
                 >
                   <AccordionSummary
-                    expandIcon={<ExpandMoreIcon />}
+                    expandIcon={<ExpandMoreIcon sx={{ color: cfg.color }} />}
                     sx={{
-                      minHeight: 48,
+                      minHeight: 52,
                       bgcolor: isExpanded ? "#f8fafc" : "#ffffff",
                       "& .MuiAccordionSummary-content": {
                         alignItems: "center",
@@ -332,7 +357,7 @@ export default function PermissionSelector({
                       justifyContent="space-between"
                       sx={{ width: "100%", pr: 1 }}
                     >
-                      <Stack direction="row" alignItems="center" spacing={1}>
+                      <Stack direction="row" alignItems="center" spacing={1.5}>
                         <Checkbox
                           size="small"
                           checked={fullySelected}
@@ -342,18 +367,40 @@ export default function PermissionSelector({
                             toggleModule(modulePermissions);
                           }}
                           onClick={(e) => e.stopPropagation()}
+                          sx={{
+                            color: cfg.color,
+                            "&.Mui-checked": { color: cfg.color },
+                          }}
                         />
-                        <Typography fontWeight={700} variant="body2">
+
+                        <Box
+                          sx={{
+                            p: 0.75,
+                            borderRadius: 1.5,
+                            bgcolor: cfg.bg,
+                            color: cfg.color,
+                            display: "flex",
+                            border: `1px solid ${cfg.border}`,
+                          }}
+                        >
+                          <ModuleIcon size={18} />
+                        </Box>
+
+                        <Typography fontWeight={900} variant="body2" sx={{ color: "#0f172a" }}>
                           {module} Module
                         </Typography>
                       </Stack>
 
                       <Chip
                         size="small"
-                        label={`${selectedCount} / ${modulePermissions.length} selected`}
-                        color={selectedCount > 0 ? "primary" : "default"}
-                        variant={selectedCount > 0 ? "filled" : "outlined"}
-                        sx={{ fontSize: "0.7rem", height: 22, fontWeight: 700 }}
+                        label={`${selectedCount} of ${modulePermissions.length} selected`}
+                        sx={{
+                          fontSize: "0.75rem",
+                          fontWeight: 800,
+                          bgcolor: selectedCount > 0 ? cfg.bg : "#f1f5f9",
+                          color: selectedCount > 0 ? cfg.color : "#94a3b8",
+                          border: `1px solid ${selectedCount > 0 ? cfg.border : "#e2e8f0"}`,
+                        }}
                       />
                     </Stack>
                   </AccordionSummary>
@@ -368,21 +415,26 @@ export default function PermissionSelector({
                             key={permission.id}
                             onClick={() => togglePermission(permission.id)}
                             sx={{
-                              pl: 5,
-                              pr: 2,
-                              py: 0.8,
-                              bgcolor: checked ? "rgba(37, 99, 235, 0.04)" : "transparent",
+                              pl: 5.5,
+                              pr: 2.5,
+                              py: 1,
+                              bgcolor: checked ? cfg.bg : "transparent",
+                              borderLeft: checked ? `4px solid ${cfg.color}` : "4px solid transparent",
                               "&:hover": {
-                                bgcolor: checked ? "rgba(37, 99, 235, 0.08)" : "#f8fafc",
+                                bgcolor: checked ? cfg.bg : "#f8fafc",
                               },
                             }}
                             dense
                           >
-                            <ListItemIcon sx={{ minWidth: 34 }}>
+                            <ListItemIcon sx={{ minWidth: 36 }}>
                               <Checkbox
                                 edge="start"
                                 checked={checked}
                                 size="small"
+                                sx={{
+                                  color: "#cbd5e1",
+                                  "&.Mui-checked": { color: cfg.color },
+                                }}
                               />
                             </ListItemIcon>
                             <ListItemText
@@ -390,12 +442,13 @@ export default function PermissionSelector({
                               secondary={permission.description || permission.code}
                               primaryTypographyProps={{
                                 variant: "body2",
-                                fontWeight: checked ? 700 : 500,
-                                color: checked ? "primary.main" : "text.primary",
+                                fontWeight: checked ? 800 : 600,
+                                color: checked ? cfg.color : "#1e293b",
                               }}
                               secondaryTypographyProps={{
                                 variant: "caption",
-                                color: "text.secondary",
+                                color: "#64748b",
+                                fontWeight: 500,
                               }}
                             />
                             <Chip
@@ -403,10 +456,12 @@ export default function PermissionSelector({
                               size="small"
                               variant="outlined"
                               sx={{
-                                fontSize: "0.68rem",
-                                height: 20,
-                                color: "text.secondary",
-                                borderColor: "#e2e8f0",
+                                fontSize: "0.7rem",
+                                fontWeight: 700,
+                                fontFamily: "monospace",
+                                color: checked ? cfg.color : "#64748b",
+                                borderColor: checked ? cfg.border : "#e2e8f0",
+                                bgcolor: checked ? "#ffffff" : "transparent",
                               }}
                             />
                           </ListItemButton>
