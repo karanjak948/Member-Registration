@@ -15,6 +15,7 @@ BULK_SMS_API_KEY = os.getenv("BULK_SMS_API_KEY", "f5e10366fd4cbc04aa487320ece1f4
 BULK_SMS_CONSUMER_KEY = os.getenv("BULK_SMS_CONSUMER_KEY", "6f4ebef63cb63733b26e23e4461bf12e383060271d1386255964b4ceecedaba6")
 BULK_SMS_CONSUMER_SECRET = os.getenv("BULK_SMS_CONSUMER_SECRET", "b5f0ea8138d11ade514f370583bcc429")
 BULK_SMS_SENDER_ID = os.getenv("BULK_SMS_SENDER_ID", "KIY TOYS")
+BULK_SMS_ACCESS_TOKEN = os.getenv("BULK_SMS_ACCESS_TOKEN", "58a0a73af923488f8f52ccf32378ab8e3313d7753e4f13194fc9c3364279fc17")
 
 
 class BulkSMSService:
@@ -67,6 +68,11 @@ class BulkSMSService:
                 logger.error(f"BulkSMS token error response: {body}")
         except Exception as e:
             logger.error(f"Failed to fetch BulkSMS access token: {e}")
+        
+        # Fallback to configured active access token
+        if BULK_SMS_ACCESS_TOKEN:
+            logger.info("Using configured active BulkSMS access token.")
+            return BULK_SMS_ACCESS_TOKEN
         return None
 
     @classmethod
