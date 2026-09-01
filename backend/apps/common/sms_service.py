@@ -4,15 +4,17 @@ import urllib.request
 import urllib.parse
 from typing import Dict, Any, List, Optional
 
+import os
+
 logger = logging.getLogger(__name__)
 
-BULK_SMS_BASE_URL = "https://bulksms.pefranksmartsolutions.co.ke/api/v1"
+BULK_SMS_BASE_URL = os.getenv("BULK_SMS_BASE_URL", "https://bulksms.pefranksmartsolutions.co.ke/api/v1")
 
 # Credentials provided for Bulk SMS Gateway
-BULK_SMS_API_KEY = "f5e10366fd4cbc04aa487320ece1f40bb246b363464966057c60f6934kdf38ab"
-BULK_SMS_CONSUMER_KEY = "6f4ebef63cb63733b26e23e4461bf12e383060271d1386255964b4ceecedaba6"
-BULK_SMS_CONSUMER_SECRET = "b5f0ea8138d11ade514f370583bcc429"
-BULK_SMS_SENDER_ID = "KIY TOYS"
+BULK_SMS_API_KEY = os.getenv("BULK_SMS_API_KEY", "f5e10366fd4cbc04aa487320ece1f40bb246b363464966057c60f6934kdf38ab")
+BULK_SMS_CONSUMER_KEY = os.getenv("BULK_SMS_CONSUMER_KEY", "6f4ebef63cb63733b26e23e4461bf12e383060271d1386255964b4ceecedaba6")
+BULK_SMS_CONSUMER_SECRET = os.getenv("BULK_SMS_CONSUMER_SECRET", "b5f0ea8138d11ade514f370583bcc429")
+BULK_SMS_SENDER_ID = os.getenv("BULK_SMS_SENDER_ID", "KIY TOYS")
 
 
 class BulkSMSService:
