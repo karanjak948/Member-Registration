@@ -1,5 +1,4 @@
-import loanApi from "./loanApi";
-
+import api from "./api";
 import {
   LoanProduct,
   LoanProductCreate,
@@ -8,68 +7,70 @@ import {
 
 class LoanProductService {
   /**
-   * GET /api/loan-products
+   * GET /api/loan-products/
    */
-  async getAll(): Promise<LoanProduct[]> {
-    const response = await loanApi.get("/loan-products");
-
-    return response.data;
+  async getAll(activeOnly: boolean = false): Promise<LoanProduct[]> {
+    try {
+      const response = await api.get("/loan-products/", {
+        params: activeOnly ? { active_only: "true" } : {},
+      });
+      const data = response.data;
+      return Array.isArray(data) ? data : (data?.results || []);
+    } catch (error: any) {
+      console.error("Failed to fetch loan products:", error);
+      throw error;
+    }
   }
 
   /**
-   * GET /api/loan-products/{product_code}
+   * GET /api/loan-products/{id}/
    */
-  async getById(
-    productId: number
-  ): Promise<LoanProduct> {
-    const response = await loanApi.get(
-      `/loan-products/${productId}`
-    );
-
-    return response.data;
+  async getById(productId: number): Promise<LoanProduct> {
+    try {
+      const response = await api.get(`/loan-products/${productId}/`);
+      return response.data;
+    } catch (error: any) {
+      console.error(`Failed to fetch loan product ${productId}:`, error);
+      throw error;
+    }
   }
 
   /**
-   * POST /api/loan-products
+   * POST /api/loan-products/
    */
-  async create(
-    data: LoanProductCreate
-  ): Promise<LoanProduct> {
-    const response = await loanApi.post(
-      "/loan-products",
-      data
-    );
-
-    return response.data;
+  async create(data: LoanProductCreate): Promise<LoanProduct> {
+    try {
+      const response = await api.post("/loan-products/", data);
+      return response.data;
+    } catch (error: any) {
+      console.error("Failed to create loan product:", error);
+      throw error;
+    }
   }
 
   /**
-   * PUT /api/loan-products/{product_code}
+   * PUT /api/loan-products/{id}/
    */
-  async update(
-    productCode: string,
-    data: LoanProductUpdate
-  ): Promise<LoanProduct> {
-    console.log("Updating Product Code:", productCode);
-    console.log("Payload:", data);
-
-    const response = await loanApi.put(
-      `/loan-products/${productCode}`,
-      data
-    );
-
-    return response.data;
+  async update(productId: number, data: LoanProductUpdate): Promise<LoanProduct> {
+    try {
+      const response = await api.put(`/loan-products/${productId}/`, data);
+      return response.data;
+    } catch (error: any) {
+      console.error(`Failed to update loan product ${productId}:`, error);
+      throw error;
+    }
   }
 
   /**
-   * DELETE /api/loan-products/{product_code}
+   * DELETE /api/loan-products/{id}/
    */
-  async delete(
-    productCode: string
-  ): Promise<void> {
-    await loanApi.delete(
-      `/loan-products/${productCode}`
-    );
+  async delete(productId: number): Promise<void> {
+    try {
+      await api.delete(`/loan-products/${productId}/`);
+    } catch (error: any) {
+      console.error(`Failed to delete loan product ${productId}:`, error);
+      throw error;
+    }
   }
 }
 

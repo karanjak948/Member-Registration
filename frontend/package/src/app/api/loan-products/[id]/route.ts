@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
 
-const API_URL =
-  "https://v1.royalltd.co.ke/lne/api/loan-products";
+const API_BASE_URL =
+  process.env.DJANGO_API_URL ||
+  process.env.NEXT_PUBLIC_API_URL ||
+  "http://127.0.0.1:8000/api";
 
 interface RouteContext {
   params: Promise<{
@@ -9,119 +13,72 @@ interface RouteContext {
   }>;
 }
 
-/* -------------------------------------------------------------------------- */
-/* GET */
-/* -------------------------------------------------------------------------- */
-
-export async function GET(
-  request: NextRequest,
-  { params }: RouteContext
-) {
+export async function GET(request: NextRequest, { params }: RouteContext) {
   try {
-    // ✅ MUST await params in Next.js 16
     const { id } = await params;
+    const session = await getServerSession(authOptions);
+    const headers: Record<string, string> = {
+      Accept: "application/json",
+    };
+    if (session?.accessToken) {
+      headers["Authorization"] = `Bearer ${session.accessToken}`;
+    }
 
-    console.log("GET Loan Product:", id);
-
-    const response = await fetch(
-      `${API_URL}/${id}`,
-      {
-        method: "GET",
-        headers: {
-          Accept: "application/json",
-        },
-        cache: "no-store",
-      }
-    );
+    const response = await fetch(`${API_BASE_URL.replace(/\/$/, "")}/loan-products/${id}/`, {
+      method: "GET",
+      headers,
+      cache: "no-store",
+    });
 
     const data = await response.json();
-
-    console.log("Loan Product Response:", data);
-
-    return NextResponse.json(data, {
-      status: response.status,
-    });
-  } catch (error) {
-    console.error("GET Loan Product Error:", error);
-
-    return NextResponse.json(
-      {
-        detail:
-          error instanceof Error
-            ? error.message
-            : "Unknown server error",
-      },
-      {
-        status: 500,
-      }
-    );
+    return NextResponse.json(data, { status: response.status });
+  } catch (error: any) {
+    return NextResponse.json({ detail: error?.message || "Server error" }, { status: 500 });
   }
 }
 
-/* -------------------------------------------------------------------------- */
-/* PUT */
-/* -------------------------------------------------------------------------- */
-
-export async function PUT(
-  request: NextRequest,
-  { params }: RouteContext
-) {
+export async function PUT(request: NextRequest, { params }: RouteContext) {
   try {
-    // ✅ MUST await params in Next.js 16
     const { id } = await params;
-
+    const session = await getServerSession(authOptions);
     const body = await request.json();
-
-    console.log("=================================");
-    console.log("Updating Loan Product");
-    console.log("Product ID:", id);
-    console.log("Payload:");
-    console.dir(body, { depth: null });
-    console.log("=================================");
-
-    const response = await fetch(
-      `${API_URL}/${id}`,
-      {
-        method: "PUT",
-        headers: {
-          Accept: "application/json",
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(body),
-      }
-    );
-
-    const responseText = await response.text();
-
-    console.log("Royal API Status:", response.status);
-    console.log("Royal API Response:", responseText);
-
-    let data;
-
-    try {
-      data = JSON.parse(responseText);
-    } catch {
-      data = {
-        detail: responseText,
-      };
+    const headers: Record<string, string> = {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    };
+    if (session?.accessToken) {
+      headers["Authorization"] = `Bearer ${session.accessToken}`;
     }
 
-    return NextResponse.json(data, {
-      status: response.status,
+    const response = await fetch(`${API_BASE_URL.replace(/\/$/, "")}/loan-products/${id}/`, {
+      method: "PUT",
+      headers,
+      body: JSON.stringify(body),
     });
-  } catch (error) {
-    console.error("PUT Loan Product Error:", error);
 
-    return NextResponse.json(
-      {
-        detail:
-          error instanceof Error
-            ? error.message
-            : "Unknown server error",
-      },
-      {
-        status: 500,
-      }
-    );
+    const data = await response.json();
+    return NextResponse.json(data, { status: response.status });
+  } catch (error: any) {
+    return NextResponse.json({ detail: error?.message || "Server error" }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: NextRequest, { params }: RouteContext) {
+  try {
+    const { id } = await params;
+    const session = await getServerSession(authOptions);
+    const headers: Record<string, string> = {};
+    if (session?.accessToken) {
+      headers["Authorization"] = `Bearer ${session.accessToken}`;
+    }
+
+    const response = await fetch(`${API_BASE_URL.replace(/\/$/, "")}/loan-products/${id}/`, {
+      method: "DELETE",
+      headers,
+    });
+
+    return new NextResponse(null, { status: response.status });
+  } catch (error: any) {
+    return NextResponse.json({ detail: error?.message || "Server error" }, { status: 500 });
   }
 }

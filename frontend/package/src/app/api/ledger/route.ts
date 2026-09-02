@@ -1,35 +1,34 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
 
-const ROYAL_API_URL =
-  process.env.LOAN_API_URL ||
-  process.env.NEXT_PUBLIC_LOAN_API_URL ||
-  "https://v1.royalltd.co.ke/lne/api";
+const API_BASE_URL =
+  process.env.DJANGO_API_URL ||
+  process.env.NEXT_PUBLIC_API_URL ||
+  "http://127.0.0.1:8000/api";
 
 export async function GET(request: NextRequest) {
   try {
+    const session = await getServerSession(authOptions);
+    const headers: Record<string, string> = {
+      Accept: "application/json",
+    };
+    if (session?.accessToken) {
+      headers["Authorization"] = `Bearer ${session.accessToken}`;
+    }
+
     const { searchParams } = new URL(request.url);
-    const accountName = searchParams.get("account_name");
-    const loanId = searchParams.get("loan_id");
+    const url = `${API_BASE_URL.replace(/\/$/, "")}/ledger-transactions/${searchParams.toString() ? `?${searchParams.toString()}` : ""}`;
 
-    const query = new URLSearchParams();
-    if (accountName) query.set("account_name", accountName);
-    if (loanId) query.set("loan_id", loanId);
-
-    const url = `${ROYAL_API_URL}/ledger${query.toString() ? `?${query.toString()}` : ""}`;
     const response = await fetch(url, {
       method: "GET",
-      headers: {
-        Accept: "application/json",
-      },
+      headers,
       cache: "no-store",
     });
 
-    if (!response.ok) {
-      return NextResponse.json([], { status: response.status });
-    }
-
     const data = await response.json();
-    return NextResponse.json(Array.isArray(data) ? data : []);
+    const list = Array.isArray(data) ? data : (data?.results || []);
+    return NextResponse.json(list, { status: response.status });
   } catch (error) {
     console.error("Error in GET /api/ledger:", error);
     return NextResponse.json([], { status: 500 });

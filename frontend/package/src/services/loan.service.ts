@@ -1,5 +1,4 @@
-import loanApi from "./loanApi";
-
+import api from "./api";
 import {
   Loan,
   LoanCreate,
@@ -7,112 +6,176 @@ import {
   LoanUpdate,
 } from "@/interfaces/loan";
 
+export interface LoanCalculatorPreviewParams {
+  principal: number | string;
+  loan_product_id?: number | string;
+  interest_rate?: number | string;
+  interest_method?: "flat" | "reducing_balance" | "compound";
+  interest_period?: "monthly" | "yearly";
+  repayment_frequency?: "daily" | "weekly" | "monthly" | "yearly";
+  num_periods: number;
+  start_date?: string;
+}
+
+export interface LoanCalculatorPreviewResponse {
+  principal: string;
+  interest_rate: string;
+  interest_method: string;
+  interest_period: string;
+  repayment_frequency: string;
+  num_periods: number;
+  total_interest: string;
+  total_payable: string;
+  regular_installment: string;
+  fees: Array<{ fee_name: string; amount: string; affects_principal: boolean }>;
+  schedule: Array<{
+    period_number: number;
+    due_date: string;
+    expected_amount: string;
+    expected_principal: string;
+    expected_interest: string;
+    opening_balance: string;
+    closing_balance: string;
+  }>;
+}
+
+export interface RepaymentCreatePayload {
+  loan: number;
+  payment_date?: string;
+  amount_paid: number | string;
+  payment_method: string;
+  transaction_reference: string;
+  notes?: string;
+}
+
 class LoanService {
   /**
-   * GET /api/loans
+   * GET /api/loans/
    */
-  async getAll(): Promise<LoanList> {
+  async getAll(params?: { status?: string; member_id?: number; search?: string }): Promise<LoanList> {
     try {
-      console.log("Fetching all loans...");
-      const response = await loanApi.get("/loans");
-      
-      // Log the raw response
-      console.log("Raw API response:", response.data);
-      
-      // Handle both array and paginated responses
+      const response = await api.get("/loans/", { params });
       const data = response.data;
-      const loanList = Array.isArray(data) ? data : (data?.results || []);
-      
-      console.log("Processed loan list:", loanList);
-      console.log("First loan ID:", loanList[0]?.id);
-      console.log("Second loan ID:", loanList[1]?.id);
-      
-      return loanList;
+      return Array.isArray(data) ? data : (data?.results || []);
     } catch (error: any) {
       console.error("Failed to fetch loans:", error);
-      
-      if (error.response?.status === 405) {
-        console.warn("Loans API endpoint not available (405)");
-        return [];
-      }
-      
       throw error;
     }
   }
 
   /**
-   * GET /api/loans/{loan_id}
+   * GET /api/loans/{loan_id}/
    */
   async getById(loanId: number): Promise<Loan> {
     try {
-      console.log(`Fetching loan ${loanId}...`);
-      console.log(`Type of loanId: ${typeof loanId}`);
-      
-      const response = await loanApi.get(`/loans/${loanId}`);
-      console.log(`Loan ${loanId} response:`, response.data);
-      
+      const response = await api.get(`/loans/${loanId}/`);
       return response.data;
     } catch (error: any) {
       console.error(`Failed to fetch loan ${loanId}:`, error);
-      
-      if (error.response?.status === 404) {
-        error.message = `Loan ${loanId} not found`;
-      }
-      
       throw error;
     }
   }
 
   /**
-   * POST /api/loans
+   * POST /api/loans/
    */
   async applyLoan(data: LoanCreate): Promise<Loan> {
-    console.log("Applying Loan");
-    console.log("Payload:", JSON.stringify(data, null, 2));
-
     try {
-      const response = await loanApi.post("/loans", data);
-      console.log("Loan applied successfully:", response.data);
+      const response = await api.post("/loans/", data);
       return response.data;
     } catch (error: any) {
       console.error("Failed to apply loan:", error);
-      
-      if (error.response) {
-        console.error("Response status:", error.response.status);
-        console.error("Response data:", error.response.data);
-      }
-      
       throw error;
     }
   }
 
   /**
-   * PUT /api/loans/{loan_id}
+   * POST /api/loans/calculate_preview/
    */
-  async update(loanId: number, data: LoanUpdate): Promise<Loan> {
-    console.log("Updating Loan:", loanId);
-    console.log("Payload:", JSON.stringify(data, null, 2));
-
+  async calculatePreview(params: LoanCalculatorPreviewParams): Promise<LoanCalculatorPreviewResponse> {
     try {
-      const response = await loanApi.put(`/loans/${loanId}`, data);
+      const response = await api.post("/loans/calculate_preview/", params);
       return response.data;
     } catch (error: any) {
-      console.warn(`Loan update failed for #${loanId}:`, error?.response?.data?.detail || error?.message);
+      console.error("Failed to calculate preview:", error);
       throw error;
     }
   }
 
   /**
-   * DELETE /api/loans/{loan_id}
+   * POST /api/loans/{id}/appraise/
+   */
+  async appraise(loanId: number, notes?: string): Promise<Loan> {
+    const response = await api.post(`/loans/${loanId}/appraise/`, { notes });
+    return response.data;
+  }
+
+  /**
+   * POST /api/loans/{id}/approve/
+   */
+  async approve(loanId: number, notes?: string): Promise<Loan> {
+    const response = await api.post(`/loans/${loanId}/approve/`, { notes });
+    return response.data;
+  }
+
+  /**
+   * POST /api/loans/{id}/reject/
+   */
+  async reject(loanId: number, reason: string): Promise<Loan> {
+    const response = await api.post(`/loans/${loanId}/reject/`, { reason });
+    return response.data;
+  }
+
+  /**
+   * POST /api/loans/{id}/disburse/
+   */
+  async disburse(loanId: number, disbursementDate?: string): Promise<Loan> {
+    const response = await api.post(`/loans/${loanId}/disburse/`, {
+      disbursement_date: disbursementDate,
+    });
+    return response.data;
+  }
+
+  /**
+   * GET /api/loans/aging_report/
+   */
+  async getAgingReport(): Promise<any> {
+    const response = await api.get("/loans/aging_report/");
+    return response.data;
+  }
+
+  /**
+   * Repayments API: POST /api/repayments/
+   */
+  async recordRepayment(data: RepaymentCreatePayload): Promise<any> {
+    const response = await api.post("/repayments/", data);
+    return response.data;
+  }
+
+  /**
+   * GET /api/repayments/
+   */
+  async getRepayments(loanId?: number): Promise<any[]> {
+    const response = await api.get("/repayments/", {
+      params: loanId ? { loan_id: loanId } : {},
+    });
+    const data = response.data;
+    return Array.isArray(data) ? data : (data?.results || []);
+  }
+
+  /**
+   * PUT /api/loans/{loan_id}/
+   */
+  async update(loanId: number, data: LoanUpdate): Promise<Loan> {
+    const response = await api.put(`/loans/${loanId}/`, data);
+    return response.data;
+  }
+
+  /**
+   * DELETE /api/loans/{loan_id}/
    */
   async delete(loanId: number): Promise<void> {
-    try {
-      console.log(`Deleting loan ${loanId}...`);
-      await loanApi.delete(`/loans/${loanId}`);
-    } catch (error: any) {
-      console.error(`Failed to delete loan ${loanId}:`, error);
-      throw error;
-    }
+    await api.delete(`/loans/${loanId}/`);
   }
 }
 

@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
 
-const ROYAL_API_URL =
-  process.env.LOAN_API_URL ||
-  process.env.NEXT_PUBLIC_LOAN_API_URL ||
-  "https://v1.royalltd.co.ke/lne/api";
+const API_BASE_URL =
+  process.env.DJANGO_API_URL ||
+  process.env.NEXT_PUBLIC_API_URL ||
+  "http://127.0.0.1:8000/api";
 
 export async function GET(
   request: NextRequest,
@@ -11,20 +13,23 @@ export async function GET(
 ) {
   try {
     const { id } = await context.params;
-    const response = await fetch(`${ROYAL_API_URL}/loans/${id}/repayments`, {
+    const session = await getServerSession(authOptions);
+    const headers: Record<string, string> = {
+      Accept: "application/json",
+    };
+    if (session?.accessToken) {
+      headers["Authorization"] = `Bearer ${session.accessToken}`;
+    }
+
+    const response = await fetch(`${API_BASE_URL.replace(/\/$/, "")}/repayments/?loan_id=${id}`, {
       method: "GET",
-      headers: {
-        Accept: "application/json",
-      },
+      headers,
       cache: "no-store",
     });
 
-    if (!response.ok) {
-      return NextResponse.json([], { status: response.status });
-    }
-
     const data = await response.json();
-    return NextResponse.json(data);
+    const list = Array.isArray(data) ? data : (data?.results || []);
+    return NextResponse.json(list, { status: response.status });
   } catch (error) {
     console.error("Error fetching loan repayments:", error);
     return NextResponse.json([], { status: 500 });
@@ -38,22 +43,37 @@ export async function POST(
   try {
     const { id } = await context.params;
     const body = await request.json();
+    const session = await getServerSession(authOptions);
 
-    const response = await fetch(`${ROYAL_API_URL}/loans/${id}/repayments`, {
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    };
+    if (session?.accessToken) {
+      headers["Authorization"] = `Bearer ${session.accessToken}`;
+    }
+
+    const payload = {
+      loan: Number(id),
+      amount_paid: body.amount || body.amount_paid,
+      payment_date: body.payment_date,
+      payment_method: body.payment_method || "mpesa",
+      transaction_reference: body.transaction_reference || `TXN-${Date.now()}`,
+      notes: body.notes,
+    };
+
+    const response = await fetch(`${API_BASE_URL.replace(/\/$/, "")}/repayments/`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
-      body: JSON.stringify(body),
+      headers,
+      body: JSON.stringify(payload),
     });
 
     const data = await response.json();
     return NextResponse.json(data, { status: response.status });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error creating loan repayment:", error);
     return NextResponse.json(
-      { error: "Failed to record repayment" },
+      { error: "Failed to record repayment", detail: error?.message },
       { status: 500 }
     );
   }
