@@ -61,13 +61,19 @@ export default function ResetPasswordDialog({
 
     try {
       setLoading(true);
-      await userService.updateUser(user.id, { password: newPassword } as any);
+      await userService.updateUser(user.id, { password: newPassword });
       setNewPassword("");
       setConfirmPassword("");
       onSuccess();
     } catch (err: any) {
       console.error(err);
-      setError(err?.response?.data?.detail || "Failed to reset password.");
+      const errMsg =
+        err?.response?.data?.password?.[0] ||
+        err?.response?.data?.password ||
+        err?.response?.data?.detail ||
+        err?.response?.data?.message ||
+        "Failed to reset password.";
+      setError(typeof errMsg === "string" ? errMsg : JSON.stringify(errMsg));
     } finally {
       setLoading(false);
     }

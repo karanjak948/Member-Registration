@@ -26,13 +26,17 @@ export default function ViewMemberPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const memberId = Number(params.id);
+  const rawId = params?.id as string;
+  const memberId = Number(rawId);
 
   useEffect(() => {
-    if (memberId) {
-      loadMember();
+    if (!rawId || isNaN(memberId) || memberId <= 0) {
+      setLoading(false);
+      setError(`Invalid member identifier "${rawId}". Please select a valid member from the directory.`);
+      return;
     }
-  }, [memberId]);
+    loadMember();
+  }, [rawId, memberId]);
 
   async function loadMember() {
     try {

@@ -151,7 +151,13 @@ export interface LoanProduct {
 
   repayment_frequency: RepaymentFrequency;
 
+  min_repayment_period?: number;
+
   max_repayment_period: number | null;
+
+  min_amount?: string | number;
+
+  max_amount?: string | number | null;
 
   requires_guarantor: boolean;
 

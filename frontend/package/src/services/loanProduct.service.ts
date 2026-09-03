@@ -25,7 +25,7 @@ class LoanProductService {
   /**
    * GET /api/loan-products/{id}/
    */
-  async getById(productId: number): Promise<LoanProduct> {
+  async getById(productId: number | string): Promise<LoanProduct> {
     try {
       const response = await api.get(`/loan-products/${productId}/`);
       return response.data;
@@ -51,7 +51,7 @@ class LoanProductService {
   /**
    * PUT /api/loan-products/{id}/
    */
-  async update(productId: number, data: LoanProductUpdate): Promise<LoanProduct> {
+  async update(productId: number | string, data: LoanProductUpdate): Promise<LoanProduct> {
     try {
       const response = await api.put(`/loan-products/${productId}/`, data);
       return response.data;
@@ -64,7 +64,7 @@ class LoanProductService {
   /**
    * DELETE /api/loan-products/{id}/
    */
-  async delete(productId: number): Promise<void> {
+  async delete(productId: number | string): Promise<void> {
     try {
       await api.delete(`/loan-products/${productId}/`);
     } catch (error: any) {

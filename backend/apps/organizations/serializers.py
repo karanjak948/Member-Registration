@@ -2,6 +2,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import (
     validate_password,
 )
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
 
 from rest_framework import serializers
@@ -612,6 +613,21 @@ class OrganizationUserUpdateSerializer(
         required=False,
     )
 
+    password = serializers.CharField(
+        max_length=128,
+        required=False,
+        write_only=True,
+        min_length=6,
+    )
+
+    def validate_password(self, value):
+        if value:
+            try:
+                validate_password(value, user=self.instance.user)
+            except DjangoValidationError as exc:
+                raise serializers.ValidationError(list(exc.messages))
+        return value
+
     def validate_email(self, value):
         value = value.strip().lower()
 
@@ -666,6 +682,11 @@ class OrganizationUserUpdateSerializer(
             None,
         )
 
+        password = validated_data.pop(
+            "password",
+            None,
+        )
+
         user = instance.user
 
         user_fields = []
@@ -686,13 +707,9 @@ class OrganizationUserUpdateSerializer(
                     field
                 )
 
-        if user_fields:
-            user.save(
-                update_fields=user_fields
-            )
-
-        if role_id is not None:
-            instance.role_id = role_id
+        if password:
+            user.set_password(password)
+            user_fields.append("password")
 
         if "is_active" in validated_data:
             instance.is_active = (
@@ -700,6 +717,19 @@ class OrganizationUserUpdateSerializer(
                     "is_active"
                 ]
             )
+            user.is_active = instance.is_active
+            if "is_active" not in user_fields:
+                user_fields.append("is_active")
+
+        if user_fields:
+            if hasattr(user, "updated_at"):
+                user_fields.append("updated_at")
+            user.save(
+                update_fields=user_fields
+            )
+
+        if role_id is not None:
+            instance.role_id = role_id
 
         instance.save()
 

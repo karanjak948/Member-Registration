@@ -51,24 +51,33 @@ class LoanScheduleEntrySerializer(serializers.ModelSerializer):
 
 
 class LoanGuarantorSerializer(serializers.ModelSerializer):
-    guarantor_name = serializers.CharField(source="guarantor_member.first_name", read_only=True)
+    guarantor_id = serializers.IntegerField(source="guarantor_member.id", read_only=True)
+    guarantor_name = serializers.SerializerMethodField()
     guarantor_membership_no = serializers.CharField(
         source="guarantor_member.membership_number", read_only=True
     )
     guarantor_phone = serializers.CharField(source="guarantor_member.phone_number", read_only=True)
+    guarantor_national_id = serializers.CharField(source="guarantor_member.national_id", read_only=True)
 
     class Meta:
         model = LoanGuarantor
         fields = [
             "id",
             "guarantor_member",
+            "guarantor_id",
             "guarantor_name",
             "guarantor_membership_no",
             "guarantor_phone",
+            "guarantor_national_id",
             "guarantee_amount",
             "status",
             "notes",
         ]
+
+    def get_guarantor_name(self, obj):
+        if obj.guarantor_member:
+            return f"{obj.guarantor_member.first_name} {obj.guarantor_member.other_names}".strip()
+        return "N/A"
 
 
 class LoanCollateralSerializer(serializers.ModelSerializer):
@@ -87,6 +96,8 @@ class LoanCollateralSerializer(serializers.ModelSerializer):
 
 
 class LoanListSerializer(serializers.ModelSerializer):
+    member_id = serializers.IntegerField(source="member.id", read_only=True)
+    loan_product_id = serializers.IntegerField(source="loan_product.id", read_only=True)
     member_name = serializers.SerializerMethodField()
     membership_number = serializers.CharField(source="member.membership_number", read_only=True)
     member_phone = serializers.CharField(source="member.phone_number", read_only=True)
@@ -99,10 +110,12 @@ class LoanListSerializer(serializers.ModelSerializer):
             "id",
             "loan_number",
             "member",
+            "member_id",
             "member_name",
             "membership_number",
             "member_phone",
             "loan_product",
+            "loan_product_id",
             "product_name",
             "product_code",
             "principal_amount",
@@ -129,6 +142,9 @@ class LoanListSerializer(serializers.ModelSerializer):
 
 
 class LoanDetailSerializer(serializers.ModelSerializer):
+    member_id = serializers.IntegerField(source="member.id", read_only=True)
+    loan_product_id = serializers.IntegerField(source="loan_product.id", read_only=True)
+    guarantor_member_id = serializers.SerializerMethodField()
     member_name = serializers.SerializerMethodField()
     membership_number = serializers.CharField(source="member.membership_number", read_only=True)
     member_phone = serializers.CharField(source="member.phone_number", read_only=True)
@@ -145,13 +161,16 @@ class LoanDetailSerializer(serializers.ModelSerializer):
             "id",
             "loan_number",
             "member",
+            "member_id",
             "member_name",
             "membership_number",
             "member_phone",
             "member_national_id",
             "loan_product",
+            "loan_product_id",
             "product_name",
             "product_code",
+            "guarantor_member_id",
             "principal_amount",
             "security_provided_value",
             "security_provided_notes",
@@ -188,11 +207,26 @@ class LoanDetailSerializer(serializers.ModelSerializer):
     def get_member_name(self, obj):
         return f"{obj.member.first_name} {obj.member.other_names}".strip()
 
+    def get_guarantor_member_id(self, obj):
+        first_g = obj.guarantors.first()
+        if first_g and first_g.guarantor_member_id:
+            return first_g.guarantor_member_id
+        return None
+
 
 class LoanApplicationSerializer(serializers.ModelSerializer):
     """
     Serializer for submitting a new loan application.
+    Supports both primary key objects (member, loan_product) and ID aliases (member_id, loan_product_id).
     """
+    member = serializers.PrimaryKeyRelatedField(queryset=Member.objects.all(), required=False)
+    loan_product = serializers.PrimaryKeyRelatedField(queryset=LoanProduct.objects.all(), required=False)
+    member_id = serializers.PrimaryKeyRelatedField(
+        queryset=Member.objects.all(), source="member", required=False, write_only=True
+    )
+    loan_product_id = serializers.PrimaryKeyRelatedField(
+        queryset=LoanProduct.objects.all(), source="loan_product", required=False, write_only=True
+    )
     guarantors_data = LoanGuarantorSerializer(many=True, required=False)
     collaterals_data = LoanCollateralSerializer(many=True, required=False)
 
@@ -201,7 +235,9 @@ class LoanApplicationSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "member",
+            "member_id",
             "loan_product",
+            "loan_product_id",
             "principal_amount",
             "num_periods",
             "application_date",
@@ -213,7 +249,20 @@ class LoanApplicationSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ["id"]
 
+    def to_internal_value(self, data):
+        mutable_data = data.copy() if hasattr(data, "copy") else dict(data)
+        if "member_id" in mutable_data and "member" not in mutable_data:
+            mutable_data["member"] = mutable_data["member_id"]
+        if "loan_product_id" in mutable_data and "loan_product" not in mutable_data:
+            mutable_data["loan_product"] = mutable_data["loan_product_id"]
+        return super().to_internal_value(mutable_data)
+
     def validate(self, attrs):
+        if not attrs.get("member"):
+            raise serializers.ValidationError({"member": "Borrower member is required."})
+        if not attrs.get("loan_product"):
+            raise serializers.ValidationError({"loan_product": "Loan product is required."})
+
         product = attrs.get("loan_product")
         principal = attrs.get("principal_amount")
         periods = attrs.get("num_periods")
@@ -227,7 +276,7 @@ class LoanApplicationSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError(
                     {"principal_amount": f"Maximum loan amount is {product.max_amount}."}
                 )
-            if product.max_repayment_period and periods > product.max_repayment_period:
+            if product.max_repayment_period and periods and periods > product.max_repayment_period:
                 raise serializers.ValidationError(
                     {"num_periods": f"Maximum repayment period is {product.max_repayment_period}."}
                 )

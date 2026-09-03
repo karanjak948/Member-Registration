@@ -64,7 +64,7 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
     } else if (body.status === "rejected") {
       url = `${API_BASE_URL.replace(/\/$/, "")}/loans/${id}/reject/`;
       method = "POST";
-    } else if (body.status === "active" || body.disbursement_date) {
+    } else if (body.status === "active" || body.action === "disburse") {
       url = `${API_BASE_URL.replace(/\/$/, "")}/loans/${id}/disburse/`;
       method = "POST";
     }

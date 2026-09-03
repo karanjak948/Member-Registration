@@ -84,7 +84,11 @@ class LoanService {
       const response = await api.post("/loans/", data);
       return response.data;
     } catch (error: any) {
-      console.error("Failed to apply loan:", error);
+      if (error.response?.status === 400) {
+        console.warn("[Loan Application Policy Validation]:", error.response?.data);
+      } else {
+        console.error("Failed to apply loan:", error);
+      }
       throw error;
     }
   }

@@ -83,4 +83,6 @@ export interface UpdateOrganizationUserRequest {
   role_id?: number;
 
   is_active?: boolean;
+
+  password?: string;
 }

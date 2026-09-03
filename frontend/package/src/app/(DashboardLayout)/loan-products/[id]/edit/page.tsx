@@ -78,6 +78,7 @@ export default function EditLoanProductPage() {
     <LoanProductForm
       mode="edit"
       initialValues={mapLoanProductToForm(product)}
+      productId={product.id}
       productCode={product.product_code}
     />
   );

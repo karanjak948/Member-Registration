@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 
-import { Box, Card, CardContent, Stack, Typography } from "@mui/material";
+import { Alert, Box, Card, CardContent, Snackbar, Stack, Typography } from "@mui/material";
 
 import { FormProvider, useForm } from "react-hook-form";
 
@@ -78,12 +79,14 @@ const defaultValues: LoanProductCreate = {
 interface LoanProductFormProps {
   mode?: "create" | "edit";
   initialValues?: LoanProductCreate;
+  productId?: number | string;
   productCode?: string;
 }
 
 export default function LoanProductForm({
   mode = "create",
   initialValues,
+  productId,
   productCode,
 }: LoanProductFormProps) {
   const methods = useForm<LoanProductCreate>({
@@ -91,33 +94,58 @@ export default function LoanProductForm({
     mode: "onBlur",
   });
 
+  const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [snackbar, setSnackbar] = useState<{
+    open: boolean;
+    message: string;
+    severity: "success" | "error";
+  }>({
+    open: false,
+    message: "",
+    severity: "success",
+  });
 
   async function onSubmit(data: LoanProductCreate) {
     try {
       setLoading(true);
 
-      console.log("Submitting Loan Product");
-      console.log("Mode:", mode);
-      console.log("Product Code:", productCode);
-      console.log("Payload:", data);
-
       if (mode === "edit") {
-        if (!productCode) {
-          throw new Error("Missing product code.");
+        const targetId = productId ?? productCode;
+        if (!targetId) {
+          throw new Error("Missing product identifier.");
         }
 
-        await loanProductService.update(productCode, data);
+        await loanProductService.update(targetId, data);
+        setSnackbar({
+          open: true,
+          message: `Loan product '${data.product_name}' updated successfully!`,
+          severity: "success",
+        });
       } else {
         await loanProductService.create(data);
-
         methods.reset(defaultValues);
+        setSnackbar({
+          open: true,
+          message: `Loan product '${data.product_name}' created successfully!`,
+          severity: "success",
+        });
       }
-    } catch (error) {
+
+      setTimeout(() => {
+        router.push("/loan-products");
+      }, 1400);
+    } catch (error: any) {
       console.error(
         `Failed to ${mode === "edit" ? "update" : "create"} loan product:`,
         error,
       );
+      const msg = error.response?.data?.detail || error.response?.data?.error || error.message || `Failed to ${mode === "edit" ? "update" : "create"} loan product.`;
+      setSnackbar({
+        open: true,
+        message: msg,
+        severity: "error",
+      });
     } finally {
       setLoading(false);
     }
@@ -156,6 +184,22 @@ export default function LoanProductForm({
           </CardContent>
         </Card>
       </Box>
+
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={4500}
+        onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))}
+        anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+      >
+        <Alert
+          severity={snackbar.severity}
+          variant="filled"
+          onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))}
+          sx={{ borderRadius: 2.5, fontWeight: 700 }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </FormProvider>
   );
 }
