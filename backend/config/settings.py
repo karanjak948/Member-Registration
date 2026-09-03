@@ -196,11 +196,12 @@ DEFAULT_FROM_EMAIL = (
 FRONTEND_URL = "http://localhost:3000"
 
 
-STATIC_URL = 'static/'
+STATIC_URL = "/static/"
+STATIC_ROOT = BASE_DIR / "staticfiles"
 
 STATICFILES_DIRS = [
     BASE_DIR / "static",
-]
+] if (BASE_DIR / "static").exists() else []
 
 MEDIA_URL = "/media/"
 
