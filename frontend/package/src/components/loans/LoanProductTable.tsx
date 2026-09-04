@@ -126,31 +126,60 @@ export default function LoanProductTable({ products, loading = false }: Props) {
     {
       field: "product_name",
       headerName: "Product Name & Facility",
-      flex: 2,
-      minWidth: 240,
+      flex: 2.2,
+      minWidth: 260,
       renderCell: ({ row }) => (
-        <Stack direction="row" spacing={1.5} alignItems="center" sx={{ height: "100%" }}>
+        <Stack
+          direction="row"
+          spacing={1.5}
+          alignItems="center"
+          sx={{ width: "100%", overflow: "hidden" }}
+        >
           <Box
             sx={{
-              width: 34,
-              height: 34,
-              borderRadius: 2,
-              bgcolor: "#f0fdf4",
-              color: "#059669",
+              width: 40,
+              height: 40,
+              minWidth: 40,
+              borderRadius: 2.5,
+              bgcolor: "#ecfdf5",
+              color: "#047857",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              border: "1px solid #bbf7d0",
+              border: "1px solid #a7f3d0",
+              boxShadow: "0 2px 6px rgba(4, 120, 87, 0.08)",
             }}
           >
-            <IconCategory size={18} />
+            <IconCategory size={20} stroke={2} />
           </Box>
-          <Box>
-            <Typography variant="body2" fontWeight={800} sx={{ color: "#0f172a" }}>
+          <Box sx={{ minWidth: 0, overflow: "hidden" }}>
+            <Typography
+              variant="body2"
+              fontWeight={800}
+              noWrap
+              sx={{
+                color: "#0f172a",
+                fontSize: "0.925rem",
+                lineHeight: 1.35,
+                cursor: "pointer",
+                "&:hover": { color: "#047857" },
+              }}
+              onClick={() => router.push(`/loan-products/${row.id}`)}
+            >
               {row.product_name}
             </Typography>
-            <Typography variant="caption" sx={{ color: "#64748b" }}>
-              {row.interest_method === "reducing_balance" ? "Reducing Balance" : "Flat Rate"} &bull; v{row.version_number || 1}
+            <Typography
+              variant="caption"
+              noWrap
+              sx={{
+                color: "#64748b",
+                fontSize: "0.75rem",
+                lineHeight: 1.25,
+                display: "block",
+                mt: 0.25,
+              }}
+            >
+              {row.interest_method === "reducing_balance" ? "Reducing Balance" : "Flat Rate"} &bull; v{row.version_number || 1}.0
             </Typography>
           </Box>
         </Stack>
@@ -563,6 +592,7 @@ export default function LoanProductTable({ products, loading = false }: Props) {
         >
           <DataGrid
             autoHeight
+            rowHeight={74}
             rows={filteredProducts}
             columns={columns}
             loading={loading}
@@ -586,10 +616,17 @@ export default function LoanProductTable({ products, loading = false }: Props) {
                 color: "#334155",
                 textTransform: "uppercase",
                 letterSpacing: "0.5px",
+                minHeight: "56px !important",
+                maxHeight: "56px !important",
+              },
+              "& .MuiDataGrid-columnHeader": {
+                outline: "none !important",
               },
               "& .MuiDataGrid-cell": {
                 borderBottom: "1px solid #f1f5f9",
-                py: 1.5,
+                display: "flex",
+                alignItems: "center",
+                outline: "none !important",
               },
               "& .MuiDataGrid-row:hover": {
                 bgcolor: "#f0fdf4",
