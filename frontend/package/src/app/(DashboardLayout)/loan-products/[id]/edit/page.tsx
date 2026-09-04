@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
-import { Alert, Box, CircularProgress } from "@mui/material";
+import { useParams, useRouter } from "next/navigation";
+import { Alert, Box, Button, CircularProgress, Typography } from "@mui/material";
+import { IconArrowLeft } from "@tabler/icons-react";
 
 import LoanProductForm from "@/components/loans/LoanProductForm";
 import loanProductService from "@/services/loanProduct.service";
@@ -12,7 +13,7 @@ import { mapLoanProductToForm } from "@/utils/loanProductMapper";
 
 export default function EditLoanProductPage() {
   const params = useParams();
-
+  const router = useRouter();
   const productId = Number(params.id);
 
   const [product, setProduct] = useState<LoanProduct | null>(null);
@@ -22,16 +23,13 @@ export default function EditLoanProductPage() {
   useEffect(() => {
     async function loadProduct() {
       try {
-        console.log("Loading Loan Product ID:", productId);
-
+        setLoading(true);
+        setError("");
         const data = await loanProductService.getById(productId);
-
-        console.log("Loan Product Loaded:", data);
-
         setProduct(data);
       } catch (err) {
         console.error("Failed to load loan product:", err);
-        setError("Unable to load loan product.");
+        setError("Unable to load loan product configuration.");
       } finally {
         setLoading(false);
       }
@@ -49,27 +47,43 @@ export default function EditLoanProductPage() {
     return (
       <Box
         display="flex"
-        justifyContent="center"
+        flexDirection="column"
         alignItems="center"
-        minHeight="60vh"
+        justifyContent="center"
+        minHeight="55vh"
+        gap={2}
       >
-        <CircularProgress />
+        <CircularProgress sx={{ color: "#047857" }} size={42} thickness={4} />
+        <Typography variant="body2" color="text.secondary" fontWeight={600}>
+          Loading loan product configuration for editing...
+        </Typography>
       </Box>
     );
   }
 
-  if (error) {
+  if (error || !product) {
     return (
-      <Box p={3}>
-        <Alert severity="error">{error}</Alert>
-      </Box>
-    );
-  }
-
-  if (!product) {
-    return (
-      <Box p={3}>
-        <Alert severity="warning">Loan product not found.</Alert>
+      <Box sx={{ maxWidth: 600, mx: "auto", py: 6, px: 2 }}>
+        <Alert
+          severity={error ? "error" : "warning"}
+          sx={{ borderRadius: 3, mb: 3 }}
+        >
+          {error || "Loan product not found."}
+        </Alert>
+        <Button
+          variant="outlined"
+          startIcon={<IconArrowLeft size={18} />}
+          onClick={() => router.push("/loan-products")}
+          sx={{
+            borderRadius: 2,
+            textTransform: "none",
+            fontWeight: 600,
+            borderColor: "#cbd5e1",
+            color: "#334155",
+          }}
+        >
+          Return to Loan Products Catalog
+        </Button>
       </Box>
     );
   }

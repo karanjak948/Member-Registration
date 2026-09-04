@@ -1,14 +1,26 @@
 "use client";
 
-import { useState } from "react";
+import React, { useState } from "react";
 import { useRouter } from "next/navigation";
-
-import { Alert, Box, Card, CardContent, Snackbar, Stack, Typography } from "@mui/material";
-
+import {
+  Alert,
+  Box,
+  Button,
+  Chip,
+  Container,
+  Paper,
+  Snackbar,
+  Stack,
+  Typography,
+} from "@mui/material";
+import {
+  IconArrowLeft,
+  IconBuildingBank,
+  IconSparkles,
+} from "@tabler/icons-react";
 import { FormProvider, useForm } from "react-hook-form";
 
 import loanProductService from "@/services/loanProduct.service";
-
 import { LoanProductCreate } from "@/interfaces/loanProduct";
 
 import BasicInformation from "./sections/BasicInformation";
@@ -72,7 +84,6 @@ const defaultValues: LoanProductCreate = {
   allocation_order: "penalty,interest,principal",
 
   fees: [],
-
   penalties: [],
 };
 
@@ -140,7 +151,11 @@ export default function LoanProductForm({
         `Failed to ${mode === "edit" ? "update" : "create"} loan product:`,
         error,
       );
-      const msg = error.response?.data?.detail || error.response?.data?.error || error.message || `Failed to ${mode === "edit" ? "update" : "create"} loan product.`;
+      const msg =
+        error.response?.data?.detail ||
+        error.response?.data?.error ||
+        error.message ||
+        `Failed to ${mode === "edit" ? "update" : "create"} loan product.`;
       setSnackbar({
         open: true,
         message: msg,
@@ -153,38 +168,132 @@ export default function LoanProductForm({
 
   return (
     <FormProvider {...methods}>
-      <Box component="form" onSubmit={methods.handleSubmit(onSubmit)}>
-        <Card>
-          <CardContent>
-            <Stack spacing={3}>
-              <Typography variant="h5" fontWeight={700}>
-                {mode === "create" ? "Loan Product" : "Edit Loan Product"}
-              </Typography>
+      <Box
+        component="form"
+        onSubmit={methods.handleSubmit(onSubmit)}
+        sx={{ pb: 8 }}
+      >
+        {/* ========================================================================= */}
+        {/* EXECUTIVE BANNER                                                          */}
+        {/* ========================================================================= */}
+        <Paper
+          elevation={0}
+          sx={{
+            background: "linear-gradient(135deg, #064e3b 0%, #047857 55%, #059669 100%)",
+            borderRadius: 3.5,
+            p: { xs: 3, md: 4 },
+            mb: 3.5,
+            color: "#ffffff",
+            position: "relative",
+            overflow: "hidden",
+            boxShadow: "0 12px 36px -8px rgba(6, 78, 59, 0.28)",
+          }}
+        >
+          {/* Decorative glow */}
+          <Box
+            sx={{
+              position: "absolute",
+              top: -60,
+              right: -60,
+              width: 240,
+              height: 240,
+              borderRadius: "50%",
+              background: "radial-gradient(circle, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0) 70%)",
+              pointerEvents: "none",
+            }}
+          />
 
-              <BasicInformation />
+          <Stack
+            direction={{ xs: "column", sm: "row" }}
+            justifyContent="space-between"
+            alignItems={{ xs: "flex-start", sm: "center" }}
+            spacing={2}
+            sx={{ mb: 2.5 }}
+          >
+            <Button
+              variant="text"
+              startIcon={<IconArrowLeft size={18} />}
+              onClick={() => router.push("/loan-products")}
+              sx={{
+                color: "rgba(255,255,255,0.9)",
+                textTransform: "none",
+                fontWeight: 600,
+                fontSize: "0.875rem",
+                px: 1.5,
+                py: 0.5,
+                borderRadius: 2,
+                background: "rgba(255,255,255,0.1)",
+                backdropFilter: "blur(6px)",
+                "&:hover": {
+                  background: "rgba(255,255,255,0.2)",
+                  color: "#ffffff",
+                },
+              }}
+            >
+              Back to Catalog
+            </Button>
 
-              <InterestConfiguration />
+            <Chip
+              icon={<IconSparkles size={16} color="#fbbf24" />}
+              label={mode === "edit" ? "Edit Product Tier Mode" : "New Loan Product Tier"}
+              sx={{
+                bgcolor: "rgba(255, 255, 255, 0.18)",
+                color: "#ffffff",
+                fontWeight: 700,
+                borderRadius: 2,
+                backdropFilter: "blur(4px)",
+              }}
+            />
+          </Stack>
 
-              <LoanRequirements />
+          <Typography
+            variant="h3"
+            sx={{
+              fontWeight: 800,
+              letterSpacing: "-0.5px",
+              fontSize: { xs: "1.75rem", md: "2.25rem" },
+              mb: 1,
+            }}
+          >
+            {mode === "create" ? "Create Loan Product Tier" : `Edit Loan Product: ${initialValues?.product_name || productCode || ""}`}
+          </Typography>
 
-              <ApprovalWorkflow />
+          <Typography
+            variant="body2"
+            sx={{ color: "rgba(255, 255, 255, 0.85)", fontSize: "0.95rem", maxWidth: 850 }}
+          >
+            Configure core financial architecture, interest calculation engines, underwriting eligibility criteria,
+            PAR classification aging thresholds, repayment recovery waterfalls, and fee schedules.
+          </Typography>
+        </Paper>
 
-              <ClassificationThresholds />
+        {/* ========================================================================= */}
+        {/* FORM SECTIONS STACK                                                       */}
+        {/* ========================================================================= */}
+        <Stack spacing={3.5}>
+          <BasicInformation />
 
-              <RepaymentAllocation />
+          <InterestConfiguration />
 
-              <ReschedulingOptions />
+          <LoanRequirements />
 
-              <ProductFeeTable />
+          <ApprovalWorkflow />
 
-              <DynamicPenaltyTable />
+          <ClassificationThresholds />
 
-              <FormActions loading={loading} />
-            </Stack>
-          </CardContent>
-        </Card>
+          <RepaymentAllocation />
+
+          <ReschedulingOptions />
+
+          <ProductFeeTable />
+
+          <DynamicPenaltyTable />
+
+          <FormActions loading={loading} mode={mode} />
+        </Stack>
       </Box>
 
+      {/* Toast notifications */}
       <Snackbar
         open={snackbar.open}
         autoHideDuration={4500}
@@ -195,7 +304,7 @@ export default function LoanProductForm({
           severity={snackbar.severity}
           variant="filled"
           onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))}
-          sx={{ borderRadius: 2.5, fontWeight: 700 }}
+          sx={{ borderRadius: 2.5, fontWeight: 700, boxShadow: "0 8px 24px rgba(0,0,0,0.15)" }}
         >
           {snackbar.message}
         </Alert>
