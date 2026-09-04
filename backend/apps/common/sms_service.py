@@ -11,11 +11,13 @@ logger = logging.getLogger(__name__)
 BULK_SMS_BASE_URL = os.getenv("BULK_SMS_BASE_URL", "https://bulksms.pefranksmartsolutions.co.ke/api/v1")
 
 # Credentials provided for Bulk SMS Gateway
-BULK_SMS_API_KEY = os.getenv("BULK_SMS_API_KEY", "f5e10366fd4cbc04aa487320ece1f40bb246b363464966057c60f6934kdf38ab")
-BULK_SMS_CONSUMER_KEY = os.getenv("BULK_SMS_CONSUMER_KEY", "6f4ebef63cb63733b26e23e4461bf12e383060271d1386255964b4ceecedaba6")
-BULK_SMS_CONSUMER_SECRET = os.getenv("BULK_SMS_CONSUMER_SECRET", "b5f0ea8138d11ade514f370583bcc429")
-BULK_SMS_SENDER_ID = os.getenv("BULK_SMS_SENDER_ID", "KIY TOYS")
-BULK_SMS_ACCESS_TOKEN = os.getenv("BULK_SMS_ACCESS_TOKEN", "58a0a73af923488f8f52ccf32378ab8e3313d7753e4f13194fc9c3364279fc17")
+BULK_SMS_API_KEY = os.getenv("BULK_SMS_API_KEY", "07b5152f2e891ce06a62015a2734a76c8d007cce429509cf6473753f0045bbd68364cba6154ef8ca923a64e6b760e333578b0aea881e849e5461a694d72b66a2")
+BULK_SMS_CONSUMER_KEY = os.getenv("BULK_SMS_CONSUMER_KEY", "48fa6034c147eea77d04072ee645a1d95b66d71367043118f56da62ebfd91388")
+BULK_SMS_CONSUMER_SECRET = os.getenv("BULK_SMS_CONSUMER_SECRET", "f9d58e689b03415dfe55b439b1ce63de")
+BULK_SMS_SENDER_ID = os.getenv("BULK_SMS_SENDER_ID", "ROYAL LTD")
+BULK_SMS_ACCESS_TOKEN = os.getenv("BULK_SMS_ACCESS_TOKEN", "c6ffd3c2373fb5517287e7cd0e4f3691a68bdcb465319ababd7fd039e839cbdb")
+
+_cached_token: Optional[str] = None
 
 
 class BulkSMSService:
@@ -33,17 +35,21 @@ class BulkSMSService:
         clean_phone = "".join(filter(str.isdigit, str(phone)))
         if clean_phone.startswith("0") and len(clean_phone) == 10:
             return "254" + clean_phone[1:]
-        elif clean_phone.startswith("7") or clean_phone.startswith("1") and len(clean_phone) == 9:
+        elif clean_phone.startswith("7") or (clean_phone.startswith("1") and len(clean_phone) == 9):
             return "254" + clean_phone
         elif clean_phone.startswith("254") and len(clean_phone) == 12:
             return clean_phone
         return clean_phone
 
     @classmethod
-    def get_access_token(cls) -> Optional[str]:
+    def get_access_token(cls, force_refresh: bool = False) -> Optional[str]:
         """
-        Request JWT access token from Bulk SMS gateway.
+        Request JWT access token from Bulk SMS gateway with dynamic caching.
         """
+        global _cached_token
+        if _cached_token and not force_refresh:
+            return _cached_token
+
         url = f"{BULK_SMS_BASE_URL}/access-token"
         payload = {
             "api_key": BULK_SMS_API_KEY,
@@ -64,6 +70,7 @@ class BulkSMSService:
                 res_json = json.loads(body)
                 token = res_json.get("access_token")
                 if token:
+                    _cached_token = token
                     return token
                 logger.error(f"BulkSMS token error response: {body}")
         except Exception as e:
@@ -71,7 +78,8 @@ class BulkSMSService:
         
         # Fallback to configured active access token
         if BULK_SMS_ACCESS_TOKEN:
-            logger.info("Using configured active BulkSMS access token.")
+            logger.info("Using configured active BulkSMS access token fallback.")
+            _cached_token = BULK_SMS_ACCESS_TOKEN
             return BULK_SMS_ACCESS_TOKEN
         return None
 

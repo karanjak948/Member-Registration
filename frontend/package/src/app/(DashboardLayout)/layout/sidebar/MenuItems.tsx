@@ -120,6 +120,18 @@ export function getMenuItems(
     icon: IconBriefcase,
     children: [
       {
+        id: "loan-products-tier",
+        title: "Loan Products & Tiers",
+        icon: IconSettings,
+        href: "/loan-products",
+      },
+      {
+        id: "new-loan-product",
+        title: "Create Loan Product",
+        icon: IconPlus,
+        href: "/loan-products/new",
+      },
+      {
         id: "all-loans",
         title: "All Loans Portfolio",
         icon: IconCoin,

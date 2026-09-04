@@ -39,7 +39,9 @@ import {
   IconBuildingBank,
   IconCertificate,
   IconChecklist,
+  IconSettings,
 } from "@tabler/icons-react";
+import ExportButton from "@/components/common/ExportButton";
 import { useLoans } from "@/hooks/useLoans";
 import { usePermissions } from "@/hooks/usePermissions";
 import { PERMISSIONS } from "@/constants/permissions";
@@ -146,7 +148,7 @@ function LoansContent() {
   const canDisburseLoans = isSystemAdmin || can(PERMISSIONS.DISBURSE_LOANS);
 
   const filteredLoans = useMemo(() => {
-    return loans.filter((loan) => {
+    return loans.filter((loan: any) => {
       const searchLower = search.toLowerCase();
       const matchesSearch =
         !search.trim() ||
@@ -212,6 +214,19 @@ function LoansContent() {
       day: "numeric",
     });
   };
+
+  const loanExportColumns = useMemo(
+    () => [
+      { header: "Loan Ref #", accessor: (l: any) => l.loan_reference_number || l.loan_number || `LN-${l.id}` },
+      { header: "Borrower ID", accessor: (l: any) => l.borrower_name || `Member #${l.member || l.borrower || l.member_id || l.id}` },
+      { header: "Product Tier", accessor: (l: any) => l.product_name || `Product #${l.loan_product || l.product_id || "Standard"}` },
+      { header: "Principal (KES)", accessor: (l: any) => formatCurrency(Number(l.principal_amount || 0)) },
+      { header: "Outstanding (KES)", accessor: (l: any) => formatCurrency(Number(l.outstanding_balance ?? l.principal_amount ?? 0)) },
+      { header: "Application Date", accessor: (l: any) => l.application_date ? new Date(l.application_date).toLocaleDateString() : "—" },
+      { header: "Status", accessor: (l: any) => statusConfig[l.status]?.label || l.status || "—" },
+    ],
+    [],
+  );
 
   const handleViewLoan = (loan: any) => {
     const identifier = loan.id;
@@ -342,7 +357,7 @@ function LoansContent() {
               </Box>
             </Stack>
 
-            <Stack direction="row" spacing={1.5}>
+            <Stack direction="row" spacing={1.5} flexWrap="wrap" useFlexGap>
               <Button
                 variant="outlined"
                 startIcon={<IconRefresh size={18} />}
@@ -360,6 +375,25 @@ function LoansContent() {
                 }}
               >
                 Refresh
+              </Button>
+
+              <Button
+                variant="outlined"
+                startIcon={<IconSettings size={18} />}
+                onClick={() => router.push("/loan-products")}
+                sx={{
+                  bgcolor: "rgba(255, 255, 255, 0.12)",
+                  color: "#ffffff",
+                  fontWeight: 800,
+                  borderRadius: 2.5,
+                  px: 2.25,
+                  py: 1,
+                  backdropFilter: "blur(8px)",
+                  border: "1px solid rgba(255, 255, 255, 0.25)",
+                  "&:hover": { bgcolor: "rgba(255, 255, 255, 0.22)" },
+                }}
+              >
+                Product Tiers
               </Button>
 
               <Button
@@ -603,6 +637,13 @@ function LoansContent() {
                   />
                 );
               })}
+
+              <ExportButton
+                data={filteredLoans}
+                columns={loanExportColumns}
+                filename="royal_sacco_loan_portfolio"
+                title="Royal SACCO - Loan Portfolio & Credit Registry"
+              />
             </Stack>
           </Stack>
         </Paper>

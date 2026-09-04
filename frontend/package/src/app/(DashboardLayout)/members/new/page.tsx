@@ -252,6 +252,10 @@ export default function RegisterMemberPage() {
     if (key === "member" || key === "review") {
       return true;
     }
+    if (key === "vehicle") {
+      // Per SACCO policy update, vehicle registration is optional for all members (including Normal members)
+      return false;
+    }
     return isNormalMember;
   }
 
