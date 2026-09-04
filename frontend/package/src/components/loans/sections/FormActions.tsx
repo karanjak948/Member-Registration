@@ -3,7 +3,6 @@
 import React from "react";
 import { useRouter } from "next/navigation";
 import { Button, Card, Divider, Stack, Typography } from "@mui/material";
-import { LoadingButton } from "@mui/lab";
 import { IconDeviceFloppy, IconRotateClockwise2, IconArrowLeft } from "@tabler/icons-react";
 import { useFormContext } from "react-hook-form";
 import { LoanProductCreate } from "@/interfaces/loanProduct";
@@ -70,7 +69,7 @@ export default function FormActions({ loading = false, mode = "create" }: FormAc
             Reset Fields
           </Button>
 
-          <LoadingButton
+          <Button
             type="submit"
             variant="contained"
             loading={loading}
@@ -90,7 +89,7 @@ export default function FormActions({ loading = false, mode = "create" }: FormAc
             }}
           >
             {mode === "edit" ? "Update Loan Product Tier" : "Publish Loan Product Tier"}
-          </LoadingButton>
+          </Button>
         </Stack>
       </Stack>
     </Card>

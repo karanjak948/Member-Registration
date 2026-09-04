@@ -115,7 +115,7 @@ export function mapLoanProductToForm(
     allocation_order:
       product.allocation_order
         ? product.allocation_order
-        : "penalty,interest,principal",
+        : "penalty,fees,interest,principal",
 
     fees: product.fees.map((fee) => ({
       fee_name: fee.fee_name,

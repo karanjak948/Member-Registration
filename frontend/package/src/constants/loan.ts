@@ -67,6 +67,10 @@ export const SECURITY_TYPES = [
     label: "Percentage",
   },
   {
+    value: "fixed_amount",
+    label: "Fixed Amount",
+  },
+  {
     value: "fixed",
     label: "Fixed Amount",
   },
@@ -76,6 +80,10 @@ export const SECURITY_TYPES = [
  * Product Fees
  */
 export const FEE_TYPES = [
+  {
+    value: "fixed_amount",
+    label: "Fixed Amount",
+  },
   {
     value: "fixed",
     label: "Fixed Amount",
@@ -108,6 +116,10 @@ export const PENALTY_TYPES = [
   {
     value: "percentage",
     label: "Percentage",
+  },
+  {
+    value: "fixed_amount",
+    label: "Fixed Amount",
   },
   {
     value: "fixed",
@@ -158,6 +170,10 @@ export const PENALTY_BASES = [
  */
 export const DEPOSIT_TYPES = [
   {
+    value: "fixed_amount",
+    label: "Fixed Amount",
+  },
+  {
     value: "fixed",
     label: "Fixed Amount",
   },
@@ -183,6 +199,14 @@ export const OFFSET_COVER_TYPES = [
     value: "deposit",
     label: "Deposit",
   },
+  {
+    value: "security",
+    label: "Security / Collateral",
+  },
+  {
+    value: "both",
+    label: "Both Savings & Security",
+  },
 ] as const;
 
 /**
@@ -190,8 +214,16 @@ export const OFFSET_COVER_TYPES = [
  */
 export const ALLOCATION_ORDERS = [
   {
+    value: "penalty,fees,interest,principal",
+    label: "Penalty → Fees → Interest → Principal (Standard)",
+  },
+  {
     value: "penalty,interest,principal",
     label: "Penalty → Interest → Principal",
+  },
+  {
+    value: "interest,fees,penalty,principal",
+    label: "Interest → Fees → Penalty → Principal",
   },
   {
     value: "interest,penalty,principal",

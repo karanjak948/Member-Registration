@@ -37,18 +37,24 @@ export type RepaymentFrequency =
 
 export type PercentageOrFixed =
   | "percentage"
-  | "fixed";
+  | "fixed"
+  | "fixed_amount";
 
 export type OffsetCovers =
   | "savings"
   | "shares"
-  | "deposit";
+  | "deposit"
+  | "security"
+  | "both";
 
 export type AllocationOrder =
+  | "penalty,fees,interest,principal"
   | "penalty,interest,principal"
+  | "interest,fees,penalty,principal"
   | "interest,penalty,principal"
   | "interest,principal,penalty"
-  | "principal,interest,penalty";
+  | "principal,interest,penalty"
+  | string;
 
 /* ===========================
    CREATE
