@@ -84,7 +84,7 @@ class BulkSMSService:
         return None
 
     @classmethod
-    def send_sms(cls, phone_number: str, message: str, sender_id: str = BULK_SMS_SENDER_ID) -> Dict[str, Any]:
+    def send_sms(cls, phone_number: str, message: str, sender_id: str = BULK_SMS_SENDER_ID, retry_on_auth_fail: bool = True) -> Dict[str, Any]:
         """
         Send an SMS notification to a specified phone number.
         """
@@ -115,8 +115,22 @@ class BulkSMSService:
             with urllib.request.urlopen(req, timeout=10) as response:
                 body = response.read().decode("utf-8")
                 res_json = json.loads(body)
+
+                # If token expired/invalid, retry once with fresh token
+                if retry_on_auth_fail and (res_json.get("return") == 0 or ("token" in str(res_json).lower() and "fail" in str(res_json).lower())):
+                    logger.warning("Access token rejected by SMS gateway. Refreshing token and retrying...")
+                    cls.get_access_token(force_refresh=True)
+                    return cls.send_sms(phone_number, message, sender_id, retry_on_auth_fail=False)
+
                 logger.info(f"BulkSMS response for {formatted_phone}: {res_json}")
                 return {"success": True, "response": res_json}
+        except urllib.error.HTTPError as he:
+            if retry_on_auth_fail and he.code in (401, 403):
+                logger.warning(f"HTTP {he.code} from SMS gateway. Refreshing token and retrying...")
+                cls.get_access_token(force_refresh=True)
+                return cls.send_sms(phone_number, message, sender_id, retry_on_auth_fail=False)
+            logger.error(f"Failed to send BulkSMS to {formatted_phone}: {he}")
+            return {"success": False, "error": str(he)}
         except Exception as e:
             logger.error(f"Failed to send BulkSMS to {formatted_phone}: {e}")
             return {"success": False, "error": str(e)}
