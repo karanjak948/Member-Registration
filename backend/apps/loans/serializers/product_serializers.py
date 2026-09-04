@@ -132,17 +132,24 @@ class LoanProductSerializer(serializers.ModelSerializer):
         """
         Updating a product creates a new version if financial terms change.
         """
+        # Extract nested relations and explicit fields
         fees_data = validated_data.pop("fees", None)
         penalties_data = validated_data.pop("penalties", None)
+        product_code = validated_data.pop("product_code", instance.product_code)
+        validated_data.pop("version_number", None)
+        validated_data.pop("is_active", None)
 
         # Spawn new version
         new_version = instance.version_number + 1
         instance.is_active = False
         instance.save(update_fields=["is_active"])
 
+        # Also ensure previous versions with this code are inactive
+        LoanProduct.objects.filter(product_code=product_code).exclude(id=instance.id).update(is_active=False)
+
         # Create new version record
         new_product = LoanProduct.objects.create(
-            product_code=instance.product_code,
+            product_code=product_code,
             version_number=new_version,
             is_active=True,
             **validated_data
