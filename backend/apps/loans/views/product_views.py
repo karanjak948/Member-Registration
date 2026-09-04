@@ -18,7 +18,10 @@ class LoanProductViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         qs = super().get_queryset()
+        include_archived = self.request.query_params.get("include_archived")
+        if include_archived in ("true", "1", "True"):
+            return qs
         active_only = self.request.query_params.get("active_only")
-        if active_only in ("true", "1", "True"):
-            qs = qs.filter(is_active=True)
-        return qs
+        if active_only in ("false", "0", "False"):
+            return qs
+        return qs.filter(is_active=True)

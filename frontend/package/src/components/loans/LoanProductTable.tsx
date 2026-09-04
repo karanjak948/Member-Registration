@@ -42,7 +42,7 @@ interface Props {
 export default function LoanProductTable({ products, loading = false }: Props) {
   const router = useRouter();
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"ALL" | "ACTIVE" | "INACTIVE">("ALL");
+  const [statusFilter, setStatusFilter] = useState<"ALL" | "ACTIVE" | "INACTIVE">("ACTIVE");
 
   const filteredProducts = useMemo(() => {
     const term = search.trim().toLowerCase();
