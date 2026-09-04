@@ -92,6 +92,7 @@ class LoanProductSerializer(serializers.ModelSerializer):
             "updated_at",
         ]
         read_only_fields = ["id", "version_number", "created_at", "updated_at"]
+        validators = []  # Disables default unique_together validator as versioning is handled in create/update
 
     def get_active_loans_count(self, obj):
         return obj.loans.filter(status__in=["active", "watchful", "non_performing", "doubtful"]).count()
@@ -139,13 +140,14 @@ class LoanProductSerializer(serializers.ModelSerializer):
         validated_data.pop("version_number", None)
         validated_data.pop("is_active", None)
 
-        # Spawn new version
-        new_version = instance.version_number + 1
+        # Spawn new version based on latest existing version for this product_code
+        latest = LoanProduct.objects.filter(product_code=product_code).order_by("-version_number").first()
+        new_version = (latest.version_number + 1) if latest else (instance.version_number + 1)
         instance.is_active = False
         instance.save(update_fields=["is_active"])
 
-        # Also ensure previous versions with this code are inactive
-        LoanProduct.objects.filter(product_code=product_code).exclude(id=instance.id).update(is_active=False)
+        # Also ensure all previous versions with this code are inactive
+        LoanProduct.objects.filter(product_code=product_code).update(is_active=False)
 
         # Create new version record
         new_product = LoanProduct.objects.create(
