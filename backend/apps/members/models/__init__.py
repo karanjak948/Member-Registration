@@ -7,6 +7,7 @@ from .audit import MemberAudit
 from .field_configuration import FieldConfiguration
 from .member_configuration import MemberConfiguration
 from .member_workflow_history import MemberWorkflowHistory
+from .sms_log import SMSLog, SMSEventType, SMSDeliveryStatus
 
 __all__ = [
     "Member",
@@ -18,4 +19,7 @@ __all__ = [
     "FieldConfiguration",
     "MemberConfiguration",
     "MemberWorkflowHistory",
+    "SMSLog",
+    "SMSEventType",
+    "SMSDeliveryStatus",
 ]

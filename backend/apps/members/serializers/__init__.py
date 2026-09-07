@@ -7,6 +7,7 @@ from .member_configuration import MemberConfigurationSerializer
 from .member_workflow_history import MemberWorkflowHistorySerializer
 from .next_of_kin import NextOfKinSerializer
 from .vehicle import VehicleSerializer
+from .sms_serializer import SMSLogSerializer
 
 __all__ = [
     "MemberCategorySerializer",
@@ -18,4 +19,5 @@ __all__ = [
     "FieldConfigurationSerializer",
     "MemberConfigurationSerializer",
     "MemberWorkflowHistorySerializer",
+    "SMSLogSerializer",
 ]

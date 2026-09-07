@@ -19,6 +19,13 @@ class LoanProductFeeSerializer(serializers.ModelSerializer):
             "ledger_account_name",
         ]
 
+    def to_internal_value(self, data):
+        if isinstance(data, dict):
+            data = data.copy()
+            if data.get("fee_type") == "fixed":
+                data["fee_type"] = "fixed_amount"
+        return super().to_internal_value(data)
+
 
 class LoanProductPenaltySerializer(serializers.ModelSerializer):
     id = serializers.IntegerField(required=False)
@@ -34,11 +41,65 @@ class LoanProductPenaltySerializer(serializers.ModelSerializer):
             "ledger_account_name",
         ]
 
+    def to_internal_value(self, data):
+        if isinstance(data, dict):
+            data = data.copy()
+            if data.get("penalty_type") == "fixed":
+                data["penalty_type"] = "fixed_amount"
+        return super().to_internal_value(data)
+
 
 class LoanProductSerializer(serializers.ModelSerializer):
     fees = LoanProductFeeSerializer(many=True, required=False)
     penalties = LoanProductPenaltySerializer(many=True, required=False)
     active_loans_count = serializers.SerializerMethodField()
+
+    def to_internal_value(self, data):
+        if isinstance(data, dict):
+            data = data.copy()
+            # Normalize "fixed" to "fixed_amount" for all percentage/fixed fields
+            for f in [
+                "security_type",
+                "deposit_type",
+                "late_payment_penalty_type",
+                "reschedule_fee_type",
+                "offset_fee_type",
+            ]:
+                if data.get(f) == "fixed":
+                    data[f] = "fixed_amount"
+
+            # Normalize product_code
+            if "product_code" in data and isinstance(data["product_code"], str):
+                data["product_code"] = data["product_code"].strip().upper()
+
+            # Ensure empty strings for optional numeric fields become None or default
+            for num_f in [
+                "max_amount",
+                "min_amount",
+                "max_repayment_period",
+                "savings_multiplier",
+                "security_value",
+                "deposit_value",
+                "late_payment_penalty_value",
+                "reschedule_fee_value",
+                "offset_fee_value",
+            ]:
+                if data.get(num_f) == "" or data.get(num_f) is None:
+                    if num_f == "min_amount":
+                        data[num_f] = 0
+                    elif num_f == "min_repayment_period":
+                        data[num_f] = 1
+                    else:
+                        data[num_f] = None
+
+            # Auto-assign organization if not provided
+            if not data.get("organization"):
+                from apps.organizations.models import Organization
+                org = Organization.objects.first()
+                if org:
+                    data["organization"] = org.id
+
+        return super().to_internal_value(data)
 
     class Meta:
         model = LoanProduct

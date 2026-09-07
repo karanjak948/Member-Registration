@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 
 const BULK_SMS_BASE_URL = "https://bulksms.pefranksmartsolutions.co.ke/api/v1";
-const BULK_SMS_API_KEY = "f5e10366fd4cbc04aa487320ece1f40bb246b363464966057c60f6934kdf38ab";
-const BULK_SMS_CONSUMER_KEY = "6f4ebef63cb63733b26e23e4461bf12e383060271d1386255964b4ceecedaba6";
-const BULK_SMS_CONSUMER_SECRET = "b5f0ea8138d11ade514f370583bcc429";
-const BULK_SMS_SENDER_ID = "KIY TOYS";
+const BULK_SMS_API_KEY = "07b5152f2e891ce06a62015a2734a76c8d007cce429509cf6473753f0045bbd68364cba6154ef8ca923a64e6b760e333578b0aea881e849e5461a694d72b66a2";
+const BULK_SMS_CONSUMER_KEY = "48fa6034c147eea77d04072ee645a1d95b66d71367043118f56da62ebfd91388";
+const BULK_SMS_CONSUMER_SECRET = "f9d58e689b03415dfe55b439b1ce63de";
+const BULK_SMS_SENDER_ID = "ROYAL LTD";
 
 function formatPhoneNumber(phone: string): string {
   if (!phone) return "";
@@ -81,7 +81,7 @@ export async function POST(req: Request) {
 
     const sendData = await sendRes.json().catch(() => ({}));
 
-    if (sendRes.ok) {
+    if (sendRes.ok && !sendData.failed && sendData.return !== 3) {
       return NextResponse.json({
         success: true,
         message: sendData.success || "SMS sent successfully!",
@@ -89,8 +89,8 @@ export async function POST(req: Request) {
       });
     } else {
       return NextResponse.json(
-        { error: sendData.detail || sendData.error || "Failed to dispatch SMS via gateway." },
-        { status: sendRes.status }
+        { error: sendData.failed || sendData.detail || sendData.error || "Failed to dispatch SMS via gateway." },
+        { status: 400 }
       );
     }
   } catch (err: any) {

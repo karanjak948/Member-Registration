@@ -46,7 +46,10 @@ const defaultValues: LoanProductCreate = {
   interest_period: "monthly",
 
   repayment_frequency: "monthly",
+  min_repayment_period: 1,
   max_repayment_period: 1,
+  min_amount: 0,
+  max_amount: null,
 
   requires_guarantor: false,
 
@@ -151,11 +154,18 @@ export default function LoanProductForm({
         `Failed to ${mode === "edit" ? "update" : "create"} loan product:`,
         error,
       );
-      const msg =
+      let msg =
         error.response?.data?.detail ||
-        error.response?.data?.error ||
-        error.message ||
-        `Failed to ${mode === "edit" ? "update" : "create"} loan product.`;
+        error.response?.data?.error;
+
+      if (!msg && error.response?.data && typeof error.response.data === "object") {
+        msg = Object.entries(error.response.data)
+          .map(([k, v]) => `${k.replace(/_/g, " ")}: ${Array.isArray(v) ? v.join(", ") : v}`)
+          .join(" | ");
+      }
+
+      msg = msg || error.message || `Failed to ${mode === "edit" ? "update" : "create"} loan product.`;
+
       setSnackbar({
         open: true,
         message: msg,

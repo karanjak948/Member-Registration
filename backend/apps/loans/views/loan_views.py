@@ -1,3 +1,4 @@
+import logging
 from datetime import date
 from decimal import Decimal
 from django.db import transaction
@@ -5,6 +6,8 @@ from django.utils import timezone
 from rest_framework import viewsets, permissions, status, filters
 from rest_framework.decorators import action
 from rest_framework.response import Response
+
+logger = logging.getLogger(__name__)
 
 from apps.loans.models import (
     Loan,
@@ -98,6 +101,13 @@ class LoanViewSet(viewsets.ModelViewSet):
 
         for c in collaterals_data:
             LoanCollateral.objects.create(loan=loan, **c)
+
+        # Trigger Loan Application Confirmation SMS
+        try:
+            from apps.common.notification_service import NotificationService
+            NotificationService.notify_loan_application(loan)
+        except Exception as notif_err:
+            logger.error(f"Failed to dispatch loan application SMS for {loan.loan_number}: {notif_err}")
 
         return loan
 
@@ -216,6 +226,14 @@ class LoanViewSet(viewsets.ModelViewSet):
         loan.approved_by = request.user
         loan.approved_at = timezone.now()
         loan.save()
+
+        # Trigger Loan Approval Confirmation SMS
+        try:
+            from apps.common.notification_service import NotificationService
+            NotificationService.notify_loan_approval(loan)
+        except Exception as notif_err:
+            logger.error(f"Failed to dispatch loan approval SMS for {loan.loan_number}: {notif_err}")
+
         return Response(LoanDetailSerializer(loan).data)
 
     @action(detail=True, methods=["post"], url_path="reject")
@@ -321,6 +339,20 @@ class LoanViewSet(viewsets.ModelViewSet):
             fee_deductions=total_upfront_fees,
         )
 
+        # Trigger Loan Disbursement Confirmation SMS (Disbursed amount + Regular installment)
+        try:
+            first_entry = schedule[0] if schedule else None
+            inst_amount = first_entry.expected_amount if first_entry else (principal / num_periods)
+            first_due = first_entry.due_date if first_entry else disb_date
+            from apps.common.notification_service import NotificationService
+            NotificationService.notify_loan_disbursement(
+                loan=loan,
+                installment_amount=inst_amount,
+                first_due_date=first_due,
+            )
+        except Exception as notif_err:
+            logger.error(f"Failed to dispatch loan disbursement SMS for {loan.loan_number}: {notif_err}")
+
         return Response(LoanDetailSerializer(loan).data)
 
     @action(detail=False, methods=["get"], url_path="aging_report")
@@ -399,4 +431,56 @@ class LoanViewSet(viewsets.ModelViewSet):
                 for k, v in summary.items()
             },
             "loans": loans_data,
+        })
+
+    @action(detail=False, methods=["post"], url_path="send_overdue_alerts")
+    def send_overdue_alerts(self, request):
+        """
+        Batch-triggers Overdue Delinquency SMS alerts to active borrowers with overdue installments.
+        """
+        from apps.common.notification_service import NotificationService
+
+        today = timezone.now().date()
+        active_loans = Loan.objects.filter(
+            status__in=[
+                LoanStatus.ACTIVE,
+                LoanStatus.WATCHFUL,
+                LoanStatus.NON_PERFORMING,
+                LoanStatus.DOUBTFUL,
+            ]
+        ).select_related("member", "loan_product")
+
+        dispatched = 0
+        failed = 0
+        results = []
+
+        for loan in active_loans:
+            oldest_unpaid = loan.schedule_entries.filter(is_paid=False).order_by("due_date").first()
+            if oldest_unpaid and oldest_unpaid.due_date < today:
+                days_overdue = (today - oldest_unpaid.due_date).days
+                overdue_amount = oldest_unpaid.total_due
+                res = NotificationService.notify_overdue_loan(
+                    loan=loan,
+                    days_overdue=days_overdue,
+                    overdue_amount=overdue_amount,
+                )
+                if res.get("success"):
+                    dispatched += 1
+                else:
+                    failed += 1
+                results.append({
+                    "loan_number": loan.loan_number,
+                    "member": f"{loan.member.first_name} {loan.member.other_names}".strip(),
+                    "phone": loan.member.phone_number,
+                    "days_overdue": days_overdue,
+                    "overdue_amount": str(overdue_amount),
+                    "status": "Sent" if res.get("success") else "Failed",
+                })
+
+        return Response({
+            "success": True,
+            "message": f"Overdue alerts dispatched to {dispatched} borrowers ({failed} failed).",
+            "dispatched_count": dispatched,
+            "failed_count": failed,
+            "results": results,
         })

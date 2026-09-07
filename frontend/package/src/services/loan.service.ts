@@ -181,6 +181,36 @@ class LoanService {
   async delete(loanId: number): Promise<void> {
     await api.delete(`/loans/${loanId}/`);
   }
+
+  /**
+   * POST /api/loans/send_overdue_alerts/
+   */
+  async sendOverdueAlerts(): Promise<any> {
+    const response = await api.post("/loans/send_overdue_alerts/");
+    return response.data;
+  }
+
+  /**
+   * GET /api/sms/logs/
+   */
+  async getSMSLogs(params?: { status?: string; event_type?: string; search?: string }): Promise<any> {
+    const response = await api.get("/sms/logs/", { params });
+    const data = response.data;
+    return Array.isArray(data) ? data : (data?.results || []);
+  }
+
+  /**
+   * POST /api/sms/send/
+   */
+  async sendSMS(payload: {
+    contacts?: string[];
+    phone_number?: string;
+    message: string;
+    recipient_type?: string;
+  }): Promise<any> {
+    const response = await api.post("/sms/send/", payload);
+    return response.data;
+  }
 }
 
 export default new LoanService();

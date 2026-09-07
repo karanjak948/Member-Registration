@@ -163,6 +163,15 @@ CORS_ALLOWED_ORIGINS = (
 CORS_ALLOW_ALL_ORIGINS = os.getenv("CORS_ALLOW_ALL_ORIGINS", "True") == "True"
 CORS_ALLOW_CREDENTIALS = True
 
+CSRF_TRUSTED_ORIGINS = (
+    os.getenv(
+        "CSRF_TRUSTED_ORIGINS",
+        "http://localhost:3000,http://localhost:3001,http://127.0.0.1:3000,https://v1.royalltd.co.ke",
+    ).split(",")
+)
+
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
 # Internationalization
 # https://docs.djangoproject.com/en/6.0/topics/i18n/
 
@@ -193,7 +202,7 @@ DEFAULT_FROM_EMAIL = (
 )
 
 # Must match the URL where the Next.js frontend is running.
-FRONTEND_URL = "http://localhost:3000"
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
 
 
 STATIC_URL = "/static/"

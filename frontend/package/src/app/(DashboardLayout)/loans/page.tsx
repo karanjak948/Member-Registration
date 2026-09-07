@@ -22,6 +22,7 @@ import {
   IconButton,
   Tooltip,
   Alert,
+  Snackbar,
   Button,
   Grid,
   InputAdornment,
@@ -40,11 +41,13 @@ import {
   IconCertificate,
   IconChecklist,
   IconSettings,
+  IconAlertTriangle,
 } from "@tabler/icons-react";
 import ExportButton from "@/components/common/ExportButton";
 import { useLoans } from "@/hooks/useLoans";
 import { usePermissions } from "@/hooks/usePermissions";
 import { PERMISSIONS } from "@/constants/permissions";
+import loanService from "@/services/loan.service";
 
 const statusConfig: Record<
   string,
@@ -122,6 +125,31 @@ function LoansContent() {
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
+  const [sendingOverdue, setSendingOverdue] = useState(false);
+  const [actionFeedback, setActionFeedback] = useState<{ message: string; severity: "success" | "error" | "info" } | null>(null);
+
+  const handleTriggerOverdueAlerts = async () => {
+    if (!window.confirm("Are you sure you want to dispatch overdue delinquency SMS notices to all borrowers with late installments?")) {
+      return;
+    }
+    try {
+      setSendingOverdue(true);
+      const res = await loanService.sendOverdueAlerts();
+      setActionFeedback({
+        message: res.message || "Overdue SMS notices dispatched successfully.",
+        severity: "success",
+      });
+      refresh();
+    } catch (err: any) {
+      console.error("Failed to trigger overdue alerts:", err);
+      setActionFeedback({
+        message: err.response?.data?.error || "Failed to dispatch overdue notices.",
+        severity: "error",
+      });
+    } finally {
+      setSendingOverdue(false);
+    }
+  };
 
   // Sync statusFilter whenever the URL query parameter changes
   useEffect(() => {
@@ -375,6 +403,26 @@ function LoansContent() {
                 }}
               >
                 Refresh
+              </Button>
+
+              <Button
+                variant="outlined"
+                startIcon={<IconAlertTriangle size={18} />}
+                onClick={handleTriggerOverdueAlerts}
+                disabled={sendingOverdue}
+                sx={{
+                  bgcolor: "rgba(239, 68, 68, 0.2)",
+                  color: "#ffffff",
+                  fontWeight: 800,
+                  borderRadius: 2.5,
+                  px: 2.25,
+                  py: 1,
+                  backdropFilter: "blur(8px)",
+                  border: "1px solid rgba(239, 68, 68, 0.45)",
+                  "&:hover": { bgcolor: "rgba(239, 68, 68, 0.35)" },
+                }}
+              >
+                {sendingOverdue ? "Notifying..." : "Notify Overdue"}
               </Button>
 
               <Button
@@ -867,6 +915,24 @@ function LoansContent() {
           </TableContainer>
         </Paper>
       </Stack>
+
+      {actionFeedback && (
+        <Snackbar
+          open={Boolean(actionFeedback)}
+          autoHideDuration={6000}
+          onClose={() => setActionFeedback(null)}
+          anchorOrigin={{ vertical: "top", horizontal: "right" }}
+        >
+          <Alert
+            severity={actionFeedback.severity}
+            variant="filled"
+            onClose={() => setActionFeedback(null)}
+            sx={{ fontWeight: 800, borderRadius: 2 }}
+          >
+            {actionFeedback.message}
+          </Alert>
+        </Snackbar>
+      )}
     </Container>
   );
 }

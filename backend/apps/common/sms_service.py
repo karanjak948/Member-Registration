@@ -123,6 +123,13 @@ class BulkSMSService:
                     return cls.send_sms(phone_number, message, sender_id, retry_on_auth_fail=False)
 
                 logger.info(f"BulkSMS response for {formatted_phone}: {res_json}")
+
+                # Check for explicit gateway failure responses (e.g. insufficient SMS balance / top up required)
+                if "failed" in res_json or "error" in res_json or res_json.get("return") == 3 or res_json.get("status") in ("failed", "error"):
+                    err_msg = res_json.get("failed") or res_json.get("error") or res_json.get("message") or f"Gateway returned return code: {res_json.get('return')}"
+                    logger.warning(f"BulkSMS gateway rejected SMS for {formatted_phone}: {err_msg}")
+                    return {"success": False, "error": str(err_msg), "response": res_json}
+
                 return {"success": True, "response": res_json}
         except urllib.error.HTTPError as he:
             if retry_on_auth_fail and he.code in (401, 403):

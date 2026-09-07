@@ -148,15 +148,27 @@ class RepaymentSerializer(serializers.ModelSerializer):
         loan.total_penalties_paid += alloc.allocated_penalty
         loan.last_payment_date = payment_date
 
+        is_closed = False
         if loan.outstanding_balance <= Decimal("0.01"):
             loan.status = LoanStatus.CLOSED
             loan.outstanding_balance = Decimal("0.00")
             loan.principal_balance = Decimal("0.00")
             loan.interest_balance = Decimal("0.00")
+            is_closed = True
 
         loan.save()
 
         # Post Double-Entry Journal Entry
         record_repayment_journal(repayment)
+
+        # Trigger Repayment Confirmation SMS & Loan Completion SMS
+        try:
+            from apps.common.notification_service import NotificationService
+            NotificationService.notify_repayment(repayment, remaining_balance=loan.outstanding_balance)
+            if is_closed:
+                NotificationService.notify_loan_completion(loan)
+        except Exception as notif_err:
+            import logging
+            logging.getLogger(__name__).error(f"Failed to dispatch repayment SMS for {repayment.repayment_number}: {notif_err}")
 
         return repayment

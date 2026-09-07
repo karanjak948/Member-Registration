@@ -13,11 +13,19 @@ from .views import (
     NextOfKinViewSet,
     VehicleViewSet,
     SendSMSAPIView,
+    SMSLogViewSet,
+    SendOverdueSMSAPIView,
 )
 
 
 
 router = DefaultRouter()
+
+router.register(
+    r"sms/logs",
+    SMSLogViewSet,
+    basename="sms-logs",
+)
 
 router.register(
     r"member-categories",
@@ -74,5 +82,7 @@ router.register(
 urlpatterns = [
     path("sms/send", SendSMSAPIView.as_view(), name="send-sms-no-slash"),
     path("sms/send/", SendSMSAPIView.as_view(), name="send-sms"),
+    path("sms/overdue", SendOverdueSMSAPIView.as_view(), name="send-overdue-sms-no-slash"),
+    path("sms/overdue/", SendOverdueSMSAPIView.as_view(), name="send-overdue-sms"),
     path("", include(router.urls)),
 ]
