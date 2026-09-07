@@ -27,6 +27,7 @@ import {
   Collapse,
 } from "@mui/material";
 import PageContainer from "@/app/(DashboardLayout)/components/container/PageContainer";
+import api from "@/services/api";
 import {
   IconBuildingBank,
   IconCoins,
@@ -87,11 +88,25 @@ export default function FinancePage() {
     setLoading(true);
     try {
       const [txRes, accRes] = await Promise.all([
-        fetch("/api/ledger").then((r) => r.json()).catch(() => []),
-        fetch("/api/ledger-accounts").then((r) => r.json()).catch(() => []),
+        api
+          .get("/ledger-transactions/")
+          .then((r) => r.data)
+          .catch(async () => {
+            return fetch("/api/ledger").then((r) => r.json()).catch(() => []);
+          }),
+        api
+          .get("/ledger-accounts/")
+          .then((r) => r.data)
+          .catch(async () => {
+            return fetch("/api/ledger-accounts").then((r) => r.json()).catch(() => []);
+          }),
       ]);
-      setTransactions(Array.isArray(txRes) ? txRes : []);
-      setAccounts(Array.isArray(accRes) ? accRes : []);
+
+      const txList = Array.isArray(txRes) ? txRes : (txRes?.results || []);
+      const accList = Array.isArray(accRes) ? accRes : (accRes?.results || []);
+
+      setTransactions(txList);
+      setAccounts(accList);
     } catch (err) {
       console.warn("Error fetching ledger data:", err);
     } finally {
