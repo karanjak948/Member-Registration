@@ -56,6 +56,7 @@ INSTALLED_APPS = [
     "apps.authentication",
     "apps.members",
     "apps.loans",
+    "apps.savings",
     "apps.reports",
     "apps.organizations",
     "apps.common",
@@ -151,6 +152,11 @@ AUTH_PASSWORD_VALIDATORS = [
 
 
 AUTH_USER_MODEL = "authentication.User"
+
+AUTHENTICATION_BACKENDS = [
+    "apps.authentication.backends.EmailOrUsernameModelBackend",
+    "django.contrib.auth.backends.ModelBackend",
+]
 
 
 CORS_ALLOWED_ORIGINS = (

@@ -4,6 +4,8 @@ import {
   LoanCreate,
   LoanList,
   LoanUpdate,
+  LoanApprovePayload,
+  LoanDisbursePayload,
 } from "@/interfaces/loan";
 
 export interface LoanCalculatorPreviewParams {
@@ -117,8 +119,9 @@ class LoanService {
   /**
    * POST /api/loans/{id}/approve/
    */
-  async approve(loanId: number, notes?: string): Promise<Loan> {
-    const response = await api.post(`/loans/${loanId}/approve/`, { notes });
+  async approve(loanId: number, payload?: string | LoanApprovePayload): Promise<Loan> {
+    const body = typeof payload === "string" ? { notes: payload } : (payload || {});
+    const response = await api.post(`/loans/${loanId}/approve/`, body);
     return response.data;
   }
 
@@ -133,10 +136,9 @@ class LoanService {
   /**
    * POST /api/loans/{id}/disburse/
    */
-  async disburse(loanId: number, disbursementDate?: string): Promise<Loan> {
-    const response = await api.post(`/loans/${loanId}/disburse/`, {
-      disbursement_date: disbursementDate,
-    });
+  async disburse(loanId: number, payload?: string | LoanDisbursePayload): Promise<Loan> {
+    const body = typeof payload === "string" ? { disbursement_date: payload } : (payload || {});
+    const response = await api.post(`/loans/${loanId}/disburse/`, body);
     return response.data;
   }
 

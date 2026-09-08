@@ -23,6 +23,8 @@ import {
   IconRefresh,
   IconAlertCircle,
   IconWallet,
+  IconPigMoney,
+  IconBook2,
 } from "@tabler/icons-react";
 
 import type { ElementType } from "react";
@@ -242,6 +244,30 @@ export function getMenuItems(
   });
 
   // ============================================================
+  // MPA (Member Personal Account / Savings)
+  // ============================================================
+  items.push({
+    id: "mpa",
+    title: "MPA",
+    icon: IconPigMoney,
+    href: "/savings",
+    children: [
+      {
+        id: "savings-payments",
+        title: "Savings Payments",
+        icon: IconCoin,
+        href: "/savings",
+      },
+      {
+        id: "new-savings-payment",
+        title: "New Payment Entry",
+        icon: IconPlus,
+        href: "/savings/new",
+      },
+    ],
+  });
+
+  // ============================================================
   // FINANCE
   // ============================================================
   items.push({
@@ -249,6 +275,26 @@ export function getMenuItems(
     title: "Finance",
     icon: IconBuildingBank,
     href: "/finance",
+    children: [
+      {
+        id: "finance-ledger",
+        title: "Ledger",
+        icon: IconBook2,
+        href: "/finance?tab=ledger",
+      },
+      {
+        id: "finance-accounts",
+        title: "Ledger Accounts",
+        icon: IconReceipt,
+        href: "/finance?tab=accounts",
+      },
+      {
+        id: "finance-audit",
+        title: "Audit Log",
+        icon: IconSearch,
+        href: "/finance?tab=audit",
+      },
+    ],
   });
 
   // ============================================================

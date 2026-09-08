@@ -1,5 +1,12 @@
-from rest_framework import viewsets, permissions, filters
-from apps.loans.models import LedgerAccount, LedgerTransaction
+from uuid import uuid4
+from decimal import Decimal
+from django.utils import timezone
+from django.db import transaction
+from rest_framework import viewsets, permissions, filters, status
+from rest_framework.decorators import action
+from rest_framework.response import Response
+
+from apps.loans.models import LedgerAccount, LedgerTransaction, LedgerEntry
 from apps.loans.serializers import (
     LedgerAccountSerializer,
     LedgerTransactionSerializer,
@@ -21,12 +28,89 @@ class LedgerAccountViewSet(viewsets.ModelViewSet):
 
 class LedgerTransactionViewSet(viewsets.ReadOnlyModelViewSet):
     """
-    Read-only view for general ledger journal entries.
+    General ledger journal entries and manual income posting.
     """
     queryset = LedgerTransaction.objects.all().prefetch_related("entries", "entries__account").select_related("loan")
     serializer_class = LedgerTransactionSerializer
     permission_classes = [permissions.IsAuthenticated]
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
-    search_fields = ["transaction_number", "reference_type", "reference_id", "loan__loan_number"]
+    search_fields = ["transaction_number", "reference_type", "reference_id", "loan__loan_number", "description"]
     ordering_fields = ["transaction_date", "created_at"]
     ordering = ["-transaction_date", "-created_at"]
+
+    @action(detail=False, methods=["post"], url_path="post-income")
+    @transaction.atomic
+    def post_income(self, request):
+        """
+        Post income transaction (fees, security deposits, interest, penalties)
+        balanced against Cash/Bank (1010).
+        """
+        account_id = request.data.get("account_id")
+        amount = request.data.get("amount")
+        description = request.data.get("description", "").strip()
+        reference_no = request.data.get("reference_no", "").strip()
+        reference_type = request.data.get("reference_type", "INCOME").upper()
+        transaction_date = request.data.get("transaction_date") or timezone.now().date()
+
+        if not account_id or not amount:
+            return Response(
+                {"error": "account_id and amount are required fields."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            target_account = LedgerAccount.objects.get(id=account_id)
+        except LedgerAccount.DoesNotExist:
+            return Response(
+                {"error": f"Ledger account #{account_id} does not exist."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        try:
+            parsed_amount = Decimal(str(amount))
+            if parsed_amount <= 0:
+                raise ValueError()
+        except (ValueError, TypeError):
+            return Response(
+                {"error": "Amount must be a positive number."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        cash_account, _ = LedgerAccount.objects.get_or_create(
+            account_code="1010",
+            defaults={
+                "account_name": "Cash and Bank Balances",
+                "account_type": "asset",
+                "is_active": True,
+            },
+        )
+
+        txn_number = f"GL-INC-{uuid4().hex[:8].upper()}"
+        journal_txn = LedgerTransaction.objects.create(
+            transaction_number=txn_number,
+            transaction_date=transaction_date,
+            description=description or f"{target_account.account_name} payment received",
+            reference_type=reference_type,
+            reference_id=reference_no or txn_number,
+        )
+
+        # Debit Cash/Bank
+        LedgerEntry.objects.create(
+            transaction=journal_txn,
+            account=cash_account,
+            entry_type=LedgerEntry.EntryType.DEBIT,
+            amount=parsed_amount,
+            narration=f"Cash receipt for {target_account.account_name}",
+        )
+
+        # Credit Income / Liability Account
+        LedgerEntry.objects.create(
+            transaction=journal_txn,
+            account=target_account,
+            entry_type=LedgerEntry.EntryType.CREDIT,
+            amount=parsed_amount,
+            narration=description or f"Receipt reference {reference_no}",
+        )
+
+        serializer = self.get_serializer(journal_txn)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)

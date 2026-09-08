@@ -228,3 +228,19 @@ class MemberSerializer(serializers.ModelSerializer):
                 "%d %b %Y %I:%M %p"
             )
         return None
+
+    def validate_kra_pin(self, value):
+        """
+        Convert empty/whitespace KRA PIN to None to prevent MySQL unique index collisions.
+        """
+        if not value or not str(value).strip():
+            return None
+        return str(value).strip().upper()
+
+    def validate_email(self, value):
+        """
+        Convert empty/whitespace email to None to prevent unique constraint collisions.
+        """
+        if not value or not str(value).strip():
+            return None
+        return str(value).strip().lower()

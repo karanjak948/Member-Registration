@@ -107,12 +107,13 @@ const AuthLogin = ({ title, subtitle, subtext }: LoginType) => {
               component="label"
               htmlFor="username"
             >
-              Username
+              Username or Email
             </Typography>
             <CustomTextField
               id="username"
               fullWidth
               autoComplete="username"
+              placeholder="Enter your username or email address"
               value={username}
               disabled={loading}
               onChange={(event: React.ChangeEvent<HTMLInputElement>) => {

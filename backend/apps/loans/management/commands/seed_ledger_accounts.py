@@ -25,11 +25,15 @@ class Command(BaseCommand):
         self.stdout.write("--- 1. Seeding Standard Chart of Accounts ---")
         standard_accounts = [
             ("1010", "Cash and Bank Balances", AccountType.ASSET),
-            ("1200", "Loan Portfolio Receivable", AccountType.ASSET),
+            ("1200", "Loans Issued", AccountType.ASSET),
+            ("2100", "Security deposits", AccountType.LIABILITY),
+            ("2010", "Member Normal Savings", AccountType.LIABILITY),
+            ("2020", "Member Welfare Contributions", AccountType.LIABILITY),
             ("2900", "Unallocated Member Deposits / Suspense", AccountType.LIABILITY),
-            ("4000", "Interest Income on Loans", AccountType.REVENUE),
-            ("4100", "Loan Processing Fee Income", AccountType.REVENUE),
-            ("4200", "Penalty Income", AccountType.REVENUE),
+            ("4000", "Interest earned", AccountType.REVENUE),
+            ("4100", "Processing fees", AccountType.REVENUE),
+            ("4150", "Form fees", AccountType.REVENUE),
+            ("4200", "Penalties collected", AccountType.REVENUE),
             ("5000", "Loan Loss Provision Expense", AccountType.EXPENSE),
         ]
 

@@ -163,6 +163,17 @@ class Member(AuditModel):
             RC-000002
         """
 
+        # Ensure optional unique fields are None (NULL in DB) when empty, preventing duplicate empty string IntegrityError
+        if self.kra_pin is not None and not str(self.kra_pin).strip():
+            self.kra_pin = None
+        elif self.kra_pin:
+            self.kra_pin = str(self.kra_pin).strip().upper()
+
+        if self.email is not None and not str(self.email).strip():
+            self.email = None
+        elif self.email:
+            self.email = str(self.email).strip().lower()
+
         if not self.membership_number:
             last_member = (
                 Member.objects.aggregate(

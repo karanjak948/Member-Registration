@@ -147,6 +147,7 @@ export interface Loan {
   disbursement_date: string | null;
   maturity_date?: string | null;
   num_periods?: number | null;
+  repayments_count?: number;
   interest_rate?: string | number;
   interest_method?: string;
   repayment_frequency?: string;
@@ -163,12 +164,35 @@ export interface Loan {
   days_overdue?: number;
   last_payment_date?: string | null;
   appraisal_notes?: string;
+  approved_amount?: string | number | null;
+  approval_date?: string | null;
   approval_notes?: string;
+  disbursed_amount?: string | number | null;
+  disbursement_method?: string | null;
+  disbursement_bank?: string | null;
+  disbursement_reference?: string | null;
+  disbursement_notes?: string | null;
+  disbursed_at?: string | null;
   rejection_reason?: string;
   schedule_entries?: LoanScheduleEntry[];
   guarantors?: LoanGuarantorItem[];
   collaterals?: LoanCollateralItem[];
   created_at: string;
+}
+
+export interface LoanApprovePayload {
+  notes?: string;
+  approved_amount?: number | string;
+  approval_date?: string;
+}
+
+export interface LoanDisbursePayload {
+  disbursement_date?: string;
+  disbursed_amount?: number | string;
+  disbursement_method?: string;
+  disbursement_bank?: string;
+  disbursement_reference?: string;
+  disbursement_notes?: string;
 }
 
 /**

@@ -250,10 +250,19 @@ export default function ReviewStep({
       formData.append("other_names", cleanString(member.other_names));
       formData.append("national_id", cleanString(member.national_id));
       formData.append("phone_number", cleanString(member.phone_number));
-      formData.append("email", cleanString(member.email));
+      const cleanedEmail = cleanString(member.email);
+      if (cleanedEmail) {
+        formData.append("email", cleanedEmail);
+      }
+
       formData.append("physical_address", cleanString(member.physical_address));
       formData.append("occupation", cleanString(member.occupation));
-      formData.append("kra_pin", cleanString(member.kra_pin));
+
+      const cleanedKraPin = cleanString(member.kra_pin);
+      if (cleanedKraPin) {
+        formData.append("kra_pin", cleanedKraPin.toUpperCase());
+      }
+
       formData.append("category", String(member.category || ""));
 
       if (member.passport_photo instanceof File) {

@@ -221,10 +221,33 @@ class LoanViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
         notes = request.data.get("notes", "")
+        approved_amount_raw = request.data.get("approved_amount")
+        approval_date_raw = request.data.get("approval_date")
+
+        if approved_amount_raw is not None and str(approved_amount_raw).strip():
+            approved_amount = Decimal(str(approved_amount_raw))
+        else:
+            approved_amount = loan.principal_amount
+
+        if approval_date_raw:
+            try:
+                approval_date = timezone.datetime.strptime(approval_date_raw, "%Y-%m-%d").date()
+            except (ValueError, TypeError):
+                approval_date = timezone.now().date()
+        else:
+            approval_date = timezone.now().date()
+
         loan.status = LoanStatus.APPROVED
+        loan.approved_amount = approved_amount
+        loan.approval_date = approval_date
         loan.approval_notes = notes
         loan.approved_by = request.user
         loan.approved_at = timezone.now()
+
+        # Update principal to approved amount for ongoing balances
+        loan.principal_amount = approved_amount
+        loan.principal_balance = approved_amount
+        loan.outstanding_balance = approved_amount
         loan.save()
 
         # Trigger Loan Approval Confirmation SMS
@@ -263,20 +286,34 @@ class LoanViewSet(viewsets.ModelViewSet):
             )
 
         disb_date_str = request.data.get("disbursement_date")
-        disb_date = (
-            timezone.datetime.strptime(disb_date_str, "%Y-%m-%d").date()
-            if disb_date_str
-            else timezone.now().date()
-        )
+        try:
+            disb_date = (
+                timezone.datetime.strptime(disb_date_str, "%Y-%m-%d").date()
+                if disb_date_str
+                else timezone.now().date()
+            )
+        except (ValueError, TypeError):
+            disb_date = timezone.now().date()
+
+        disb_amount_raw = request.data.get("disbursed_amount")
+        if disb_amount_raw is not None and str(disb_amount_raw).strip():
+            disbursed_amount = Decimal(str(disb_amount_raw))
+        else:
+            disbursed_amount = loan.approved_amount or loan.principal_amount
+
+        disbursement_method = request.data.get("disbursement_method", "")
+        disbursement_bank = request.data.get("disbursement_bank", "")
+        disbursement_reference = request.data.get("disbursement_reference", "")
+        disbursement_notes = request.data.get("disbursement_notes", "")
 
         product = loan.loan_product
-        principal = loan.principal_amount
+        principal = disbursed_amount
         num_periods = loan.num_periods
 
         # Clear existing schedule entries if any
         loan.schedule_entries.all().delete()
 
-        # Generate amortization schedule
+        # Generate amortization schedule using the actual disbursed amount
         schedule = generate_schedule(
             principal=principal,
             interest_rate_pct=loan.interest_rate,
@@ -320,10 +357,16 @@ class LoanViewSet(viewsets.ModelViewSet):
             )
         LoanScheduleEntry.objects.bulk_create(entries_to_create)
 
-        # Update Loan Header
+        # Update Loan Header with full disbursement audit details
         maturity_date = schedule[-1].due_date if schedule else disb_date
         loan.disbursement_date = disb_date
         loan.maturity_date = maturity_date
+        loan.disbursed_amount = disbursed_amount
+        loan.disbursement_method = disbursement_method
+        loan.disbursement_bank = disbursement_bank
+        loan.disbursement_reference = disbursement_reference
+        loan.disbursement_notes = disbursement_notes
+        loan.disbursed_at = timezone.now()
         loan.status = LoanStatus.ACTIVE
         loan.disbursed_by = request.user
         loan.principal_balance = principal

@@ -30,6 +30,8 @@ import {
   IconShieldCheck,
   IconBuildingBank,
   IconReceipt,
+  IconPigMoney,
+  IconReportMoney,
 } from "@tabler/icons-react";
 
 interface PermissionSelectorProps {
@@ -46,6 +48,9 @@ interface GroupedPermissions {
 const moduleConfig: Record<string, { color: string; bg: string; border: string; icon: any }> = {
   Members: { color: "#059669", bg: "#ecfdf5", border: "#a7f3d0", icon: IconUsers },
   Loans: { color: "#2563eb", bg: "#eff6ff", border: "#bfdbfe", icon: IconCoins },
+  Finance: { color: "#0891b2", bg: "#ecfeff", border: "#a5f3fc", icon: IconReportMoney },
+  Savings: { color: "#16a34a", bg: "#f0fdf4", border: "#bbf7d0", icon: IconPigMoney },
+  Mpa: { color: "#16a34a", bg: "#f0fdf4", border: "#bbf7d0", icon: IconPigMoney },
   Roles: { color: "#7c3aed", bg: "#f5f3ff", border: "#ddd6fe", icon: IconShieldCheck },
   Users: { color: "#d97706", bg: "#fffbeb", border: "#fde68a", icon: IconBuildingBank },
   Collections: { color: "#0d9488", bg: "#f0fdfa", border: "#99f6e4", icon: IconReceipt },
@@ -59,7 +64,7 @@ export default function PermissionSelector({
 }: PermissionSelectorProps) {
   const [search, setSearch] = useState("");
   const [expandedModules, setExpandedModules] = useState<Set<string>>(
-    () => new Set(["Members", "Loans", "Roles", "Users", "Collections"])
+    () => new Set(["Members", "Loans", "Finance", "Savings", "Mpa", "Roles", "Users", "Collections"])
   );
 
   const groupedPermissions = useMemo(() => {

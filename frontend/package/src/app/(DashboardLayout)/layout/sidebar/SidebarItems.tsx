@@ -31,6 +31,8 @@ export default function SidebarItems() {
     "members-menu": true,
     "jinue-loans": true,
     "collections": false,
+    "mpa": true,
+    "finance": true,
     "administration": false,
   });
 
@@ -43,6 +45,10 @@ export default function SidebarItems() {
         setOpenSections((prev) => ({ ...prev, "jinue-loans": true }));
       } else if (pathname.startsWith("/collections")) {
         setOpenSections((prev) => ({ ...prev, "collections": true }));
+      } else if (pathname.startsWith("/savings") || pathname.startsWith("/mpa")) {
+        setOpenSections((prev) => ({ ...prev, "mpa": true }));
+      } else if (pathname.startsWith("/finance")) {
+        setOpenSections((prev) => ({ ...prev, "finance": true }));
       } else if (pathname.startsWith("/administration") || pathname.startsWith("/settings")) {
         setOpenSections((prev) => ({ ...prev, "administration": true }));
       }
@@ -169,6 +175,8 @@ export default function SidebarItems() {
                   const basePath = child.href.split("?")[0];
                   if (basePath === "/loans" && (pathname === "/loans" || (pathname.startsWith("/loans/") && pathname !== "/loans/apply"))) return true;
                   if (basePath === "/members" && (pathname === "/members" || (pathname.startsWith("/members/") && pathname !== "/members/new"))) return true;
+                  if (basePath === "/savings" && pathname.startsWith("/savings")) return true;
+                  if (basePath === "/finance" && pathname.startsWith("/finance")) return true;
                   return pathname === basePath;
                 });
 
@@ -218,6 +226,10 @@ export default function SidebarItems() {
                             if (currentUrl === child.href) return true;
                             if (child.href === "/loans" && pathname === "/loans" && !queryStr) return true;
                             if (child.href === "/members" && pathname === "/members" && !queryStr) return true;
+                            if (child.href === "/savings" && pathname === "/savings" && !queryStr) return true;
+                            if (child.href === "/finance?tab=ledger" && pathname === "/finance" && (!queryStr || searchParams.get("tab") === "ledger")) return true;
+                            if (child.href === "/finance?tab=accounts" && pathname === "/finance" && searchParams.get("tab") === "accounts") return true;
+                            if (child.href === "/finance?tab=audit" && pathname === "/finance" && searchParams.get("tab") === "audit") return true;
                             return false;
                           })();
 

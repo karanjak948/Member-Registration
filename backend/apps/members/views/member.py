@@ -1,3 +1,4 @@
+from django.db.models import Q
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -34,10 +35,13 @@ class MemberViewSet(OrganizationScopedViewSet):
     def get_queryset(self):
         """
         Return only members belonging to the authenticated
-        user's organization.
+        user's organization with indexed search and filtering support.
 
-        This prevents cross-organization access even when
-        a user guesses another member's primary key.
+        Supports server-side filtering by:
+        - `search`: First name, other names, membership number, national ID, phone, email, or KRA PIN
+        - `status`: Member status (ACTIVE, INACTIVE, SUSPENDED)
+        - `stage`: Registration stage (DATA_CAPTURE_PENDING, APPROVED, REJECTED, ACTIVE)
+        - `category`: Member category ID
         """
 
         organization = self.get_organization()
@@ -45,7 +49,7 @@ class MemberViewSet(OrganizationScopedViewSet):
         if organization is None:
             return Member.objects.none()
 
-        return (
+        qs = (
             Member.objects
             .select_related(
                 "organization",
@@ -55,8 +59,37 @@ class MemberViewSet(OrganizationScopedViewSet):
             .filter(
                 organization=organization,
             )
-            .order_by("-created_at", "-id")
         )
+
+        # Server-side search for 1,000+ members
+        search = (self.request.query_params.get("search") or "").strip()
+        if search:
+            qs = qs.filter(
+                Q(first_name__icontains=search) |
+                Q(other_names__icontains=search) |
+                Q(membership_number__icontains=search) |
+                Q(national_id__icontains=search) |
+                Q(phone_number__icontains=search) |
+                Q(email__icontains=search) |
+                Q(kra_pin__icontains=search)
+            )
+
+        # Filter by status
+        member_status = (self.request.query_params.get("status") or "").strip()
+        if member_status:
+            qs = qs.filter(status=member_status)
+
+        # Filter by registration stage
+        stage = (self.request.query_params.get("stage") or "").strip()
+        if stage:
+            qs = qs.filter(registration_stage=stage)
+
+        # Filter by category
+        category = (self.request.query_params.get("category") or "").strip()
+        if category:
+            qs = qs.filter(category_id=category)
+
+        return qs.order_by("-created_at", "-id")
 
     def perform_create(self, serializer):
         """

@@ -17,6 +17,7 @@ import {
   Paper,
   InputAdornment,
   Chip,
+  Autocomplete,
 } from "@mui/material";
 import { LoadingButton } from "@mui/lab";
 import { Controller, FormProvider, useForm, useWatch } from "react-hook-form";
@@ -446,42 +447,176 @@ export default function ApplyLoanForm() {
                   name="member_id"
                   control={methods.control}
                   rules={{ validate: (v) => v > 0 || "Select a borrower member" }}
-                  render={({ field, fieldState }) => (
-                    <TextField
-                      select
-                      fullWidth
-                      value={field.value}
-                      onChange={(e) => field.onChange(Number(e.target.value))}
-                      error={!!fieldState.error}
-                      helperText={fieldState.error?.message}
-                      slotProps={{
-                        input: {
-                          startAdornment: (
-                            <InputAdornment position="start">
-                              <IconUser size={18} style={{ color: "#059669" }} />
-                            </InputAdornment>
-                          ),
-                          sx: {
-                            borderRadius: 2,
-                            fontWeight: 600,
-                            "& .MuiOutlinedInput-notchedOutline": { borderColor: "#cbd5e1" },
-                            "&:hover .MuiOutlinedInput-notchedOutline": { borderColor: "#059669" },
-                            "&.Mui-focused .MuiOutlinedInput-notchedOutline": { borderColor: "#059669", borderWidth: 2 },
-                          },
-                        },
-                      }}
-                    >
-                      <MenuItem value={0}>-- Select Member Applicant --</MenuItem>
-                      {members.map((member) => (
-                        <MenuItem key={member.id} value={member.id}>
-                          <Stack direction="row" spacing={1} alignItems="center">
-                            <span style={{ fontWeight: 800 }}>{member.first_name} {member.other_names}</span>
-                            <span style={{ color: "#64748b", fontFamily: "monospace", fontSize: "0.82rem" }}>({member.membership_number})</span>
-                          </Stack>
-                        </MenuItem>
-                      ))}
-                    </TextField>
-                  )}
+                  render={({ field, fieldState }) => {
+                    const currentMember = members.find((m) => m.id === Number(field.value)) || null;
+
+                    return (
+                      <Stack spacing={1.5}>
+                        <Autocomplete
+                          options={members}
+                          value={currentMember}
+                          onChange={(_, newValue) => {
+                            field.onChange(newValue ? newValue.id : 0);
+                          }}
+                          getOptionLabel={(option) =>
+                            `${option.first_name || ""} ${option.other_names || ""} (${option.membership_number || option.id})`
+                          }
+                          isOptionEqualToValue={(option, val) => option.id === val.id}
+                          filterOptions={(options, { inputValue }) => {
+                            const query = inputValue.toLowerCase().trim();
+                            if (!query) return options.slice(0, 80);
+                            return options
+                              .filter((m) => {
+                                const fullName = `${m.first_name || ""} ${m.other_names || ""}`.toLowerCase();
+                                const memNo = (m.membership_number || "").toLowerCase();
+                                const nationalId = (m.national_id || "").toLowerCase();
+                                const phone = (m.phone_number || "").toLowerCase();
+                                return (
+                                  fullName.includes(query) ||
+                                  memNo.includes(query) ||
+                                  nationalId.includes(query) ||
+                                  phone.includes(query)
+                                );
+                              })
+                              .slice(0, 80);
+                          }}
+                          renderInput={(params) => (
+                            <TextField
+                              {...params}
+                              fullWidth
+                              placeholder="Search 1,000+ members by name, RC-number, ID, phone..."
+                              error={!!fieldState.error}
+                              helperText={fieldState.error?.message || "Filter across 1,000+ registered SACCO members"}
+                              slotProps={{
+                                input: {
+                                  ...params.InputProps,
+                                  startAdornment: (
+                                    <>
+                                      <InputAdornment position="start">
+                                        <IconUser size={18} style={{ color: "#059669" }} />
+                                      </InputAdornment>
+                                      {params.InputProps.startAdornment}
+                                    </>
+                                  ),
+                                  sx: {
+                                    borderRadius: 2,
+                                    fontWeight: 600,
+                                    "& .MuiOutlinedInput-notchedOutline": { borderColor: "#cbd5e1" },
+                                    "&:hover .MuiOutlinedInput-notchedOutline": { borderColor: "#059669" },
+                                    "&.Mui-focused .MuiOutlinedInput-notchedOutline": { borderColor: "#059669", borderWidth: 2 },
+                                  },
+                                },
+                              }}
+                            />
+                          )}
+                          renderOption={(props, member) => {
+                            const { key, ...otherProps } = props as any;
+                            return (
+                              <li key={member.id} {...otherProps} style={{ padding: "8px 12px" }}>
+                                <Stack direction="row" spacing={1.5} alignItems="center" sx={{ width: "100%" }}>
+                                  <Box
+                                    sx={{
+                                      width: 34,
+                                      height: 34,
+                                      borderRadius: "50%",
+                                      bgcolor: "#ecfdf5",
+                                      color: "#059669",
+                                      display: "flex",
+                                      alignItems: "center",
+                                      justifyContent: "center",
+                                      fontWeight: 800,
+                                      fontSize: "0.8rem",
+                                      flexShrink: 0,
+                                    }}
+                                  >
+                                    {(member.first_name?.[0] || "M").toUpperCase()}
+                                  </Box>
+                                  <Box sx={{ flex: 1, minWidth: 0 }}>
+                                    <Typography variant="body2" fontWeight={800} sx={{ color: "#0f172a" }} noWrap>
+                                      {member.first_name} {member.other_names}
+                                    </Typography>
+                                    <Typography variant="caption" sx={{ color: "#64748b" }} noWrap display="block">
+                                      National ID: {member.national_id || "—"} • Phone: {member.phone_number || "—"}
+                                    </Typography>
+                                  </Box>
+                                  <Chip
+                                    size="small"
+                                    label={member.membership_number || `RC-${member.id}`}
+                                    sx={{
+                                      bgcolor: "#f1f5f9",
+                                      color: "#0f766e",
+                                      fontWeight: 800,
+                                      fontFamily: "monospace",
+                                      fontSize: "0.72rem",
+                                    }}
+                                  />
+                                </Stack>
+                              </li>
+                            );
+                          }}
+                        />
+
+                        {/* Selected Borrower Quick Badge */}
+                        {currentMember && (
+                          <Box
+                            sx={{
+                              p: 1.5,
+                              borderRadius: 2,
+                              bgcolor: "#f0fdf4",
+                              border: "1px solid #bbf7d0",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "space-between",
+                            }}
+                          >
+                            <Stack direction="row" spacing={1.5} alignItems="center">
+                              <Box
+                                sx={{
+                                  width: 28,
+                                  height: 28,
+                                  borderRadius: "50%",
+                                  bgcolor: "#059669",
+                                  color: "#ffffff",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  fontWeight: 900,
+                                  fontSize: "0.75rem",
+                                }}
+                              >
+                                ✓
+                              </Box>
+                              <Box>
+                                <Typography variant="caption" sx={{ color: "#166534", fontWeight: 800, textTransform: "uppercase" }}>
+                                  Verified SACCO Borrower
+                                </Typography>
+                                <Typography variant="body2" fontWeight={800} sx={{ color: "#0f172a" }}>
+                                  {currentMember.first_name} {currentMember.other_names}{" "}
+                                  <span style={{ color: "#059669", fontFamily: "monospace" }}>
+                                    ({currentMember.membership_number})
+                                  </span>
+                                </Typography>
+                              </Box>
+                            </Stack>
+                            <Button
+                              size="small"
+                              variant="text"
+                              onClick={() => field.onChange(0)}
+                              sx={{
+                                color: "#64748b",
+                                fontWeight: 700,
+                                textTransform: "none",
+                                fontSize: "0.75rem",
+                                "&:hover": { color: "#e11d48" },
+                              }}
+                            >
+                              Clear
+                            </Button>
+                          </Box>
+                        )}
+                      </Stack>
+                    );
+                  }}
                 />
               </Grid>
 
@@ -968,41 +1103,178 @@ export default function ApplyLoanForm() {
                     name="guarantor_member_id"
                     control={methods.control}
                     rules={{ required: "Please select an endorsing guarantor member." }}
-                    render={({ field, fieldState }) => (
-                      <TextField
-                        select
-                        fullWidth
-                        value={field.value ?? ""}
-                        onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : null)}
-                        error={!!fieldState.error}
-                        helperText={fieldState.error?.message}
-                        slotProps={{
-                          input: {
-                            startAdornment: (
-                              <InputAdornment position="start">
-                                <IconUser size={18} style={{ color: "#2563eb" }} />
-                              </InputAdornment>
-                            ),
-                            sx: {
-                              borderRadius: 2,
-                              fontWeight: 600,
-                              "& .MuiOutlinedInput-notchedOutline": { borderColor: "#cbd5e1" },
-                              "&:hover .MuiOutlinedInput-notchedOutline": { borderColor: "#2563eb" },
-                              "&.Mui-focused .MuiOutlinedInput-notchedOutline": { borderColor: "#2563eb", borderWidth: 2 },
-                            },
-                          },
-                        }}
-                      >
-                        <MenuItem value="">-- Select Endorsing Guarantor --</MenuItem>
-                        {members
-                          .filter((m) => m.id !== methods.getValues("member_id"))
-                          .map((member) => (
-                            <MenuItem key={member.id} value={member.id}>
-                              {member.first_name} {member.other_names} ({member.membership_number})
-                            </MenuItem>
-                          ))}
-                      </TextField>
-                    )}
+                    render={({ field, fieldState }) => {
+                      const selectedApplicantId = methods.watch("member_id");
+                      const eligibleGuarantors = members.filter((m) => m.id !== Number(selectedApplicantId));
+                      const currentGuarantor = eligibleGuarantors.find((m) => m.id === Number(field.value)) || null;
+
+                      return (
+                        <Stack spacing={1.5}>
+                          <Autocomplete
+                            options={eligibleGuarantors}
+                            value={currentGuarantor}
+                            onChange={(_, newValue) => {
+                              field.onChange(newValue ? newValue.id : null);
+                            }}
+                            getOptionLabel={(option) =>
+                              `${option.first_name || ""} ${option.other_names || ""} (${option.membership_number || option.id})`
+                            }
+                            isOptionEqualToValue={(option, val) => option.id === val.id}
+                            filterOptions={(options, { inputValue }) => {
+                              const query = inputValue.toLowerCase().trim();
+                              if (!query) return options.slice(0, 80);
+                              return options
+                                .filter((m) => {
+                                  const fullName = `${m.first_name || ""} ${m.other_names || ""}`.toLowerCase();
+                                  const memNo = (m.membership_number || "").toLowerCase();
+                                  const nationalId = (m.national_id || "").toLowerCase();
+                                  const phone = (m.phone_number || "").toLowerCase();
+                                  return (
+                                    fullName.includes(query) ||
+                                    memNo.includes(query) ||
+                                    nationalId.includes(query) ||
+                                    phone.includes(query)
+                                  );
+                                })
+                                .slice(0, 80);
+                            }}
+                            renderInput={(params) => (
+                              <TextField
+                                {...params}
+                                fullWidth
+                                placeholder="Search endorsing guarantor from 1,000+ members..."
+                                error={!!fieldState.error}
+                                helperText={fieldState.error?.message || "Search by name, RC-number, National ID, or phone"}
+                                slotProps={{
+                                  input: {
+                                    ...params.InputProps,
+                                    startAdornment: (
+                                      <>
+                                        <InputAdornment position="start">
+                                          <IconUser size={18} style={{ color: "#2563eb" }} />
+                                        </InputAdornment>
+                                        {params.InputProps.startAdornment}
+                                      </>
+                                    ),
+                                    sx: {
+                                      borderRadius: 2,
+                                      fontWeight: 600,
+                                      "& .MuiOutlinedInput-notchedOutline": { borderColor: "#cbd5e1" },
+                                      "&:hover .MuiOutlinedInput-notchedOutline": { borderColor: "#2563eb" },
+                                      "&.Mui-focused .MuiOutlinedInput-notchedOutline": { borderColor: "#2563eb", borderWidth: 2 },
+                                    },
+                                  },
+                                }}
+                              />
+                            )}
+                            renderOption={(props, member) => {
+                              const { key, ...otherProps } = props as any;
+                              return (
+                                <li key={member.id} {...otherProps} style={{ padding: "8px 12px" }}>
+                                  <Stack direction="row" spacing={1.5} alignItems="center" sx={{ width: "100%" }}>
+                                    <Box
+                                      sx={{
+                                        width: 34,
+                                        height: 34,
+                                        borderRadius: "50%",
+                                        bgcolor: "#eff6ff",
+                                        color: "#2563eb",
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                        fontWeight: 800,
+                                        fontSize: "0.8rem",
+                                        flexShrink: 0,
+                                      }}
+                                    >
+                                      {(member.first_name?.[0] || "G").toUpperCase()}
+                                    </Box>
+                                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                                      <Typography variant="body2" fontWeight={800} sx={{ color: "#0f172a" }} noWrap>
+                                        {member.first_name} {member.other_names}
+                                      </Typography>
+                                      <Typography variant="caption" sx={{ color: "#64748b" }} noWrap display="block">
+                                        National ID: {member.national_id || "—"} • Phone: {member.phone_number || "—"}
+                                      </Typography>
+                                    </Box>
+                                    <Chip
+                                      size="small"
+                                      label={member.membership_number || `RC-${member.id}`}
+                                      sx={{
+                                        bgcolor: "#f1f5f9",
+                                        color: "#1e40af",
+                                        fontWeight: 800,
+                                        fontFamily: "monospace",
+                                        fontSize: "0.72rem",
+                                      }}
+                                    />
+                                  </Stack>
+                                </li>
+                              );
+                            }}
+                          />
+
+                          {/* Selected Guarantor Quick Confirmation Badge */}
+                          {currentGuarantor && (
+                            <Box
+                              sx={{
+                                p: 1.5,
+                                borderRadius: 2,
+                                bgcolor: "#eff6ff",
+                                border: "1px solid #bfdbfe",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "space-between",
+                              }}
+                            >
+                              <Stack direction="row" spacing={1.5} alignItems="center">
+                                <Box
+                                  sx={{
+                                    width: 28,
+                                    height: 28,
+                                    borderRadius: "50%",
+                                    bgcolor: "#2563eb",
+                                    color: "#ffffff",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    fontWeight: 900,
+                                    fontSize: "0.75rem",
+                                  }}
+                                >
+                                  ✓
+                                </Box>
+                                <Box>
+                                  <Typography variant="caption" sx={{ color: "#1e40af", fontWeight: 800, textTransform: "uppercase" }}>
+                                    Verified SACCO Guarantor Endorser
+                                  </Typography>
+                                  <Typography variant="body2" fontWeight={800} sx={{ color: "#0f172a" }}>
+                                    {currentGuarantor.first_name} {currentGuarantor.other_names}{" "}
+                                    <span style={{ color: "#2563eb", fontFamily: "monospace" }}>
+                                      ({currentGuarantor.membership_number})
+                                    </span>
+                                  </Typography>
+                                </Box>
+                              </Stack>
+                              <Button
+                                size="small"
+                                variant="text"
+                                onClick={() => field.onChange(null)}
+                                sx={{
+                                  color: "#64748b",
+                                  fontWeight: 700,
+                                  textTransform: "none",
+                                  fontSize: "0.75rem",
+                                  "&:hover": { color: "#e11d48" },
+                                }}
+                              >
+                                Clear
+                              </Button>
+                            </Box>
+                          )}
+                        </Stack>
+                      );
+                    }}
                   />
                 </Grid>
               )}

@@ -37,6 +37,11 @@ urlpatterns = [
         include("apps.loans.urls"),
     ),
 
+    path(
+        "api/",
+        include("apps.savings.urls"),
+    ),
+
     # Always serve media uploads directly (logos, passport photos, documents)
     re_path(
         r"^media/(?P<path>.*)$",

@@ -25,7 +25,15 @@ import {
   IconButton,
   Tooltip,
   Collapse,
+  Button,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  MenuItem,
+  Alert,
 } from "@mui/material";
+import { useSearchParams } from "next/navigation";
 import PageContainer from "@/app/(DashboardLayout)/components/container/PageContainer";
 import api from "@/services/api";
 import {
@@ -41,6 +49,7 @@ import {
   IconArrowDownLeft,
   IconScale,
   IconBook2,
+  IconPlus,
 } from "@tabler/icons-react";
 
 interface LedgerEntry {
@@ -80,9 +89,73 @@ export default function FinancePage() {
   const [transactions, setTransactions] = useState<LedgerTransaction[]>([]);
   const [accounts, setAccounts] = useState<LedgerAccount[]>([]);
   const [loading, setLoading] = useState(true);
+  const searchParams = useSearchParams();
+  const tabParam = searchParams.get("tab");
   const [tabValue, setTabValue] = useState<number>(0);
+
+  useEffect(() => {
+    if (tabParam === "accounts") {
+      setTabValue(1);
+    } else if (tabParam === "audit") {
+      setTabValue(2);
+    } else if (tabParam === "ledger") {
+      setTabValue(0);
+    }
+  }, [tabParam]);
+
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedTxns, setExpandedTxns] = useState<Record<number, boolean>>({});
+
+  // Income Posting State
+  const [openIncomeModal, setOpenIncomeModal] = useState(false);
+  const [postingIncome, setPostingIncome] = useState(false);
+  const [postError, setPostError] = useState<string | null>(null);
+  const [postSuccess, setPostSuccess] = useState(false);
+  const [incomeForm, setIncomeForm] = useState({
+    account_id: "",
+    amount: "",
+    transaction_date: new Date().toISOString().split("T")[0],
+    reference_no: "",
+    reference_type: "INCOME",
+    description: "",
+  });
+
+  const handlePostIncome = async () => {
+    if (!incomeForm.account_id || !incomeForm.amount) {
+      setPostError("Please select a ledger account and enter an amount.");
+      return;
+    }
+    setPostingIncome(true);
+    setPostError(null);
+    try {
+      await api.post("/ledger-transactions/post-income/", {
+        account_id: Number(incomeForm.account_id),
+        amount: Number(incomeForm.amount),
+        transaction_date: incomeForm.transaction_date,
+        reference_no: incomeForm.reference_no,
+        reference_type: incomeForm.reference_type,
+        description: incomeForm.description,
+      });
+      setPostSuccess(true);
+      fetchData();
+      setTimeout(() => {
+        setOpenIncomeModal(false);
+        setPostSuccess(false);
+        setIncomeForm({
+          account_id: "",
+          amount: "",
+          transaction_date: new Date().toISOString().split("T")[0],
+          reference_no: "",
+          reference_type: "INCOME",
+          description: "",
+        });
+      }, 1000);
+    } catch (err: any) {
+      setPostError(err.response?.data?.error || "Failed to post income entry.");
+    } finally {
+      setPostingIncome(false);
+    }
+  };
 
   const fetchData = async () => {
     setLoading(true);
@@ -193,17 +266,39 @@ export default function FinancePage() {
               Real-time double-entry financial journals, chart of accounts, and SACCO liquidity tracking
             </Typography>
           </Box>
-          <IconButton
-            onClick={fetchData}
-            color="primary"
-            sx={{
-              border: "1px solid #e2e8f0",
-              bgcolor: "#ffffff",
-              "&:hover": { bgcolor: "#f8fafc" },
-            }}
-          >
-            <IconRefresh size={20} />
-          </IconButton>
+          <Stack direction="row" spacing={1.5} alignItems="center">
+            <Button
+              variant="contained"
+              startIcon={<IconPlus size={18} />}
+              onClick={() => {
+                setPostError(null);
+                setPostSuccess(false);
+                setOpenIncomeModal(true);
+              }}
+              sx={{
+                bgcolor: "#059669",
+                "&:hover": { bgcolor: "#047857" },
+                fontWeight: 700,
+                textTransform: "none",
+                borderRadius: 2,
+                px: 2,
+                boxShadow: "0 2px 8px rgba(5, 150, 105, 0.25)",
+              }}
+            >
+              Post Income / Transaction
+            </Button>
+            <IconButton
+              onClick={fetchData}
+              color="primary"
+              sx={{
+                border: "1px solid #e2e8f0",
+                bgcolor: "#ffffff",
+                "&:hover": { bgcolor: "#f8fafc" },
+              }}
+            >
+              <IconRefresh size={20} />
+            </IconButton>
+          </Stack>
         </Stack>
 
         {/* Executive Metric Cards */}
@@ -356,7 +451,14 @@ export default function FinancePage() {
             >
               <Tabs
                 value={tabValue}
-                onChange={(_, v) => setTabValue(v)}
+                onChange={(_, v) => {
+                  setTabValue(v);
+                  const tabNames = ["ledger", "accounts", "audit"];
+                  const newTab = tabNames[v] || "ledger";
+                  if (typeof window !== "undefined") {
+                    window.history.replaceState(null, "", `/finance?tab=${newTab}`);
+                  }
+                }}
                 sx={{
                   "& .MuiTab-root": {
                     fontWeight: 700,
@@ -367,21 +469,29 @@ export default function FinancePage() {
                 }}
               >
                 <Tab
+                  value={0}
                   icon={<IconReceipt2 size={18} />}
                   iconPosition="start"
-                  label={`General Journal (${filteredTransactions.length})`}
+                  label={`General Ledger (${filteredTransactions.length})`}
                 />
                 <Tab
+                  value={1}
                   icon={<IconBook2 size={18} />}
                   iconPosition="start"
-                  label={`Chart of Accounts (${accounts.length})`}
+                  label={`Ledger Accounts (${accounts.length})`}
+                />
+                <Tab
+                  value={2}
+                  icon={<IconSearch size={18} />}
+                  iconPosition="start"
+                  label={`Audit Log (${filteredTransactions.length})`}
                 />
               </Tabs>
 
-              {tabValue === 0 && (
+              {(tabValue === 0 || tabValue === 2) && (
                 <TextField
                   size="small"
-                  placeholder="Search journal entries..."
+                  placeholder={tabValue === 0 ? "Search journal entries..." : "Search audit logs..."}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   slotProps={{
@@ -568,8 +678,8 @@ export default function FinancePage() {
                   </Table>
                 </TableContainer>
               )
-            ) : (
-              /* TAB 2: Chart of Accounts */
+            ) : tabValue === 1 ? (
+              /* TAB 2: Chart of Accounts / Ledger Accounts */
               <TableContainer>
                 <Table>
                   <TableHead sx={{ bgcolor: "#f8fafc" }}>
@@ -618,9 +728,210 @@ export default function FinancePage() {
                   </TableBody>
                 </Table>
               </TableContainer>
+            ) : (
+              /* TAB 3: Audit Log */
+              <TableContainer>
+                <Table>
+                  <TableHead sx={{ bgcolor: "#f8fafc" }}>
+                    <TableRow>
+                      <TableCell sx={{ fontWeight: 700, color: "#475569" }}>Date &amp; Time</TableCell>
+                      <TableCell sx={{ fontWeight: 700, color: "#475569" }}>Transaction #</TableCell>
+                      <TableCell sx={{ fontWeight: 700, color: "#475569" }}>Event Type</TableCell>
+                      <TableCell sx={{ fontWeight: 700, color: "#475569" }}>Reference</TableCell>
+                      <TableCell sx={{ fontWeight: 700, color: "#475569" }}>Description / Narration</TableCell>
+                      <TableCell sx={{ fontWeight: 700, color: "#475569" }} align="right">
+                        Debit / Credit Total
+                      </TableCell>
+                      <TableCell sx={{ fontWeight: 700, color: "#475569" }} align="center">
+                        Integrity Audit
+                      </TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {filteredTransactions.map((tx) => {
+                      const totalAmt = (tx.entries || [])
+                        .filter((e) => e.entry_type === "debit")
+                        .reduce((acc, cur) => acc + Number(cur.amount || 0), 0);
+                      return (
+                        <TableRow key={`audit-${tx.id}`} hover>
+                          <TableCell sx={{ color: "#475569", whiteSpace: "nowrap" }}>
+                            {tx.created_at ? new Date(tx.created_at).toLocaleString("en-GB") : tx.transaction_date}
+                          </TableCell>
+                          <TableCell sx={{ fontWeight: 700, color: "#0f172a" }}>
+                            {tx.transaction_number}
+                          </TableCell>
+                          <TableCell>
+                            <Chip
+                              label={tx.reference_type}
+                              size="small"
+                              sx={{ bgcolor: "#eff6ff", color: "#1d4ed8", fontWeight: 700, fontSize: "0.72rem" }}
+                            />
+                          </TableCell>
+                          <TableCell sx={{ fontWeight: 600, color: "#0284c7" }}>
+                            {tx.reference_id || tx.loan_number || "-"}
+                          </TableCell>
+                          <TableCell sx={{ color: "#334155", maxWidth: 260 }}>
+                            <Typography variant="body2" noWrap>
+                              {tx.description}
+                            </Typography>
+                          </TableCell>
+                          <TableCell align="right" sx={{ fontWeight: 700, color: "#059669" }}>
+                            KES {totalAmt.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                          </TableCell>
+                          <TableCell align="center">
+                            <Chip
+                              label="VERIFIED"
+                              size="small"
+                              color="success"
+                              sx={{ fontWeight: 800, fontSize: "0.68rem" }}
+                            />
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </TableContainer>
             )}
           </CardContent>
         </Card>
+
+        {/* Post Income / Fee Entry Dialog */}
+        <Dialog
+          open={openIncomeModal}
+          onClose={() => !postingIncome && setOpenIncomeModal(false)}
+          maxWidth="sm"
+          fullWidth
+          PaperProps={{
+            sx: { borderRadius: 3, p: 1 },
+          }}
+        >
+          <DialogTitle sx={{ fontWeight: 800, color: "#0f172a", pb: 1 }}>
+            Post Income / Transaction to Ledger
+            <Typography variant="body2" color="text.secondary">
+              Direct entry to SACCO General Ledger with balanced double-entry accounting.
+            </Typography>
+          </DialogTitle>
+          <Divider />
+          <DialogContent sx={{ pt: 2.5 }}>
+            <Stack spacing={2.5}>
+              {postError && <Alert severity="error">{postError}</Alert>}
+              {postSuccess && <Alert severity="success">Transaction posted to General Ledger successfully!</Alert>}
+
+              <TextField
+                select
+                fullWidth
+                label="Target Ledger Account *"
+                value={incomeForm.account_id}
+                onChange={(e) => setIncomeForm({ ...incomeForm, account_id: e.target.value })}
+                helperText="Select the revenue or liability account to credit (Cash/Bank 1010 will be debited)"
+              >
+                {accounts
+                  .filter((a) => a.account_code !== "1010")
+                  .map((acc) => (
+                    <MenuItem key={acc.id} value={acc.id}>
+                      <Stack direction="row" spacing={1} alignItems="center">
+                        <Typography fontWeight={700} color="#059669">
+                          {acc.account_code}
+                        </Typography>
+                        <Typography fontWeight={600}>- {acc.account_name}</Typography>
+                        <Chip
+                          label={acc.account_type.toUpperCase()}
+                          size="small"
+                          sx={{ fontSize: "0.68rem", height: 20 }}
+                        />
+                      </Stack>
+                    </MenuItem>
+                  ))}
+              </TextField>
+
+              <TextField
+                fullWidth
+                type="number"
+                label="Amount (KES) *"
+                value={incomeForm.amount}
+                onChange={(e) => setIncomeForm({ ...incomeForm, amount: e.target.value })}
+                slotProps={{
+                  input: {
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <Typography fontWeight={700} color="text.secondary">
+                          KES
+                        </Typography>
+                      </InputAdornment>
+                    ),
+                  },
+                }}
+              />
+
+              <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+                <TextField
+                  fullWidth
+                  type="date"
+                  label="Transaction Date *"
+                  value={incomeForm.transaction_date}
+                  onChange={(e) => setIncomeForm({ ...incomeForm, transaction_date: e.target.value })}
+                  slotProps={{ inputLabel: { shrink: true } }}
+                />
+                <TextField
+                  select
+                  fullWidth
+                  label="Category / Ref Type"
+                  value={incomeForm.reference_type}
+                  onChange={(e) => setIncomeForm({ ...incomeForm, reference_type: e.target.value })}
+                >
+                  <MenuItem value="INCOME">General Income</MenuItem>
+                  <MenuItem value="FEE">Form / Processing Fee</MenuItem>
+                  <MenuItem value="DEPOSIT">Security Deposit</MenuItem>
+                  <MenuItem value="PENALTY">Penalty Collected</MenuItem>
+                  <MenuItem value="INTEREST">Interest Earned</MenuItem>
+                </TextField>
+              </Stack>
+
+              <TextField
+                fullWidth
+                label="Reference # / Receipt / M-Pesa Code"
+                placeholder="e.g. REC-89421 or QJH762512"
+                value={incomeForm.reference_no}
+                onChange={(e) => setIncomeForm({ ...incomeForm, reference_no: e.target.value })}
+              />
+
+              <TextField
+                fullWidth
+                multiline
+                rows={2}
+                label="Description / Narration"
+                placeholder="Brief description of the transaction..."
+                value={incomeForm.description}
+                onChange={(e) => setIncomeForm({ ...incomeForm, description: e.target.value })}
+              />
+            </Stack>
+          </DialogContent>
+          <DialogActions sx={{ px: 3, pb: 2.5 }}>
+            <Button
+              onClick={() => setOpenIncomeModal(false)}
+              disabled={postingIncome}
+              sx={{ color: "text.secondary", textTransform: "none", fontWeight: 600 }}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="contained"
+              onClick={handlePostIncome}
+              disabled={postingIncome || !incomeForm.account_id || !incomeForm.amount}
+              sx={{
+                bgcolor: "#059669",
+                "&:hover": { bgcolor: "#047857" },
+                textTransform: "none",
+                fontWeight: 700,
+                borderRadius: 2,
+                px: 3,
+              }}
+            >
+              {postingIncome ? "Posting..." : "Post to General Ledger"}
+            </Button>
+          </DialogActions>
+        </Dialog>
       </Box>
     </PageContainer>
   );

@@ -48,6 +48,9 @@ import { useLoans } from "@/hooks/useLoans";
 import { usePermissions } from "@/hooks/usePermissions";
 import { PERMISSIONS } from "@/constants/permissions";
 import loanService from "@/services/loan.service";
+import LoanApprovalDialog from "@/components/loans/dialogs/LoanApprovalDialog";
+import LoanDisbursementDialog from "@/components/loans/dialogs/LoanDisbursementDialog";
+import LoanDetailsModal from "@/components/loans/dialogs/LoanDetailsModal";
 
 const statusConfig: Record<
   string,
@@ -258,35 +261,85 @@ function LoansContent() {
 
   const handleViewLoan = (loan: any) => {
     const identifier = loan.id;
-    router.push(`/loans/${identifier}`);
+    setSelectedLoanIdForDetails(identifier);
+    setDetailsModalOpen(true);
   };
 
-  const handleQuickApprove = async (loanId: number) => {
+  const [selectedLoanForApproval, setSelectedLoanForApproval] = useState<any>(null);
+  const [approvalDialogOpen, setApprovalDialogOpen] = useState(false);
+  const [selectedLoanForDisbursement, setSelectedLoanForDisbursement] = useState<any>(null);
+  const [disbursementDialogOpen, setDisbursementDialogOpen] = useState(false);
+  const [selectedLoanIdForDetails, setSelectedLoanIdForDetails] = useState<number | null>(null);
+  const [detailsModalOpen, setDetailsModalOpen] = useState(false);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [snackbar, setSnackbar] = useState<{
+    open: boolean;
+    message: string;
+    severity: "success" | "error" | "info";
+  }>({
+    open: false,
+    message: "",
+    severity: "info",
+  });
+
+  const handleConfirmApproval = async (data: {
+    approved_amount: number;
+    approval_date: string;
+    notes: string;
+  }) => {
+    if (!selectedLoanForApproval) return;
     try {
-      await fetch(`/api/loans/${loanId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "approved" }),
+      setActionLoading(true);
+      await loanService.approve(selectedLoanForApproval.id, data);
+      setApprovalDialogOpen(false);
+      setSelectedLoanForApproval(null);
+      setSnackbar({
+        open: true,
+        message: "Loan facility successfully approved by credit committee!",
+        severity: "success",
       });
       refresh();
-    } catch (err) {
+    } catch (err: any) {
       console.error("Failed to approve loan:", err);
+      setSnackbar({
+        open: true,
+        message: err.response?.data?.error || err.response?.data?.detail || "Failed to approve loan.",
+        severity: "error",
+      });
+    } finally {
+      setActionLoading(false);
     }
   };
 
-  const handleQuickDisburse = async (loanId: number) => {
+  const handleConfirmDisbursement = async (data: {
+    disbursed_amount: number;
+    disbursement_date: string;
+    disbursement_method: string;
+    disbursement_bank: string;
+    disbursement_reference: string;
+    disbursement_notes: string;
+  }) => {
+    if (!selectedLoanForDisbursement) return;
     try {
-      await fetch(`/api/loans/${loanId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          status: "active",
-          disbursement_date: new Date().toISOString().split("T")[0],
-        }),
+      setActionLoading(true);
+      await loanService.disburse(selectedLoanForDisbursement.id, data);
+      setDisbursementDialogOpen(false);
+      setSelectedLoanForDisbursement(null);
+      setSnackbar({
+        open: true,
+        message: "Loan facility successfully disbursed! Amortization schedule and ledger entries generated.",
+        severity: "success",
       });
       refresh();
-    } catch (err) {
+    } catch (err: any) {
       console.error("Failed to disburse loan:", err);
+      setSnackbar({
+        open: true,
+        message: err.response?.data?.error || err.response?.data?.detail || "Failed to disburse loan.",
+        severity: "error",
+      });
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -722,6 +775,7 @@ function LoansContent() {
                   <TableCell sx={{ fontWeight: 800, color: "#1e293b", py: 2 }}>Product Tier</TableCell>
                   <TableCell sx={{ fontWeight: 800, color: "#1e293b", py: 2 }}>Principal Amount</TableCell>
                   <TableCell sx={{ fontWeight: 800, color: "#1e293b", py: 2 }}>Outstanding Balance</TableCell>
+                  <TableCell sx={{ fontWeight: 800, color: "#1e293b", py: 2 }}>Repayments</TableCell>
                   <TableCell sx={{ fontWeight: 800, color: "#1e293b", py: 2 }}>Application Date</TableCell>
                   <TableCell sx={{ fontWeight: 800, color: "#1e293b", py: 2 }}>Status</TableCell>
                   <TableCell sx={{ fontWeight: 800, color: "#1e293b", py: 2, textAlign: "center" }}>
@@ -732,7 +786,7 @@ function LoansContent() {
               <TableBody>
                 {filteredLoans.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={9} align="center" sx={{ py: 8 }}>
+                    <TableCell colSpan={10} align="center" sx={{ py: 8 }}>
                       <Box display="flex" flexDirection="column" alignItems="center" justifyContent="center">
                         <IconCoins size={44} color="#94a3b8" />
                         <Typography variant="h6" fontWeight={700} sx={{ color: "#475569", mt: 1.5 }}>
@@ -818,6 +872,48 @@ function LoansContent() {
                           </Typography>
                         </TableCell>
 
+                        <TableCell>
+                          <Stack spacing={0.4} alignItems="flex-start">
+                            <Chip
+                              size="small"
+                              icon={
+                                <IconReceipt
+                                  size={13}
+                                  style={{
+                                    color:
+                                      Number(loan.repayments_count || 0) > 0
+                                        ? "#047857"
+                                        : "#64748b",
+                                  }}
+                                />
+                              }
+                              label={
+                                loan.repayments_count !== undefined && loan.repayments_count !== null
+                                  ? `${loan.repayments_count} of ${loan.num_periods || 0} Paid`
+                                  : `${loan.num_periods || 0} Installments`
+                              }
+                              sx={{
+                                fontWeight: 800,
+                                fontSize: "0.74rem",
+                                bgcolor: Number(loan.repayments_count || 0) > 0 ? "#ecfdf5" : "#f1f5f9",
+                                color: Number(loan.repayments_count || 0) > 0 ? "#047857" : "#475569",
+                                border: `1px solid ${Number(loan.repayments_count || 0) > 0 ? "#a7f3d0" : "#cbd5e1"}`,
+                              }}
+                            />
+                            <Typography
+                              variant="caption"
+                              sx={{
+                                color: "#64748b",
+                                fontWeight: 700,
+                                fontSize: "0.7rem",
+                                pl: 0.5,
+                              }}
+                            >
+                              {loan.num_periods ? `${loan.num_periods} ${loan.repayment_frequency || "installments"}` : "—"}
+                            </Typography>
+                          </Stack>
+                        </TableCell>
+
                         <TableCell sx={{ color: "#475569", fontWeight: 600 }}>
                           {formatDate(loan.application_date)}
                         </TableCell>
@@ -843,7 +939,10 @@ function LoansContent() {
                                 size="small"
                                 variant="contained"
                                 startIcon={<IconCheck size={14} />}
-                                onClick={() => handleQuickApprove(loan.id)}
+                                onClick={() => {
+                                  setSelectedLoanForApproval(loan);
+                                  setApprovalDialogOpen(true);
+                                }}
                                 sx={{
                                   bgcolor: "#059669",
                                   color: "#ffffff",
@@ -866,7 +965,10 @@ function LoansContent() {
                                 size="small"
                                 variant="contained"
                                 startIcon={<IconCash size={14} />}
-                                onClick={() => handleQuickDisburse(loan.id)}
+                                onClick={() => {
+                                  setSelectedLoanForDisbursement(loan);
+                                  setDisbursementDialogOpen(true);
+                                }}
                                 sx={{
                                   bgcolor: "#0d9488",
                                   color: "#ffffff",
@@ -888,18 +990,41 @@ function LoansContent() {
                               size="small"
                               variant="outlined"
                               startIcon={<IconEye size={14} />}
-                              onClick={() => handleViewLoan(loan)}
+                              onClick={() => {
+                                setSelectedLoanIdForDetails(loan.id);
+                                setDetailsModalOpen(true);
+                              }}
                               sx={{
-                                color: "#0f766e",
-                                borderColor: "#99f6e4",
-                                bgcolor: "#f0fdfa",
+                                color: "#2563eb",
+                                borderColor: "#bfdbfe",
+                                bgcolor: "#eff6ff",
                                 fontWeight: 800,
                                 textTransform: "none",
                                 borderRadius: 2,
                                 fontSize: "0.76rem",
                                 py: 0.4,
                                 px: 1.2,
-                                "&:hover": { bgcolor: "#ccfbf1", borderColor: "#0d9488" },
+                                "&:hover": { bgcolor: "#dbeafe", borderColor: "#3b82f6" },
+                              }}
+                            >
+                              View Details
+                            </Button>
+
+                            <Button
+                              size="small"
+                              variant="outlined"
+                              onClick={() => router.push(`/loans/${loan.id}`)}
+                              sx={{
+                                color: "#64748b",
+                                borderColor: "#cbd5e1",
+                                bgcolor: "#f8fafc",
+                                fontWeight: 700,
+                                textTransform: "none",
+                                borderRadius: 2,
+                                fontSize: "0.76rem",
+                                py: 0.4,
+                                px: 1,
+                                "&:hover": { bgcolor: "#f1f5f9", borderColor: "#94a3b8" },
                               }}
                             >
                               Dossier
@@ -933,9 +1058,63 @@ function LoansContent() {
           </Alert>
         </Snackbar>
       )}
-    </Container>
-  );
-}
+
+        {/* Approval Dialog */}
+        <LoanApprovalDialog
+          open={approvalDialogOpen}
+          loan={selectedLoanForApproval}
+          loading={actionLoading}
+          onClose={() => {
+            setApprovalDialogOpen(false);
+            setSelectedLoanForApproval(null);
+          }}
+          onConfirm={handleConfirmApproval}
+        />
+
+        {/* Disbursement Dialog */}
+        <LoanDisbursementDialog
+          open={disbursementDialogOpen}
+          loan={selectedLoanForDisbursement}
+          loading={actionLoading}
+          onClose={() => {
+            setDisbursementDialogOpen(false);
+            setSelectedLoanForDisbursement(null);
+          }}
+          onConfirm={handleConfirmDisbursement}
+        />
+
+        {/* Tabbed Loan Details Modal */}
+        <LoanDetailsModal
+          open={detailsModalOpen}
+          loanId={selectedLoanIdForDetails}
+          onClose={() => {
+            setDetailsModalOpen(false);
+            setSelectedLoanIdForDetails(null);
+          }}
+          onOpenDossier={(id) => {
+            setDetailsModalOpen(false);
+            router.push(`/loans/${id}`);
+          }}
+        />
+
+        {/* Global Action Feedback Notification */}
+        <Snackbar
+          open={snackbar.open}
+          autoHideDuration={6000}
+          onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))}
+          anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+        >
+          <Alert
+            onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))}
+            severity={snackbar.severity}
+            sx={{ width: "100%", boxShadow: 3, borderRadius: 2 }}
+          >
+            {snackbar.message}
+          </Alert>
+        </Snackbar>
+      </Container>
+    );
+  }
 
 export default function LoansPage() {
   return (

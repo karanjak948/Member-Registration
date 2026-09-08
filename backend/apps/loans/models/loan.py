@@ -88,6 +88,10 @@ class Loan(AuditModel):
     appraised_at = models.DateTimeField(null=True, blank=True)
 
     approval_notes = models.TextField(blank=True, null=True)
+    approved_amount = models.DecimalField(
+        max_digits=15, decimal_places=2, null=True, blank=True
+    )
+    approval_date = models.DateField(null=True, blank=True)
     approved_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
@@ -97,6 +101,17 @@ class Loan(AuditModel):
     )
     approved_at = models.DateTimeField(null=True, blank=True)
 
+    disbursed_amount = models.DecimalField(
+        max_digits=15, decimal_places=2, null=True, blank=True
+    )
+    disbursement_method = models.CharField(
+        max_length=50, blank=True, null=True, help_text="BANK | MPESA | CHEQUE | CASH"
+    )
+    disbursement_bank = models.CharField(max_length=100, blank=True, null=True)
+    disbursement_reference = models.CharField(
+        max_length=100, blank=True, null=True, help_text="Cheque / M-Pesa / Bank Reference No."
+    )
+    disbursement_notes = models.TextField(blank=True, null=True)
     disbursed_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
@@ -104,6 +119,7 @@ class Loan(AuditModel):
         blank=True,
         related_name="disbursed_loans",
     )
+    disbursed_at = models.DateTimeField(null=True, blank=True)
 
     rejection_reason = models.TextField(blank=True, null=True)
     rejected_by = models.ForeignKey(

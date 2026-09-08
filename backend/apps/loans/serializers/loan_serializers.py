@@ -103,6 +103,7 @@ class LoanListSerializer(serializers.ModelSerializer):
     member_phone = serializers.CharField(source="member.phone_number", read_only=True)
     product_name = serializers.CharField(source="loan_product.product_name", read_only=True)
     product_code = serializers.CharField(source="loan_product.product_code", read_only=True)
+    repayments_count = serializers.SerializerMethodField()
 
     class Meta:
         model = Loan
@@ -120,6 +121,7 @@ class LoanListSerializer(serializers.ModelSerializer):
             "product_code",
             "principal_amount",
             "num_periods",
+            "repayments_count",
             "interest_rate",
             "interest_method",
             "repayment_frequency",
@@ -130,7 +132,12 @@ class LoanListSerializer(serializers.ModelSerializer):
             "penalty_balance",
             "fees_balance",
             "application_date",
+            "approved_amount",
+            "approval_date",
+            "disbursed_amount",
             "disbursement_date",
+            "disbursement_method",
+            "disbursement_reference",
             "maturity_date",
             "days_overdue",
             "last_payment_date",
@@ -140,12 +147,16 @@ class LoanListSerializer(serializers.ModelSerializer):
     def get_member_name(self, obj):
         return f"{obj.member.first_name} {obj.member.other_names}".strip()
 
+    def get_repayments_count(self, obj):
+        return obj.repayments.count()
+
 
 class LoanDetailSerializer(serializers.ModelSerializer):
     member_id = serializers.IntegerField(source="member.id", read_only=True)
     loan_product_id = serializers.IntegerField(source="loan_product.id", read_only=True)
     guarantor_member_id = serializers.SerializerMethodField()
     member_name = serializers.SerializerMethodField()
+    repayments_count = serializers.SerializerMethodField()
     membership_number = serializers.CharField(source="member.membership_number", read_only=True)
     member_phone = serializers.CharField(source="member.phone_number", read_only=True)
     member_national_id = serializers.CharField(source="member.national_id", read_only=True)
@@ -176,9 +187,18 @@ class LoanDetailSerializer(serializers.ModelSerializer):
             "security_provided_notes",
             "deposit_paid_amount",
             "application_date",
+            "approved_amount",
+            "approval_date",
+            "disbursed_amount",
             "disbursement_date",
+            "disbursement_method",
+            "disbursement_bank",
+            "disbursement_reference",
+            "disbursement_notes",
+            "disbursed_at",
             "maturity_date",
             "num_periods",
+            "repayments_count",
             "interest_rate",
             "interest_method",
             "repayment_frequency",
@@ -206,6 +226,9 @@ class LoanDetailSerializer(serializers.ModelSerializer):
 
     def get_member_name(self, obj):
         return f"{obj.member.first_name} {obj.member.other_names}".strip()
+
+    def get_repayments_count(self, obj):
+        return obj.repayments.count()
 
     def get_guarantor_member_id(self, obj):
         first_g = obj.guarantors.first()

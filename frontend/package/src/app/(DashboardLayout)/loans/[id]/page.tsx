@@ -56,6 +56,8 @@ import {
   IconUserCheck,
 } from "@tabler/icons-react";
 import loanService from "@/services/loan.service";
+import LoanApprovalDialog from "@/components/loans/dialogs/LoanApprovalDialog";
+import LoanDisbursementDialog from "@/components/loans/dialogs/LoanDisbursementDialog";
 import memberService from "@/services/member.service";
 import guarantorService from "@/services/guarantor.service";
 import nextOfKinService from "@/services/nextOfKin.service";
@@ -370,11 +372,15 @@ export default function LoanDetailPage() {
     }
   };
 
-  const handleApprove = async () => {
+  const handleApprove = async (data: {
+    approved_amount: number;
+    approval_date: string;
+    notes: string;
+  }) => {
     if (!loan) return;
     try {
       setActionLoading(true);
-      const updated = await loanService.approve(loan.id, approvalNotes);
+      const updated = await loanService.approve(loan.id, data);
       setLoan(updated);
       setApproveDialogOpen(false);
       setSnackbar({
@@ -425,11 +431,18 @@ export default function LoanDetailPage() {
     }
   };
 
-  const handleDisburse = async () => {
+  const handleDisburse = async (data: {
+    disbursed_amount: number;
+    disbursement_date: string;
+    disbursement_method: string;
+    disbursement_bank: string;
+    disbursement_reference: string;
+    disbursement_notes: string;
+  }) => {
     if (!loan) return;
     try {
       setActionLoading(true);
-      const updated = await loanService.disburse(loan.id, disbursementDate);
+      const updated = await loanService.disburse(loan.id, data);
       setLoan(updated);
       setDisburseDialogOpen(false);
       setSnackbar({
@@ -1425,6 +1438,7 @@ export default function LoanDetailPage() {
                   <TableRow sx={{ "& th": { bgcolor: "#f8fafc", fontWeight: 800, color: "#334155", py: 1.5 } }}>
                     <TableCell>#</TableCell>
                     <TableCell>Due Date</TableCell>
+                    <TableCell align="right">Opening</TableCell>
                     <TableCell align="right">Principal</TableCell>
                     <TableCell align="right">Interest</TableCell>
                     <TableCell align="right">Total Due</TableCell>
@@ -1448,6 +1462,9 @@ export default function LoanDetailPage() {
                       >
                         <TableCell sx={{ fontWeight: 800, color: "#475569" }}>{entry.period_number}</TableCell>
                         <TableCell sx={{ fontWeight: 700, color: "#1e293b" }}>{formatDate(entry.due_date)}</TableCell>
+                        <TableCell align="right" sx={{ fontFamily: "monospace", color: "#64748b" }}>
+                          {formatCurrency(entry.opening_balance)}
+                        </TableCell>
                         <TableCell align="right" sx={{ fontFamily: "monospace", fontWeight: 700 }}>
                           {formatCurrency(entry.expected_principal)}
                         </TableCell>
@@ -2101,46 +2118,13 @@ export default function LoanDetailPage() {
       </Dialog>
 
       {/* Approval Modal Dialog */}
-      <Dialog
+      <LoanApprovalDialog
         open={approveDialogOpen}
-        onClose={() => !actionLoading && setApproveDialogOpen(false)}
-        maxWidth="sm"
-        fullWidth
-        PaperProps={{ sx: { borderRadius: 3.5, p: 1 } }}
-      >
-        <DialogTitle sx={{ fontWeight: 900, color: "#059669" }}>
-          Approve Loan Facility
-        </DialogTitle>
-        <DialogContent>
-          <DialogContentText sx={{ color: "#475569", mb: 2 }}>
-            Grant formal credit committee approval for loan <strong>{loan.loan_number}</strong> of <strong>{formatCurrency(loan.principal_amount)}</strong>.
-          </DialogContentText>
-          <TextField
-            fullWidth
-            multiline
-            rows={3}
-            label="Approval Committee Notes (Optional)"
-            placeholder="e.g. Approved per Credit Committee Resolution #24..."
-            value={approvalNotes}
-            onChange={(e) => setApprovalNotes(e.target.value)}
-            disabled={actionLoading}
-            sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
-          />
-        </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2.5 }}>
-          <Button onClick={() => setApproveDialogOpen(false)} disabled={actionLoading} sx={{ fontWeight: 700 }}>
-            Cancel
-          </Button>
-          <Button
-            variant="contained"
-            disabled={actionLoading}
-            onClick={handleApprove}
-            sx={{ bgcolor: "#059669", color: "#ffffff", fontWeight: 800, borderRadius: 2, "&:hover": { bgcolor: "#047857" } }}
-          >
-            {actionLoading ? "Approving..." : "Confirm Approval"}
-          </Button>
-        </DialogActions>
-      </Dialog>
+        loan={loan}
+        loading={actionLoading}
+        onClose={() => setApproveDialogOpen(false)}
+        onConfirm={handleApprove}
+      />
 
       {/* Rejection Modal Dialog */}
       <Dialog
@@ -2186,55 +2170,13 @@ export default function LoanDetailPage() {
       </Dialog>
 
       {/* Disbursement Modal Dialog */}
-      <Dialog
+      <LoanDisbursementDialog
         open={disburseDialogOpen}
-        onClose={() => !actionLoading && setDisburseDialogOpen(false)}
-        maxWidth="sm"
-        fullWidth
-        PaperProps={{ sx: { borderRadius: 3.5, p: 1 } }}
-      >
-        <DialogTitle sx={{ fontWeight: 900, color: "#0d9488" }}>
-          Disburse &amp; Activate Loan Facility
-        </DialogTitle>
-        <DialogContent>
-          <DialogContentText sx={{ color: "#475569", mb: 2.5 }}>
-            Disbursing loan <strong>{loan.loan_number}</strong> will:
-            <br />• Generate the official periodic <strong>Amortization Schedule</strong>.
-            <br />• Post the double-entry <strong>Disbursement Journal</strong> in the General Ledger.
-            <br />• Transition status to <strong>Active Credit Facility</strong>.
-          </DialogContentText>
-          <TextField
-            fullWidth
-            required
-            type="date"
-            label="Disbursement Date *"
-            value={disbursementDate}
-            onChange={(e) => setDisbursementDate(e.target.value)}
-            disabled={actionLoading}
-            slotProps={{ inputLabel: { shrink: true } }}
-            sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
-          />
-        </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2.5 }}>
-          <Button onClick={() => setDisburseDialogOpen(false)} disabled={actionLoading} sx={{ fontWeight: 700 }}>
-            Cancel
-          </Button>
-          <Button
-            variant="contained"
-            disabled={actionLoading || !disbursementDate}
-            onClick={handleDisburse}
-            sx={{
-              background: "linear-gradient(135deg, #0d9488 0%, #0f766e 100%)",
-              color: "#ffffff",
-              fontWeight: 800,
-              borderRadius: 2,
-              px: 3,
-            }}
-          >
-            {actionLoading ? "Processing Disbursement..." : "Confirm & Disburse Loan"}
-          </Button>
-        </DialogActions>
-      </Dialog>
+        loan={loan}
+        loading={actionLoading}
+        onClose={() => setDisburseDialogOpen(false)}
+        onConfirm={handleDisburse}
+      />
 
       {/* Confirmation Modal for Delete Loan */}
       <Dialog
