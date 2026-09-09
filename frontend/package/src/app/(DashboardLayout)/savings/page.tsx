@@ -942,12 +942,6 @@ export default function SavingsPaymentsPage() {
                     <Typography variant="caption" fontWeight={700} color="#059669" display="block" letterSpacing={0.5}>
                       SAVINGS &amp; CREDIT CO-OPERATIVE SOCIETY &bull; EMPOWERING MEMBERS, BUILDING FUTURES
                     </Typography>
-                    <Typography variant="caption" color="text.secondary" display="block" mt={0.5}>
-                      Registered under the Co-operative Societies Act &bull; P.O. Box 45678-00100, Nairobi, Kenya
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary" display="block">
-                      Head Office: SACCO Plaza, Upper Hill &bull; Tel: +254 700 000 000 &bull; Email: info@royalsacco.co.ke &bull; KRA PIN: P051234567Z
-                    </Typography>
                   </Box>
 
                   {/* Voucher Badge Strip */}

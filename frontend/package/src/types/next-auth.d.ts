@@ -32,6 +32,8 @@ declare module "next-auth" {
 
       isStaff: boolean;
       isSuperuser: boolean;
+      isOwner?: boolean;
+      isAdmin?: boolean;
 
       organization: OrganizationInfo | null;
 
@@ -52,6 +54,8 @@ declare module "next-auth" {
 
     isStaff: boolean;
     isSuperuser: boolean;
+    isOwner?: boolean;
+    isAdmin?: boolean;
 
     organization: OrganizationInfo | null;
 
@@ -79,6 +83,8 @@ declare module "next-auth/jwt" {
 
     isStaff: boolean;
     isSuperuser: boolean;
+    isOwner?: boolean;
+    isAdmin?: boolean;
 
     organization: OrganizationInfo | null;
 

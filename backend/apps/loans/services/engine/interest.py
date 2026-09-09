@@ -100,9 +100,10 @@ def calculate_reducing_balance_schedule(
     repayment_frequency: Literal["daily", "weekly", "monthly", "yearly"] = "monthly",
 ) -> list[ReducingBalanceRow]:
     """
-    Reducing balance with equal installments (French Amortization).
-    PMT = P * [ r*(1+r)^n ] / [ (1+r)^n - 1 ]
-    where r is the effective rate per repayment period.
+    Reducing balance with equal principal payments (SACCO Straight-Line Amortization).
+    Each period pays equal principal: Principal / n, plus interest accrued on the remaining balance:
+    Interest = Remaining_Balance * r_per.
+    Total interest across n periods = Principal * r_per * (n + 1) / 2.
     """
     P = _to_d(principal)
     r_pct = _to_d(interest_rate_pct)
@@ -120,11 +121,7 @@ def calculate_reducing_balance_schedule(
     freq_py = _to_d(PERIODS_PER_YEAR[repayment_frequency])
     r_per = annual_rate / freq_py
 
-    if r_per == Decimal("0"):
-        installment = round2(P / _to_d(n))
-    else:
-        factor = (Decimal("1") + r_per) ** n
-        installment = round2(P * (r_per * factor) / (factor - Decimal("1")))
+    principal_per_period = round2(P / _to_d(n))
 
     schedule: list[ReducingBalanceRow] = []
     balance = P
@@ -134,17 +131,15 @@ def calculate_reducing_balance_schedule(
 
         if period == n:
             principal_comp = balance
-            actual_installment = round2(principal_comp + interest_charge)
             closing_balance = Decimal("0.00")
         else:
-            principal_comp = round2(installment - interest_charge)
+            principal_comp = principal_per_period
             closing_balance = round2(balance - principal_comp)
-            actual_installment = installment
-
             if closing_balance < Decimal("0"):
                 principal_comp = balance
                 closing_balance = Decimal("0.00")
-                actual_installment = round2(principal_comp + interest_charge)
+
+        actual_installment = round2(principal_comp + interest_charge)
 
         schedule.append(
             ReducingBalanceRow(

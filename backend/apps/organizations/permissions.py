@@ -142,3 +142,56 @@ class IsOrganizationMember(BasePermission):
             )
             is not None
         )
+
+
+def is_admin_or_owner_user(user) -> bool:
+    """
+    Check whether a user is an Organization Owner, Superuser, Staff,
+    or holds an administrative role (e.g. Owner, Administrator, Admin).
+    """
+    if not (user and user.is_authenticated):
+        return False
+
+    # 1. Django superuser or staff
+    if getattr(user, "is_superuser", False) or getattr(user, "is_staff", False):
+        return True
+
+    # 2. Direct organization owner
+    if hasattr(user, "owned_organization"):
+        try:
+            if user.owned_organization:
+                return True
+        except Exception:
+            pass
+
+    from .models import Organization, OrganizationUser
+    if Organization.objects.filter(owner=user).exists():
+        return True
+
+    # 3. Active role assignment
+    membership = (
+        OrganizationUser.objects
+        .select_related("role")
+        .filter(user=user, is_active=True)
+        .first()
+    )
+    if membership and membership.role:
+        role_name = (membership.role.name or "").lower()
+        if (
+            getattr(membership.role, "is_system_role", False)
+            or any(adm in role_name for adm in ["admin", "owner", "super", "system administrator", "director", "manager"])
+        ):
+            return True
+
+    return False
+
+
+class IsAdminOrOwner(BasePermission):
+    """
+    DRF permission class restricting destructive/administrative actions
+    strictly to organization owners, superusers, and administrators.
+    """
+    message = "Access denied: Only organization owners and administrators have permission to perform this action."
+
+    def has_permission(self, request, view):
+        return is_admin_or_owner_user(request.user)

@@ -26,6 +26,10 @@ import {
   Tooltip,
   InputAdornment,
   IconButton,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
 } from "@mui/material";
 import PageContainer from "@/app/(DashboardLayout)/components/container/PageContainer";
 import {
@@ -44,10 +48,12 @@ import {
   IconSearch,
   IconTag,
   IconCoins,
+  IconTrash,
 } from "@tabler/icons-react";
 import api from "@/services/api";
 import memberService from "@/services/member.service";
 import loanService from "@/services/loan.service";
+import { usePermissions } from "@/hooks/usePermissions";
 import { Member } from "@/interfaces/member";
 
 interface SMSLogItem {
@@ -102,6 +108,7 @@ const TEMPLATE_PRESETS = [
 ];
 
 export default function SMSPage() {
+  const { isAdmin } = usePermissions();
   const [recipientType, setRecipientType] = useState("all");
   const [customPhone, setCustomPhone] = useState("");
   const [message, setMessage] = useState("");
@@ -117,6 +124,68 @@ export default function SMSPage() {
     message: "",
     severity: "success" as "success" | "error" | "info",
   });
+
+  // SMS Deletion State
+  const [deleteLogDialog, setDeleteLogDialog] = useState<{
+    open: boolean;
+    log: SMSLogItem | null;
+    deleting: boolean;
+  }>({
+    open: false,
+    log: null,
+    deleting: false,
+  });
+
+  const [clearAllDialog, setClearAllDialog] = useState<{
+    open: boolean;
+    clearing: boolean;
+  }>({
+    open: false,
+    clearing: false,
+  });
+
+  const handleDeleteLog = async () => {
+    if (!deleteLogDialog.log) return;
+    setDeleteLogDialog((prev) => ({ ...prev, deleting: true }));
+    try {
+      await loanService.deleteSMSLog(deleteLogDialog.log.id);
+      setToast({
+        open: true,
+        message: `SMS log for ${deleteLogDialog.log.phone_number} deleted successfully.`,
+        severity: "success",
+      });
+      setDeleteLogDialog({ open: false, log: null, deleting: false });
+      fetchLogs();
+    } catch (err: any) {
+      setToast({
+        open: true,
+        message: err.response?.data?.error || "Failed to delete SMS log.",
+        severity: "error",
+      });
+      setDeleteLogDialog((prev) => ({ ...prev, deleting: false }));
+    }
+  };
+
+  const handleClearAllLogs = async () => {
+    setClearAllDialog((prev) => ({ ...prev, clearing: true }));
+    try {
+      const res = await loanService.clearAllSMSLogs();
+      setToast({
+        open: true,
+        message: res?.message || "All SMS logs cleared successfully.",
+        severity: "success",
+      });
+      setClearAllDialog({ open: false, clearing: false });
+      fetchLogs();
+    } catch (err: any) {
+      setToast({
+        open: true,
+        message: err.response?.data?.error || "Failed to clear SMS logs.",
+        severity: "error",
+      });
+      setClearAllDialog((prev) => ({ ...prev, clearing: false }));
+    }
+  };
 
   const fetchMembers = async () => {
     try {
@@ -868,6 +937,28 @@ export default function SMSPage() {
                     <IconRefresh size={18} color="#059669" />
                   </IconButton>
                 </Tooltip>
+
+                {isAdmin && (
+                  <Button
+                    variant="outlined"
+                    color="error"
+                    size="small"
+                    startIcon={<IconTrash size={16} />}
+                    onClick={() => setClearAllDialog({ open: true, clearing: false })}
+                    disabled={logs.length === 0}
+                    sx={{
+                      textTransform: "none",
+                      fontWeight: 700,
+                      borderRadius: 2,
+                      px: 1.8,
+                      borderColor: "#fca5a5",
+                      bgcolor: "#fef2f2",
+                      "&:hover": { bgcolor: "#fee2e2", borderColor: "#f87171" },
+                    }}
+                  >
+                    Clear All Logs
+                  </Button>
+                )}
               </Stack>
             </Stack>
 
@@ -885,12 +976,17 @@ export default function SMSPage() {
                     <TableCell sx={{ fontWeight: 800, color: "#475569" }} align="center">
                       Delivery Status
                     </TableCell>
+                    {isAdmin && (
+                      <TableCell sx={{ fontWeight: 800, color: "#475569" }} align="center">
+                        Action
+                      </TableCell>
+                    )}
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {loadingLogs ? (
                     <TableRow>
-                      <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
+                      <TableCell colSpan={isAdmin ? 7 : 6} align="center" sx={{ py: 4 }}>
                         <CircularProgress size={28} color="success" />
                         <Typography variant="body2" color="#64748b" mt={1}>
                           Loading SMS delivery logs...
@@ -899,7 +995,7 @@ export default function SMSPage() {
                     </TableRow>
                   ) : filteredLogs.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
+                      <TableCell colSpan={isAdmin ? 7 : 6} align="center" sx={{ py: 4 }}>
                         <Typography variant="body2" color="#64748b">
                           No SMS logs found matching your query.
                         </Typography>
@@ -948,6 +1044,24 @@ export default function SMSPage() {
                               }}
                             />
                           </TableCell>
+                          {isAdmin && (
+                            <TableCell align="center">
+                              <Tooltip title="Delete SMS Log">
+                                <IconButton
+                                  size="small"
+                                  color="error"
+                                  onClick={() => setDeleteLogDialog({ open: true, log, deleting: false })}
+                                  sx={{
+                                    bgcolor: "#fef2f2",
+                                    "&:hover": { bgcolor: "#fee2e2" },
+                                    borderRadius: 1.5,
+                                  }}
+                                >
+                                  <IconTrash size={16} />
+                                </IconButton>
+                              </Tooltip>
+                            </TableCell>
+                          )}
                         </TableRow>
                       );
                     })
@@ -975,6 +1089,98 @@ export default function SMSPage() {
           {toast.message}
         </Alert>
       </Snackbar>
+
+      {/* Delete Single SMS Log Dialog */}
+      <Dialog
+        open={deleteLogDialog.open}
+        onClose={() => !deleteLogDialog.deleting && setDeleteLogDialog({ open: false, log: null, deleting: false })}
+        maxWidth="xs"
+        fullWidth
+        PaperProps={{ sx: { borderRadius: 3, p: 1 } }}
+      >
+        <DialogTitle sx={{ fontWeight: 800, color: "#b91c1c", pb: 1, display: "flex", alignItems: "center", gap: 1 }}>
+          <IconAlertTriangle color="#dc2626" size={24} />
+          Delete SMS Delivery Log
+        </DialogTitle>
+        <Divider />
+        <DialogContent sx={{ pt: 2 }}>
+          <Typography variant="body1" fontWeight={700} color="#0f172a" mb={1}>
+            Delete delivery log for {deleteLogDialog.log?.recipient_name || deleteLogDialog.log?.phone_number}?
+          </Typography>
+          <Typography variant="body2" color="text.secondary" mb={2}>
+            Message: &quot;{deleteLogDialog.log?.message?.substring(0, 100)}...&quot;
+          </Typography>
+          <Paper elevation={0} sx={{ p: 1.5, bgcolor: "#fef2f2", border: "1px solid #fecaca", borderRadius: 2 }}>
+            <Typography variant="caption" color="#991b1b" fontWeight={700} display="block">
+              This will remove this specific entry from the SMS delivery audit trail.
+            </Typography>
+          </Paper>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button
+            onClick={() => setDeleteLogDialog({ open: false, log: null, deleting: false })}
+            disabled={deleteLogDialog.deleting}
+            sx={{ color: "text.secondary", textTransform: "none", fontWeight: 600 }}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            color="error"
+            onClick={handleDeleteLog}
+            disabled={deleteLogDialog.deleting}
+            sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2 }}
+          >
+            {deleteLogDialog.deleting ? "Deleting..." : "Delete Log"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Clear All SMS Logs Dialog */}
+      <Dialog
+        open={clearAllDialog.open}
+        onClose={() => !clearAllDialog.clearing && setClearAllDialog({ open: false, clearing: false })}
+        maxWidth="xs"
+        fullWidth
+        PaperProps={{ sx: { borderRadius: 3, p: 1 } }}
+      >
+        <DialogTitle sx={{ fontWeight: 800, color: "#b91c1c", pb: 1, display: "flex", alignItems: "center", gap: 1 }}>
+          <IconAlertTriangle color="#dc2626" size={24} />
+          Purge All SMS Delivery Logs
+        </DialogTitle>
+        <Divider />
+        <DialogContent sx={{ pt: 2 }}>
+          <Typography variant="body1" fontWeight={700} color="#0f172a" mb={1}>
+            Are you sure you want to delete ALL {logs.length} SMS delivery logs?
+          </Typography>
+          <Typography variant="body2" color="text.secondary" mb={2}>
+            This will permanently erase all gateway dispatch records and delivery statuses from the audit log.
+          </Typography>
+          <Paper elevation={0} sx={{ p: 1.5, bgcolor: "#fef2f2", border: "1px solid #fecaca", borderRadius: 2 }}>
+            <Typography variant="caption" color="#991b1b" fontWeight={700} display="block">
+              Warning: This action cannot be undone.
+            </Typography>
+          </Paper>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button
+            onClick={() => setClearAllDialog({ open: false, clearing: false })}
+            disabled={clearAllDialog.clearing}
+            sx={{ color: "text.secondary", textTransform: "none", fontWeight: 600 }}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            color="error"
+            onClick={handleClearAllLogs}
+            disabled={clearAllDialog.clearing}
+            sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2 }}
+          >
+            {clearAllDialog.clearing ? "Purging..." : "Confirm Purge All"}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </PageContainer>
   );
 }

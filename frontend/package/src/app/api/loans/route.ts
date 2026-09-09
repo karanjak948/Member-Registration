@@ -44,20 +44,18 @@ export async function POST(request: NextRequest) {
       "Content-Type": "application/json",
       Accept: "application/json",
     };
-    if (session?.accessToken) {
+    const incomingAuth = request.headers.get("Authorization");
+    if (incomingAuth) {
+      headers["Authorization"] = incomingAuth;
+    } else if (session?.accessToken) {
       headers["Authorization"] = `Bearer ${session.accessToken}`;
     }
 
-    // Map payload to Django serializer format
+    // Preserve all fields (guarantors_data, collaterals_data, etc.) and ensure DRF foreign keys
     const payload = {
+      ...body,
       member: body.member_id || body.member,
       loan_product: body.loan_product_id || body.loan_product,
-      principal_amount: body.principal_amount,
-      num_periods: body.num_periods,
-      application_date: body.application_date,
-      security_provided_value: body.security_provided_value,
-      security_provided_notes: body.security_provided_notes,
-      deposit_paid_amount: body.deposit_paid_amount,
     };
 
     const response = await fetch(`${API_BASE_URL.replace(/\/$/, "")}/loans/`, {

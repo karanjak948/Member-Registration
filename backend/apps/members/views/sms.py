@@ -1,5 +1,6 @@
 import logging
 from rest_framework import status, viewsets, filters
+from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
@@ -9,6 +10,8 @@ from apps.common.sms_service import BulkSMSService
 from apps.members.models import Member
 from apps.members.models.sms_log import SMSLog, SMSEventType, SMSDeliveryStatus
 from apps.members.serializers.sms_serializer import SMSLogSerializer
+from apps.organizations.permissions import is_admin_or_owner_user
+
 
 logger = logging.getLogger(__name__)
 
@@ -153,9 +156,10 @@ class SendSMSAPIView(APIView):
         )
 
 
-class SMSLogViewSet(viewsets.ReadOnlyModelViewSet):
+class SMSLogViewSet(viewsets.ModelViewSet):
     """
-    Read-only API for SMS delivery audit logs.
+    API for SMS delivery audit logs.
+    Supports single log deletion and administrative bulk purge.
     """
     queryset = SMSLog.objects.all().select_related("member")
     serializer_class = SMSLogSerializer
@@ -174,6 +178,35 @@ class SMSLogViewSet(viewsets.ReadOnlyModelViewSet):
         if event_type:
             qs = qs.filter(event_type=event_type)
         return qs
+
+    def destroy(self, request, *args, **kwargs):
+        """
+        Delete single SMS log entry. Restricted to Admins and Owners.
+        """
+        if not is_admin_or_owner_user(request.user):
+            return Response(
+                {"error": "Permission denied. Only administrators or organization owners can delete SMS logs."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        return super().destroy(request, *args, **kwargs)
+
+    @action(detail=False, methods=["delete"], url_path="clear-all")
+    def clear_all(self, request):
+        """
+        Purge all SMS delivery logs from the gateway audit trail.
+        Restricted to Admins and Owners.
+        """
+        if not is_admin_or_owner_user(request.user):
+            return Response(
+                {"error": "Permission denied. Only administrators or organization owners can purge SMS audit logs."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        count, _ = SMSLog.objects.all().delete()
+        return Response(
+            {"message": f"Successfully deleted {count} SMS log entries."},
+            status=status.HTTP_200_OK,
+        )
+
 
 
 class SendOverdueSMSAPIView(APIView):

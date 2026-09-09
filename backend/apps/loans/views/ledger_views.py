@@ -11,11 +11,13 @@ from apps.loans.serializers import (
     LedgerAccountSerializer,
     LedgerTransactionSerializer,
 )
+from apps.organizations.permissions import is_admin_or_owner_user
 
 
 class LedgerAccountViewSet(viewsets.ModelViewSet):
     """
     Chart of Accounts management API.
+    Restricts creation, updates, and deletion to Admins and Owners.
     """
     queryset = LedgerAccount.objects.all()
     serializer_class = LedgerAccountSerializer
@@ -25,10 +27,61 @@ class LedgerAccountViewSet(viewsets.ModelViewSet):
     ordering_fields = ["account_code", "account_type", "created_at"]
     ordering = ["account_code"]
 
+    def create(self, request, *args, **kwargs):
+        if not is_admin_or_owner_user(request.user):
+            return Response(
+                {"error": "Permission denied. Only administrators or organization owners can create ledger accounts."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        return super().create(request, *args, **kwargs)
 
-class LedgerTransactionViewSet(viewsets.ReadOnlyModelViewSet):
+    def update(self, request, *args, **kwargs):
+        if not is_admin_or_owner_user(request.user):
+            return Response(
+                {"error": "Permission denied. Only administrators or organization owners can modify ledger accounts."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        return super().update(request, *args, **kwargs)
+
+    def partial_update(self, request, *args, **kwargs):
+        if not is_admin_or_owner_user(request.user):
+            return Response(
+                {"error": "Permission denied. Only administrators or organization owners can modify ledger accounts."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        return super().partial_update(request, *args, **kwargs)
+
+    def destroy(self, request, *args, **kwargs):
+        """
+        Prevent deleting accounts that have linked ledger entries.
+        Allow deactivation instead. Admin/Owner only.
+        """
+        if not is_admin_or_owner_user(request.user):
+            return Response(
+                {"error": "Permission denied. Only administrators or organization owners can delete ledger accounts."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        account = self.get_object()
+        entry_count = account.entries.count()
+        if entry_count > 0:
+            return Response(
+                {
+                    "error": (
+                        f"Cannot delete account '{account.account_code} - {account.account_name}' "
+                        f"because it has {entry_count} linked transaction entries. "
+                        "You can mark it Inactive instead to preserve audit integrity."
+                    ),
+                    "can_deactivate": True,
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        return super().destroy(request, *args, **kwargs)
+
+
+class LedgerTransactionViewSet(viewsets.ModelViewSet):
     """
     General ledger journal entries and manual income posting.
+    Supports administrative deletion/voiding of transactions (Admin/Owner only).
     """
     queryset = LedgerTransaction.objects.all().prefetch_related("entries", "entries__account").select_related("loan")
     serializer_class = LedgerTransactionSerializer
@@ -37,6 +90,23 @@ class LedgerTransactionViewSet(viewsets.ReadOnlyModelViewSet):
     search_fields = ["transaction_number", "reference_type", "reference_id", "loan__loan_number", "description"]
     ordering_fields = ["transaction_date", "created_at"]
     ordering = ["-transaction_date", "-created_at"]
+
+    @transaction.atomic
+    def destroy(self, request, *args, **kwargs):
+        """
+        Administrative void/delete of a journal transaction and its entries.
+        Restricted to Admins and Owners.
+        """
+        if not is_admin_or_owner_user(request.user):
+            return Response(
+                {"error": "Permission denied. Only administrators or organization owners can void or delete ledger transactions."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        txn = self.get_object()
+        txn.entries.all().delete()
+        txn.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
 
     @action(detail=False, methods=["post"], url_path="post-income")
     @transaction.atomic

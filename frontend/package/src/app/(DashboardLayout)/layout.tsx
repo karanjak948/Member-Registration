@@ -59,17 +59,22 @@ export default function RootLayout({ children }: Props) {
 
   return (
     <MainWrapper className="mainwrapper">
-      <Sidebar
-        isSidebarOpen={isSidebarOpen}
-        isMobileSidebarOpen={isMobileSidebarOpen}
-        onSidebarClose={() => setMobileSidebarOpen(false)}
-      />
+      <Box className="no-print">
+        <Sidebar
+          isSidebarOpen={isSidebarOpen}
+          isMobileSidebarOpen={isMobileSidebarOpen}
+          onSidebarClose={() => setMobileSidebarOpen(false)}
+        />
+      </Box>
 
       <PageWrapper className="page-wrapper">
-        <Header toggleMobileSidebar={() => setMobileSidebarOpen(true)} />
+        <Box className="no-print">
+          <Header toggleMobileSidebar={() => setMobileSidebarOpen(true)} />
+        </Box>
 
         <Container
           maxWidth={false}
+          className="content-container"
           sx={{
             pt: 2,
             px: { xs: 1.5, sm: 2.5, md: 3.5 },
@@ -84,6 +89,30 @@ export default function RootLayout({ children }: Props) {
           </Box>
         </Container>
       </PageWrapper>
+
+      <style jsx global>{`
+        @media print {
+          .no-print,
+          aside,
+          header,
+          .MuiDrawer-root {
+            display: none !important;
+          }
+          .mainwrapper,
+          .page-wrapper {
+            display: block !important;
+            width: 100% !important;
+            padding: 0 !important;
+            margin: 0 !important;
+          }
+          .content-container,
+          .MuiContainer-root {
+            max-width: 100% !important;
+            padding: 0 !important;
+            margin: 0 !important;
+          }
+        }
+      `}</style>
     </MainWrapper>
   );
 }

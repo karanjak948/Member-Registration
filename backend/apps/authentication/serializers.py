@@ -71,6 +71,8 @@ class CurrentUserSerializer(serializers.ModelSerializer):
     organization = serializers.SerializerMethodField()
     role = serializers.SerializerMethodField()
     permissions = serializers.SerializerMethodField()
+    is_owner = serializers.SerializerMethodField()
+    is_admin = serializers.SerializerMethodField()
 
     class Meta:
         model = User
@@ -84,6 +86,8 @@ class CurrentUserSerializer(serializers.ModelSerializer):
             "profile_photo",
             "is_staff",
             "is_superuser",
+            "is_owner",
+            "is_admin",
             "organization",
             "role",
             "permissions",
@@ -123,6 +127,22 @@ class CurrentUserSerializer(serializers.ModelSerializer):
         self._membership_cache = membership
 
         return membership
+
+    def get_is_owner(self, obj):
+        if getattr(obj, "is_superuser", False):
+            return True
+        if hasattr(obj, "owned_organization"):
+            try:
+                if obj.owned_organization:
+                    return True
+            except Exception:
+                pass
+        from apps.organizations.models import Organization
+        return Organization.objects.filter(owner=obj).exists()
+
+    def get_is_admin(self, obj):
+        from apps.organizations.permissions import is_admin_or_owner_user
+        return is_admin_or_owner_user(obj)
 
     def get_organization(self, obj):
         membership = self.get_membership(obj)

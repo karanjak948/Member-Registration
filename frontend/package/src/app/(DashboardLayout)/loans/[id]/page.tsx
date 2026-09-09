@@ -184,6 +184,7 @@ export default function LoanDetailPage() {
 
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
   const [rejectionReason, setRejectionReason] = useState("");
+  const [rejectionError, setRejectionError] = useState("");
 
   const [disburseDialogOpen, setDisburseDialogOpen] = useState(false);
   const [disbursementDate, setDisbursementDate] = useState(new Date().toISOString().split("T")[0]);
@@ -390,11 +391,13 @@ export default function LoanDetailPage() {
       });
       await loadLoan();
     } catch (err: any) {
+      const errMsg = err.response?.data?.error || err.response?.data?.detail || err.message || "Failed to approve loan.";
       setSnackbar({
         open: true,
-        message: err.response?.data?.error || err.response?.data?.detail || "Failed to approve loan.",
+        message: errMsg,
         severity: "error",
       });
+      throw new Error(errMsg);
     } finally {
       setActionLoading(false);
     }
@@ -402,6 +405,7 @@ export default function LoanDetailPage() {
 
   const handleReject = async () => {
     if (!loan || !rejectionReason.trim()) {
+      setRejectionError("Please specify the rejection reason.");
       setSnackbar({
         open: true,
         message: "Please specify the rejection reason.",
@@ -409,6 +413,7 @@ export default function LoanDetailPage() {
       });
       return;
     }
+    setRejectionError("");
     try {
       setActionLoading(true);
       const updated = await loanService.reject(loan.id, rejectionReason);
@@ -421,9 +426,11 @@ export default function LoanDetailPage() {
       });
       await loadLoan();
     } catch (err: any) {
+      const errMsg = err.response?.data?.error || err.response?.data?.detail || err.message || "Failed to reject loan.";
+      setRejectionError(errMsg);
       setSnackbar({
         open: true,
-        message: err.response?.data?.error || err.response?.data?.detail || "Failed to reject loan.",
+        message: errMsg,
         severity: "error",
       });
     } finally {
@@ -906,6 +913,7 @@ export default function LoanDetailPage() {
                           disabled={actionLoading}
                           onClick={() => {
                             setRejectionReason("");
+                            setRejectionError("");
                             setRejectDialogOpen(true);
                           }}
                           sx={{
@@ -989,6 +997,7 @@ export default function LoanDetailPage() {
                           disabled={actionLoading}
                           onClick={() => {
                             setRejectionReason("");
+                            setRejectionError("");
                             setRejectDialogOpen(true);
                           }}
                           sx={{
@@ -2138,6 +2147,11 @@ export default function LoanDetailPage() {
           Reject Loan Application
         </DialogTitle>
         <DialogContent>
+          {rejectionError && (
+            <Alert severity="error" sx={{ mb: 2, borderRadius: 2, fontWeight: 600 }}>
+              {rejectionError}
+            </Alert>
+          )}
           <DialogContentText sx={{ color: "#475569", mb: 2 }}>
             Provide the formal reason for rejecting loan application <strong>{loan.loan_number}</strong>. This will be recorded permanently in the credit audit trail.
           </DialogContentText>

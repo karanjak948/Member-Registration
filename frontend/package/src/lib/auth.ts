@@ -118,6 +118,8 @@ export const authOptions: NextAuthOptions = {
 
             isStaff: user.is_staff,
             isSuperuser: user.is_superuser,
+            isOwner: user.is_owner ?? false,
+            isAdmin: user.is_admin ?? false,
 
             /*
              * RBAC Information
@@ -191,6 +193,12 @@ export const authOptions: NextAuthOptions = {
 
         token.isSuperuser =
           user.isSuperuser;
+
+        token.isOwner =
+          user.isOwner;
+
+        token.isAdmin =
+          user.isAdmin;
 
         /*
          * RBAC
@@ -271,6 +279,12 @@ export const authOptions: NextAuthOptions = {
 
         session.user.isSuperuser =
           token.isSuperuser as boolean;
+
+        session.user.isOwner =
+          token.isOwner as boolean;
+
+        session.user.isAdmin =
+          token.isAdmin as boolean;
 
         /*
          * RBAC

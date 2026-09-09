@@ -213,6 +213,43 @@ class LoanService {
     const response = await api.post("/sms/send/", payload);
     return response.data;
   }
+
+  /**
+   * DELETE /api/sms/logs/{id}/
+   */
+  async deleteSMSLog(id: number): Promise<void> {
+    await api.delete(`/sms/logs/${id}/`);
+  }
+
+  /**
+   * DELETE /api/sms/logs/clear-all/
+   */
+  async clearAllSMSLogs(): Promise<any> {
+    const response = await api.delete("/sms/logs/clear-all/");
+    return response.data;
+  }
+
+  /**
+   * DELETE /api/ledger-transactions/{id}/
+   */
+  async deleteLedgerTransaction(id: number): Promise<void> {
+    await api.delete(`/ledger-transactions/${id}/`);
+  }
+
+  /**
+   * DELETE /api/ledger-accounts/{id}/
+   */
+  async deleteLedgerAccount(id: number): Promise<void> {
+    await api.delete(`/ledger-accounts/${id}/`);
+  }
+
+  /**
+   * PATCH /api/ledger-accounts/{id}/
+   */
+  async updateLedgerAccount(id: number, data: { is_active?: boolean; account_name?: string; description?: string }): Promise<any> {
+    const response = await api.patch(`/ledger-accounts/${id}/`, data);
+    return response.data;
+  }
 }
 
 export default new LoanService();

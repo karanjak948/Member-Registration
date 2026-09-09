@@ -42,6 +42,20 @@ class SavingsPaymentViewSet(viewsets.ModelViewSet):
             return SavingsPaymentCreateSerializer
         return SavingsPaymentSerializer
 
+    def destroy(self, request, *args, **kwargs):
+        from apps.organizations.permissions import is_admin_or_owner_user
+        if not is_admin_or_owner_user(request.user):
+            return Response(
+                {"error": "Permission denied. Only administrators or organization owners can delete savings payments."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        payment = self.get_object()
+        if hasattr(payment, "ledger_transaction") and payment.ledger_transaction:
+            payment.ledger_transaction.entries.all().delete()
+            payment.ledger_transaction.delete()
+        return super().destroy(request, *args, **kwargs)
+
+
     def get_queryset(self):
         qs = super().get_queryset()
         user = self.request.user

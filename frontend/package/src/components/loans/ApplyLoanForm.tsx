@@ -140,10 +140,11 @@ export default function ApplyLoanForm() {
     let totalPayable = 0;
 
     if (method === "reducing_balance" && periodicRate > 0) {
-      const factor = Math.pow(1 + periodicRate, periods);
-      installment = principal * (periodicRate * factor) / (factor - 1);
-      totalPayable = installment * periods;
-      totalInterest = totalPayable - principal;
+      // SACCO Straight-Line Reducing Balance (Equal Principal Payments)
+      // Total Interest = Principal * periodicRate * (periods + 1) / 2
+      totalInterest = (principal * periodicRate * (periods + 1)) / 2;
+      totalPayable = principal + totalInterest;
+      installment = totalPayable / periods;
     } else {
       // Flat rate formula
       totalInterest = principal * periodicRate * periods;
@@ -662,7 +663,7 @@ export default function ApplyLoanForm() {
                             {product.interest_rate && (
                               <Chip
                                 size="small"
-                                label={`${product.interest_rate}% p.a.`}
+                                label={`${product.interest_rate}% ${product.interest_period === "yearly" ? "p.a." : product.interest_period === "monthly" ? "p.m." : product.interest_period || "p.a."}`}
                                 sx={{ height: 18, fontSize: "0.7rem", fontWeight: 800, bgcolor: "#ecfdf5", color: "#065f46" }}
                               />
                             )}
@@ -942,7 +943,7 @@ export default function ApplyLoanForm() {
                       <Grid size={{ xs: 12, sm: 6, md: 3 }}>
                         <Paper elevation={0} sx={{ p: 1.8, borderRadius: 2, bgcolor: "#ffffff", border: "1px solid #bbf7d0" }}>
                           <Typography variant="caption" sx={{ color: "#059669", fontWeight: 800, textTransform: "uppercase" }}>
-                            Monthly Installment (EMI)
+                            {selectedProduct?.interest_method === "reducing_balance" ? "Installment (Avg)" : "Monthly Installment (EMI)"}
                           </Typography>
                           <Typography variant="h5" fontWeight={900} sx={{ color: "#064e3b", fontFamily: "monospace", mt: 0.5 }}>
                             KES {previewData.installment.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}

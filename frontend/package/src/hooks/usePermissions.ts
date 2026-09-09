@@ -26,6 +26,20 @@ export function usePermissions() {
   const isStaff =
     session?.user.isStaff ?? false;
 
+  const isOwner =
+    session?.user.isOwner ?? false;
+
+  const roleName = (role?.name || "").toLowerCase();
+  const isAdmin =
+    isSuperuser ||
+    isStaff ||
+    isOwner ||
+    session?.user.isAdmin === true ||
+    roleName.includes("admin") ||
+    roleName.includes("owner") ||
+    roleName.includes("super") ||
+    !!role?.isSystemRole;
+
   const loading =
     status === "loading";
 
@@ -133,6 +147,10 @@ export function usePermissions() {
 
     isSuperuser,
 
+    isOwner,
+
+    isAdmin,
+
     /**
      * Permission helpers
      */
@@ -149,4 +167,5 @@ export function usePermissions() {
      */
     hasRole,
   };
+
 }

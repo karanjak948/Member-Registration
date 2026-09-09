@@ -32,10 +32,13 @@ import {
   DialogActions,
   MenuItem,
   Alert,
+  Snackbar,
 } from "@mui/material";
 import { useSearchParams } from "next/navigation";
 import PageContainer from "@/app/(DashboardLayout)/components/container/PageContainer";
 import api from "@/services/api";
+import loanService from "@/services/loan.service";
+import { usePermissions } from "@/hooks/usePermissions";
 import {
   IconBuildingBank,
   IconCoins,
@@ -50,6 +53,9 @@ import {
   IconScale,
   IconBook2,
   IconPlus,
+  IconTrash,
+  IconPower,
+  IconAlertTriangle,
 } from "@tabler/icons-react";
 
 interface LedgerEntry {
@@ -86,6 +92,7 @@ interface LedgerAccount {
 }
 
 export default function FinancePage() {
+  const { isAdmin } = usePermissions();
   const [transactions, setTransactions] = useState<LedgerTransaction[]>([]);
   const [accounts, setAccounts] = useState<LedgerAccount[]>([]);
   const [loading, setLoading] = useState(true);
@@ -119,6 +126,113 @@ export default function FinancePage() {
     reference_type: "INCOME",
     description: "",
   });
+
+  // Deletion / Void Transaction Dialog State
+  const [deleteTxnDialog, setDeleteTxnDialog] = useState<{
+    open: boolean;
+    txn: LedgerTransaction | null;
+    deleting: boolean;
+    error: string | null;
+  }>({
+    open: false,
+    txn: null,
+    deleting: false,
+    error: null,
+  });
+
+  // Ledger Account Deletion / Deactivation State
+  const [deleteAccountDialog, setDeleteAccountDialog] = useState<{
+    open: boolean;
+    account: LedgerAccount | null;
+    deleting: boolean;
+    error: string | null;
+    canDeactivate: boolean;
+  }>({
+    open: false,
+    account: null,
+    deleting: false,
+    error: null,
+    canDeactivate: false,
+  });
+
+  const [togglingAccountId, setTogglingAccountId] = useState<number | null>(null);
+  const [feedbackSnackbar, setFeedbackSnackbar] = useState<{
+    open: boolean;
+    message: string;
+    severity: "success" | "error" | "info";
+  }>({
+    open: false,
+    message: "",
+    severity: "success",
+  });
+
+  const handleDeleteTxn = async () => {
+    if (!deleteTxnDialog.txn) return;
+    setDeleteTxnDialog((prev) => ({ ...prev, deleting: true, error: null }));
+    try {
+      await loanService.deleteLedgerTransaction(deleteTxnDialog.txn.id);
+      const deletedNum = deleteTxnDialog.txn.transaction_number;
+      setDeleteTxnDialog({ open: false, txn: null, deleting: false, error: null });
+      setFeedbackSnackbar({
+        open: true,
+        message: `Transaction ${deletedNum} and its journal entries have been deleted/voided.`,
+        severity: "success",
+      });
+      fetchData();
+    } catch (err: any) {
+      setDeleteTxnDialog((prev) => ({
+        ...prev,
+        deleting: false,
+        error: err.response?.data?.error || err.message || "Failed to delete transaction.",
+      }));
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (!deleteAccountDialog.account) return;
+    setDeleteAccountDialog((prev) => ({ ...prev, deleting: true, error: null, canDeactivate: false }));
+    try {
+      await loanService.deleteLedgerAccount(deleteAccountDialog.account.id);
+      const code = deleteAccountDialog.account.account_code;
+      setDeleteAccountDialog({ open: false, account: null, deleting: false, error: null, canDeactivate: false });
+      setFeedbackSnackbar({
+        open: true,
+        message: `Account ${code} has been permanently deleted.`,
+        severity: "success",
+      });
+      fetchData();
+    } catch (err: any) {
+      const errorMsg = err.response?.data?.error || err.message || "Failed to delete account.";
+      const canDeactivate = !!err.response?.data?.can_deactivate;
+      setDeleteAccountDialog((prev) => ({
+        ...prev,
+        deleting: false,
+        error: errorMsg,
+        canDeactivate,
+      }));
+    }
+  };
+
+  const handleToggleAccountActive = async (account: LedgerAccount) => {
+    setTogglingAccountId(account.id);
+    try {
+      await loanService.updateLedgerAccount(account.id, { is_active: !account.is_active });
+      setFeedbackSnackbar({
+        open: true,
+        message: `Account ${account.account_code} is now marked as ${!account.is_active ? "Active" : "Inactive"}.`,
+        severity: "success",
+      });
+      fetchData();
+    } catch (err: any) {
+      setFeedbackSnackbar({
+        open: true,
+        message: err.response?.data?.error || "Failed to update account status.",
+        severity: "error",
+      });
+    } finally {
+      setTogglingAccountId(null);
+    }
+  };
 
   const handlePostIncome = async () => {
     if (!incomeForm.account_id || !incomeForm.amount) {
@@ -545,6 +659,11 @@ export default function FinancePage() {
                         <TableCell sx={{ fontWeight: 700, color: "#475569" }} align="center">
                           Status
                         </TableCell>
+                        {isAdmin && (
+                          <TableCell sx={{ fontWeight: 700, color: "#475569" }} align="center">
+                            Action
+                          </TableCell>
+                        )}
                       </TableRow>
                     </TableHead>
                     <TableBody>
@@ -613,11 +732,37 @@ export default function FinancePage() {
                                   sx={{ fontWeight: 700, fontSize: "0.72rem" }}
                                 />
                               </TableCell>
+                              {isAdmin && (
+                                <TableCell align="center" onClick={(e) => e.stopPropagation()}>
+                                  <Tooltip title="Delete / Void Transaction">
+                                    <IconButton
+                                      size="small"
+                                      color="error"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setDeleteTxnDialog({
+                                          open: true,
+                                          txn: tx,
+                                          deleting: false,
+                                          error: null,
+                                        });
+                                      }}
+                                      sx={{
+                                        bgcolor: "#fef2f2",
+                                        "&:hover": { bgcolor: "#fee2e2" },
+                                        borderRadius: 1.5,
+                                      }}
+                                    >
+                                      <IconTrash size={16} />
+                                    </IconButton>
+                                  </Tooltip>
+                                </TableCell>
+                              )}
                             </TableRow>
 
                             {/* Collapsible Double-Entry Details */}
                             <TableRow key={`${tx.id}-detail`}>
-                              <TableCell colSpan={8} sx={{ py: 0, px: 3, bgcolor: "#f8fafc" }}>
+                              <TableCell colSpan={isAdmin ? 9 : 8} sx={{ py: 0, px: 3, bgcolor: "#f8fafc" }}>
                                 <Collapse in={isExpanded} timeout="auto" unmountOnExit>
                                   <Box sx={{ py: 2 }}>
                                     <Typography variant="caption" fontWeight={700} color="#475569" mb={1} display="block">
@@ -691,6 +836,11 @@ export default function FinancePage() {
                       <TableCell sx={{ fontWeight: 700, color: "#475569" }} align="center">
                         Status
                       </TableCell>
+                      {isAdmin && (
+                        <TableCell sx={{ fontWeight: 700, color: "#475569" }} align="center">
+                          Actions
+                        </TableCell>
+                      )}
                     </TableRow>
                   </TableHead>
                   <TableBody>
@@ -723,6 +873,50 @@ export default function FinancePage() {
                             sx={{ fontWeight: 700, fontSize: "0.72rem" }}
                           />
                         </TableCell>
+                        {isAdmin && (
+                          <TableCell align="center">
+                            <Stack direction="row" spacing={1} justifyContent="center" alignItems="center">
+                              <Tooltip title={acc.is_active ? "Deactivate Account" : "Activate Account"}>
+                                <IconButton
+                                  size="small"
+                                  disabled={togglingAccountId === acc.id}
+                                  onClick={() => handleToggleAccountActive(acc)}
+                                  sx={{
+                                    bgcolor: acc.is_active ? "#ecfdf5" : "#f1f5f9",
+                                    color: acc.is_active ? "#059669" : "#64748b",
+                                    "&:hover": { bgcolor: acc.is_active ? "#d1fae5" : "#e2e8f0" },
+                                    borderRadius: 1.5,
+                                  }}
+                                >
+                                  <IconPower size={16} />
+                                </IconButton>
+                              </Tooltip>
+
+                              <Tooltip title="Delete Account">
+                                <IconButton
+                                  size="small"
+                                  color="error"
+                                  onClick={() => {
+                                    setDeleteAccountDialog({
+                                      open: true,
+                                      account: acc,
+                                      deleting: false,
+                                      error: null,
+                                      canDeactivate: false,
+                                    });
+                                  }}
+                                  sx={{
+                                    bgcolor: "#fef2f2",
+                                    "&:hover": { bgcolor: "#fee2e2" },
+                                    borderRadius: 1.5,
+                                  }}
+                                >
+                                  <IconTrash size={16} />
+                                </IconButton>
+                              </Tooltip>
+                            </Stack>
+                          </TableCell>
+                        )}
                       </TableRow>
                     ))}
                   </TableBody>
@@ -745,6 +939,11 @@ export default function FinancePage() {
                       <TableCell sx={{ fontWeight: 700, color: "#475569" }} align="center">
                         Integrity Audit
                       </TableCell>
+                      {isAdmin && (
+                        <TableCell sx={{ fontWeight: 700, color: "#475569" }} align="center">
+                          Action
+                        </TableCell>
+                      )}
                     </TableRow>
                   </TableHead>
                   <TableBody>
@@ -786,6 +985,31 @@ export default function FinancePage() {
                               sx={{ fontWeight: 800, fontSize: "0.68rem" }}
                             />
                           </TableCell>
+                          {isAdmin && (
+                            <TableCell align="center">
+                              <Tooltip title="Delete / Void Transaction">
+                                <IconButton
+                                  size="small"
+                                  color="error"
+                                  onClick={() => {
+                                    setDeleteTxnDialog({
+                                      open: true,
+                                      txn: tx,
+                                      deleting: false,
+                                      error: null,
+                                    });
+                                  }}
+                                  sx={{
+                                    bgcolor: "#fef2f2",
+                                    "&:hover": { bgcolor: "#fee2e2" },
+                                    borderRadius: 1.5,
+                                  }}
+                                >
+                                  <IconTrash size={16} />
+                                </IconButton>
+                              </Tooltip>
+                            </TableCell>
+                          )}
                         </TableRow>
                       );
                     })}
@@ -932,6 +1156,145 @@ export default function FinancePage() {
             </Button>
           </DialogActions>
         </Dialog>
+
+        {/* Delete / Void Transaction Dialog */}
+        <Dialog
+          open={deleteTxnDialog.open}
+          onClose={() => !deleteTxnDialog.deleting && setDeleteTxnDialog({ open: false, txn: null, deleting: false, error: null })}
+          maxWidth="xs"
+          fullWidth
+          PaperProps={{ sx: { borderRadius: 3, p: 1 } }}
+        >
+          <DialogTitle sx={{ fontWeight: 800, color: "#b91c1c", pb: 1, display: "flex", alignItems: "center", gap: 1 }}>
+            <IconAlertTriangle color="#dc2626" size={24} />
+            Void / Delete Transaction
+          </DialogTitle>
+          <Divider />
+          <DialogContent sx={{ pt: 2 }}>
+            {deleteTxnDialog.error && (
+              <Alert severity="error" sx={{ mb: 2 }}>
+                {deleteTxnDialog.error}
+              </Alert>
+            )}
+            <Typography variant="body1" fontWeight={700} color="#0f172a" mb={1}>
+              Are you sure you want to permanently delete transaction #{deleteTxnDialog.txn?.transaction_number}?
+            </Typography>
+            <Typography variant="body2" color="text.secondary" mb={2}>
+              This will remove the transaction record and its balanced debit/credit entries ({deleteTxnDialog.txn?.entries?.length || 2} entries) from both the General Ledger and Audit Trail.
+            </Typography>
+            <Paper elevation={0} sx={{ p: 1.5, bgcolor: "#fef2f2", border: "1px solid #fecaca", borderRadius: 2 }}>
+              <Typography variant="caption" color="#991b1b" fontWeight={700} display="block">
+                Warning: This action cannot be undone.
+              </Typography>
+            </Paper>
+          </DialogContent>
+          <DialogActions sx={{ px: 3, pb: 2 }}>
+            <Button
+              onClick={() => setDeleteTxnDialog({ open: false, txn: null, deleting: false, error: null })}
+              disabled={deleteTxnDialog.deleting}
+              sx={{ color: "text.secondary", textTransform: "none", fontWeight: 600 }}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="contained"
+              color="error"
+              onClick={handleDeleteTxn}
+              disabled={deleteTxnDialog.deleting}
+              sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2 }}
+            >
+              {deleteTxnDialog.deleting ? "Deleting..." : "Confirm Delete"}
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* Delete / Deactivate Ledger Account Dialog */}
+        <Dialog
+          open={deleteAccountDialog.open}
+          onClose={() => !deleteAccountDialog.deleting && setDeleteAccountDialog({ open: false, account: null, deleting: false, error: null, canDeactivate: false })}
+          maxWidth="xs"
+          fullWidth
+          PaperProps={{ sx: { borderRadius: 3, p: 1 } }}
+        >
+          <DialogTitle sx={{ fontWeight: 800, color: "#b91c1c", pb: 1, display: "flex", alignItems: "center", gap: 1 }}>
+            <IconAlertTriangle color="#dc2626" size={24} />
+            Delete Ledger Account
+          </DialogTitle>
+          <Divider />
+          <DialogContent sx={{ pt: 2 }}>
+            {deleteAccountDialog.error && (
+              <Alert severity="warning" sx={{ mb: 2 }}>
+                {deleteAccountDialog.error}
+              </Alert>
+            )}
+            <Typography variant="body1" fontWeight={700} color="#0f172a" mb={1}>
+              Delete account {deleteAccountDialog.account?.account_code} - {deleteAccountDialog.account?.account_name}?
+            </Typography>
+            <Typography variant="body2" color="text.secondary" mb={2}>
+              If this account has existing transaction entries, deletion will be blocked by system safety guards to preserve ledger integrity.
+            </Typography>
+            {deleteAccountDialog.canDeactivate && (
+              <Paper elevation={0} sx={{ p: 2, bgcolor: "#ecfdf5", border: "1px solid #a7f3d0", borderRadius: 2, mb: 1 }}>
+                <Typography variant="subtitle2" fontWeight={700} color="#065f46">
+                  Recommended Alternative:
+                </Typography>
+                <Typography variant="caption" color="#047857" display="block" mt={0.5}>
+                  You can mark this account Inactive instead. It preserves historical reports while preventing any new postings.
+                </Typography>
+              </Paper>
+            )}
+          </DialogContent>
+          <DialogActions sx={{ px: 3, pb: 2 }}>
+            <Button
+              onClick={() => setDeleteAccountDialog({ open: false, account: null, deleting: false, error: null, canDeactivate: false })}
+              disabled={deleteAccountDialog.deleting}
+              sx={{ color: "text.secondary", textTransform: "none", fontWeight: 600 }}
+            >
+              Cancel
+            </Button>
+            {deleteAccountDialog.canDeactivate ? (
+              <Button
+                variant="contained"
+                color="warning"
+                onClick={() => {
+                  if (deleteAccountDialog.account) {
+                    handleToggleAccountActive(deleteAccountDialog.account);
+                    setDeleteAccountDialog({ open: false, account: null, deleting: false, error: null, canDeactivate: false });
+                  }
+                }}
+                sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2 }}
+              >
+                Mark Account Inactive
+              </Button>
+            ) : (
+              <Button
+                variant="contained"
+                color="error"
+                onClick={handleDeleteAccount}
+                disabled={deleteAccountDialog.deleting}
+                sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2 }}
+              >
+                {deleteAccountDialog.deleting ? "Deleting..." : "Delete Account"}
+              </Button>
+            )}
+          </DialogActions>
+        </Dialog>
+
+        {/* Feedback Snackbar */}
+        <Snackbar
+          open={feedbackSnackbar.open}
+          autoHideDuration={5000}
+          onClose={() => setFeedbackSnackbar((prev) => ({ ...prev, open: false }))}
+          anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+        >
+          <Alert
+            onClose={() => setFeedbackSnackbar((prev) => ({ ...prev, open: false }))}
+            severity={feedbackSnackbar.severity}
+            sx={{ width: "100%", fontWeight: 600 }}
+          >
+            {feedbackSnackbar.message}
+          </Alert>
+        </Snackbar>
       </Box>
     </PageContainer>
   );

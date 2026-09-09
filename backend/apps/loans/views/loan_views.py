@@ -68,6 +68,32 @@ class LoanViewSet(viewsets.ModelViewSet):
             qs = qs.filter(member_id=member_id)
         return qs
 
+    def destroy(self, request, *args, **kwargs):
+        from apps.organizations.permissions import is_admin_or_owner_user
+        if not is_admin_or_owner_user(request.user):
+            return Response(
+                {"error": "Permission denied. Only administrators or organization owners can delete loan records."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        loan = self.get_object()
+        if loan.status in [
+            LoanStatus.ACTIVE,
+            LoanStatus.CLOSED,
+            LoanStatus.WATCHFUL,
+            LoanStatus.NON_PERFORMING,
+            LoanStatus.DOUBTFUL,
+        ]:
+            return Response(
+                {
+                    "error": (
+                        f"Cannot delete loan '{loan.loan_number}' because it has active financial disbursements/schedules. "
+                        "Financial integrity requires preserving serviced loans."
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        return super().destroy(request, *args, **kwargs)
+
     @transaction.atomic
     def perform_create(self, serializer):
         product: LoanProduct = serializer.validated_data["loan_product"]
@@ -169,7 +195,7 @@ class LoanViewSet(viewsets.ModelViewSet):
 
         total_interest = sum(item.expected_interest for item in schedule)
         total_payable = sum(item.expected_amount for item in schedule)
-        installment = schedule[0].expected_amount if schedule else Decimal("0.00")
+        installment = round2(total_payable / Decimal(str(num_periods))) if num_periods > 0 else (schedule[0].expected_amount if schedule else Decimal("0.00"))
 
         return Response({
             "principal": str(principal),

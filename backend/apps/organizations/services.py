@@ -310,3 +310,12 @@ class OrganizationAccessService:
                     "is_active": True,
                 },
             )
+
+    @classmethod
+    def is_admin_or_owner(cls, user) -> bool:
+        """
+        Check whether the given user is an organization owner,
+        superuser, or holds an administrative role.
+        """
+        from .permissions import is_admin_or_owner_user
+        return is_admin_or_owner_user(user)

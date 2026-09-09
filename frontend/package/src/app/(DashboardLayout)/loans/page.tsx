@@ -301,11 +301,17 @@ function LoansContent() {
       refresh();
     } catch (err: any) {
       console.error("Failed to approve loan:", err);
+      const errMsg =
+        err.response?.data?.error ||
+        err.response?.data?.detail ||
+        err.message ||
+        "Failed to approve loan.";
       setSnackbar({
         open: true,
-        message: err.response?.data?.error || err.response?.data?.detail || "Failed to approve loan.",
+        message: errMsg,
         severity: "error",
       });
+      throw new Error(errMsg);
     } finally {
       setActionLoading(false);
     }
@@ -333,11 +339,17 @@ function LoansContent() {
       refresh();
     } catch (err: any) {
       console.error("Failed to disburse loan:", err);
+      const errMsg =
+        err.response?.data?.error ||
+        err.response?.data?.detail ||
+        err.message ||
+        "Failed to disburse loan.";
       setSnackbar({
         open: true,
-        message: err.response?.data?.error || err.response?.data?.detail || "Failed to disburse loan.",
+        message: errMsg,
         severity: "error",
       });
+      throw new Error(errMsg);
     } finally {
       setActionLoading(false);
     }

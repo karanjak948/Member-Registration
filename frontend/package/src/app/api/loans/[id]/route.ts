@@ -47,7 +47,10 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
       "Content-Type": "application/json",
       Accept: "application/json",
     };
-    if (session?.accessToken) {
+    const incomingAuth = request.headers.get("Authorization");
+    if (incomingAuth) {
+      headers["Authorization"] = incomingAuth;
+    } else if (session?.accessToken) {
       headers["Authorization"] = `Bearer ${session.accessToken}`;
     }
 
@@ -55,13 +58,13 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
     let url = `${API_BASE_URL.replace(/\/$/, "")}/loans/${id}/`;
     let method = "PUT";
 
-    if (body.status === "appraised") {
+    if (body.status === "appraised" || body.action === "appraise") {
       url = `${API_BASE_URL.replace(/\/$/, "")}/loans/${id}/appraise/`;
       method = "POST";
-    } else if (body.status === "approved") {
+    } else if (body.status === "approved" || body.action === "approve") {
       url = `${API_BASE_URL.replace(/\/$/, "")}/loans/${id}/approve/`;
       method = "POST";
-    } else if (body.status === "rejected") {
+    } else if (body.status === "rejected" || body.action === "reject") {
       url = `${API_BASE_URL.replace(/\/$/, "")}/loans/${id}/reject/`;
       method = "POST";
     } else if (body.status === "active" || body.action === "disburse") {
@@ -75,11 +78,15 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
       body: JSON.stringify(body),
     });
 
-    const data = await response.json();
+    const data = await response.json().catch(() => ({}));
     return NextResponse.json(data, { status: response.status });
   } catch (error: any) {
     return NextResponse.json({ detail: error?.message || "Server error" }, { status: 500 });
   }
+}
+
+export async function POST(request: NextRequest, { params }: RouteContext) {
+  return PUT(request, { params });
 }
 
 export async function PATCH(request: NextRequest, { params }: RouteContext) {

@@ -46,6 +46,28 @@ class LoanEngineMathTests(unittest.TestCase):
         total_principal = sum(row.principal_component for row in schedule)
         self.assertEqual(round2(total_principal), Decimal("50000.00"))
 
+    def test_sacco_straight_line_reducing_balance_no_909(self):
+        # Scenario from user: KES 100,000, 2 months, 20% monthly rate
+        # Month 1: 100,000 * 20% = 20,000 interest, 50,000 principal
+        # Month 2: 50,000 * 20% = 10,000 interest, 50,000 principal
+        # Total Interest MUST be exactly KES 30,000.00 (not 30,909.09)
+        schedule = calculate_reducing_balance_schedule(
+            principal=100000,
+            interest_rate_pct=20,
+            num_periods=2,
+            interest_period="monthly",
+            repayment_frequency="monthly",
+        )
+        self.assertEqual(len(schedule), 2)
+        self.assertEqual(schedule[0].interest_charge, Decimal("20000.00"))
+        self.assertEqual(schedule[0].principal_component, Decimal("50000.00"))
+        self.assertEqual(schedule[1].interest_charge, Decimal("10000.00"))
+        self.assertEqual(schedule[1].principal_component, Decimal("50000.00"))
+        total_interest = sum(row.interest_charge for row in schedule)
+        self.assertEqual(total_interest, Decimal("30000.00"))
+        total_payable = sum(row.installment for row in schedule)
+        self.assertEqual(total_payable, Decimal("130000.00"))
+
     def test_schedule_generator_dates(self):
         disbursement = date(2026, 1, 1)
         schedule = generate_schedule(

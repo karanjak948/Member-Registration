@@ -891,12 +891,6 @@ export default function NewSavingsPaymentPage() {
                   <Typography variant="h5" fontWeight={900} color="#064e3b" letterSpacing={0.5}>
                     ROYAL SACCO SOCIETY LTD
                   </Typography>
-                  <Typography variant="caption" color="text.secondary" display="block">
-                    Registered under the Co-operative Societies Act &bull; P.O. Box 45678-00100, Nairobi
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary" display="block">
-                    Tel: +254 700 000 000 &bull; Email: info@royalsacco.co.ke &bull; KRA PIN: P051234567Z
-                  </Typography>
                 </Box>
 
                 {/* Voucher Title Strip */}
