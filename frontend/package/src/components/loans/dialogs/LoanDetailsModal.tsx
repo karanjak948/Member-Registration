@@ -268,7 +268,7 @@ export default function LoanDetailsModal({
                   "&:hover": { borderColor: "#059669", color: "#059669" },
                 }}
               >
-                Full Dossier
+                Open Loan File
               </Button>
             )}
             <IconButton size="small" onClick={onClose} sx={{ color: "#94a3b8" }}>

@@ -43,6 +43,7 @@ import {
   IconCheck,
   IconBuildingBank,
   IconCertificate,
+  IconFileText,
   IconChecklist,
   IconSettings,
   IconAlertTriangle,
@@ -1152,27 +1153,28 @@ function LoansContent() {
                                 "&:hover": { bgcolor: "#dbeafe", borderColor: "#3b82f6" },
                               }}
                             >
-                              View Details
+                              Quick Preview
                             </Button>
 
                             <Button
                               size="small"
                               variant="outlined"
+                              startIcon={<IconFileText size={14} />}
                               onClick={() => router.push(`/loans/${loan.id}`)}
                               sx={{
-                                color: "#64748b",
-                                borderColor: "#cbd5e1",
-                                bgcolor: "#f8fafc",
-                                fontWeight: 700,
+                                color: "#0f766e",
+                                borderColor: "#99f6e4",
+                                bgcolor: "#f0fdfa",
+                                fontWeight: 800,
                                 textTransform: "none",
                                 borderRadius: 2,
                                 fontSize: "0.76rem",
                                 py: 0.4,
-                                px: 1,
-                                "&:hover": { bgcolor: "#f1f5f9", borderColor: "#94a3b8" },
+                                px: 1.2,
+                                "&:hover": { bgcolor: "#ccfbf1", borderColor: "#0d9488" },
                               }}
                             >
-                              Dossier
+                              Loan File
                             </Button>
                           </Stack>
                         </TableCell>

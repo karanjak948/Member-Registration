@@ -649,7 +649,7 @@ export default function LoanDetailPage() {
               <Box>
                 <Stack direction="row" spacing={1.5} alignItems="center" mb={0.5} flexWrap="wrap">
                   <Typography variant="h4" fontWeight={900} sx={{ color: "#ffffff", letterSpacing: "-0.5px" }}>
-                    Loan Dossier
+                    Loan Facility File
                   </Typography>
                   <Chip
                     label={loan.loan_number}
@@ -1721,7 +1721,7 @@ export default function LoanDetailPage() {
                             "&.Mui-disabled": { bgcolor: "#cbd5e1", color: "#64748b" },
                           }}
                         >
-                          View Dossier
+                          View Borrower Profile
                         </Button>
                       </Stack>
 
@@ -1819,7 +1819,7 @@ export default function LoanDetailPage() {
                               "&:hover": { bgcolor: "#1d4ed8" },
                             }}
                           >
-                            View Dossier
+                            View Guarantor Profile
                           </Button>
                         )}
                       </Stack>
@@ -2433,10 +2433,10 @@ export default function LoanDetailPage() {
                   </Box>
                   <Box>
                     <Typography variant="h6" fontWeight={900} color="#0f172a">
-                      Borrower Member Dossier
+                      Borrower Member Profile
                     </Typography>
                     <Typography variant="caption" color="#64748b" fontWeight={600}>
-                      Confidential Member Profile, KYC Credentials & Registration File
+                      Confidential Member KYC Profile & Membership File
                     </Typography>
                   </Box>
                 </Stack>
@@ -2673,7 +2673,7 @@ export default function LoanDetailPage() {
 
             <DialogActions sx={{ px: 2.5, py: 2, justifyContent: "space-between", bgcolor: "#f8fafc" }}>
               <Typography variant="caption" color="#64748b" fontWeight={700}>
-                CONFIDENTIAL SACCO BORROWER DOSSIER • VIEW-ONLY MODE
+                CONFIDENTIAL SACCO BORROWER PROFILE • VIEW-ONLY MODE
               </Typography>
               <Button
                 variant="contained"
@@ -2687,7 +2687,7 @@ export default function LoanDetailPage() {
                   "&:hover": { bgcolor: "#0f766e" },
                 }}
               >
-                Close Dossier
+                Close Profile
               </Button>
             </DialogActions>
           </Dialog>
@@ -2739,7 +2739,7 @@ export default function LoanDetailPage() {
                   </Box>
                   <Box>
                     <Typography variant="h6" fontWeight={900} color="#0f172a">
-                      Endorsing Guarantor Dossier
+                      Endorsing Guarantor Profile
                     </Typography>
                     <Typography variant="caption" color="#64748b" fontWeight={600}>
                       Credit Underwriting Security, Legal Endorsement & Guarantor KYC Record
@@ -2954,7 +2954,7 @@ export default function LoanDetailPage() {
                   "&:hover": { bgcolor: "#1d4ed8" },
                 }}
               >
-                Close Dossier
+                Close Profile
               </Button>
             </DialogActions>
           </Dialog>
