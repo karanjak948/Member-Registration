@@ -8,10 +8,19 @@ from apps.loans.views.ledger_views import (
     LedgerTransactionViewSet,
 )
 
+from apps.loans.views.mpesa_views import (
+    MpesaC2BConfirmationView,
+    MpesaC2BValidationView,
+    MpesaTransactionViewSet,
+)
+
 __all__ = [
     "LoanProductViewSet",
     "LoanViewSet",
     "RepaymentViewSet",
     "LedgerAccountViewSet",
     "LedgerTransactionViewSet",
+    "MpesaC2BConfirmationView",
+    "MpesaC2BValidationView",
+    "MpesaTransactionViewSet",
 ]

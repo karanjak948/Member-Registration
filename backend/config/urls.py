@@ -38,7 +38,16 @@ urlpatterns = [
     ),
 
     path(
+        "api/v1/",
+        include("apps.loans.urls"),
+    ),
+
+    path(
         "api/",
+        include("apps.savings.urls"),
+    ),
+    path(
+        "api/v1/",
         include("apps.savings.urls"),
     ),
 
