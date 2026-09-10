@@ -193,6 +193,14 @@ class LoanService {
   }
 
   /**
+   * POST /api/loans/send_due_reminders/
+   */
+  async sendDueDateReminders(days: number = 3): Promise<any> {
+    const response = await api.post("/loans/send_due_reminders/", { days });
+    return response.data;
+  }
+
+  /**
    * GET /api/sms/logs/
    */
   async getSMSLogs(params?: { status?: string; event_type?: string; search?: string }): Promise<any> {

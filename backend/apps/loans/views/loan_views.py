@@ -62,10 +62,16 @@ class LoanViewSet(viewsets.ModelViewSet):
         qs = super().get_queryset()
         status_param = self.request.query_params.get("status")
         member_id = self.request.query_params.get("member_id")
+        loan_officer_id = self.request.query_params.get("loan_officer")
+        my_portfolio = self.request.query_params.get("my_portfolio")
         if status_param:
             qs = qs.filter(status=status_param)
         if member_id:
             qs = qs.filter(member_id=member_id)
+        if loan_officer_id:
+            qs = qs.filter(loan_officer_id=loan_officer_id)
+        if my_portfolio in ["true", "1", "True"] and self.request.user.is_authenticated:
+            qs = qs.filter(loan_officer=self.request.user)
         return qs
 
     def destroy(self, request, *args, **kwargs):
@@ -553,3 +559,68 @@ class LoanViewSet(viewsets.ModelViewSet):
             "failed_count": failed,
             "results": results,
         })
+
+    @action(detail=False, methods=["post"], url_path="send_due_reminders")
+    def send_due_reminders(self, request):
+        """
+        Batch-triggers upcoming Due Date SMS reminders to borrowers whose installments are due in 0-3 days.
+        """
+        from datetime import timedelta
+        from apps.common.notification_service import NotificationService
+
+        days_ahead = int(request.data.get("days", 3))
+        today = timezone.now().date()
+        target_date = today + timedelta(days=days_ahead)
+
+        active_loans = Loan.objects.filter(
+            status__in=[
+                LoanStatus.ACTIVE,
+                LoanStatus.WATCHFUL,
+            ]
+        ).select_related("member", "loan_product")
+
+        dispatched = 0
+        failed = 0
+        results = []
+
+        for loan in active_loans:
+            upcoming = (
+                loan.schedule_entries.filter(
+                    is_paid=False,
+                    due_date__gte=today,
+                    due_date__lte=target_date,
+                )
+                .order_by("due_date")
+                .first()
+            )
+            if upcoming:
+                days_remaining = (upcoming.due_date - today).days
+                amt = upcoming.total_due
+                res = NotificationService.notify_due_date_reminder(
+                    loan=loan,
+                    installment_amount=amt,
+                    due_date=upcoming.due_date,
+                    days_remaining=days_remaining,
+                )
+                if res.get("success"):
+                    dispatched += 1
+                else:
+                    failed += 1
+                results.append({
+                    "loan_number": loan.loan_number,
+                    "member": f"{loan.member.first_name} {loan.member.other_names}".strip(),
+                    "phone": loan.member.phone_number,
+                    "due_date": str(upcoming.due_date),
+                    "days_remaining": days_remaining,
+                    "amount": str(amt),
+                    "status": "Sent" if res.get("success") else "Failed",
+                })
+
+        return Response({
+            "success": True,
+            "message": f"Due date reminders dispatched to {dispatched} borrowers ({failed} failed).",
+            "dispatched_count": dispatched,
+            "failed_count": failed,
+            "results": results,
+        })
+

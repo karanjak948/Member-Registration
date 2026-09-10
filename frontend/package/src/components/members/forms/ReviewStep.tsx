@@ -323,22 +323,51 @@ export default function ReviewStep({
 
       const memberId = createdOrUpdatedMember.id;
 
-      // 1. Save Next of Kin (All items)
-      if (hasNextOfKin && memberId) {
+      // 1. Save Next of Kin (All items - Upsert)
+      if (memberId) {
         try {
-          for (const kin of activeKins) {
-            if (cleanString(kin.first_name)) {
-              const kinPayload = {
-                member: memberId,
-                first_name: cleanString(kin.first_name),
-                other_names: cleanString(kin.other_names),
-                relationship: cleanString(kin.relationship),
-                national_id: cleanString(kin.national_id),
-                phone_number: cleanString(kin.phone_number),
-                physical_address: cleanString(kin.physical_address),
-                is_primary: Boolean(kin.is_primary),
-              };
-              await nextOfKinService.create(kinPayload);
+          const existingKins = await nextOfKinService.getAllByMember(memberId);
+          const activeKinIds = new Set<number>();
+
+          if (hasNextOfKin) {
+            for (const kin of activeKins) {
+              if (cleanString(kin.first_name)) {
+                const kinPayload = {
+                  member: memberId,
+                  first_name: cleanString(kin.first_name),
+                  other_names: cleanString(kin.other_names),
+                  relationship: cleanString(kin.relationship),
+                  national_id: cleanString(kin.national_id),
+                  phone_number: cleanString(kin.phone_number),
+                  physical_address: cleanString(kin.physical_address),
+                  is_primary: Boolean(kin.is_primary),
+                };
+
+                const target = kin.id
+                  ? existingKins.find((ek) => ek.id === kin.id)
+                  : existingKins.find(
+                      (ek) =>
+                        (ek.national_id && ek.national_id === kin.national_id) ||
+                        (ek.first_name?.toLowerCase() === kin.first_name?.toLowerCase() &&
+                          ek.relationship?.toLowerCase() === kin.relationship?.toLowerCase()),
+                    );
+
+                if (target?.id) {
+                  activeKinIds.add(target.id);
+                  await nextOfKinService.update(target.id, kinPayload);
+                } else {
+                  const created = await nextOfKinService.create(kinPayload);
+                  if (created?.id) activeKinIds.add(created.id);
+                }
+              }
+            }
+          }
+
+          if (mode === "edit") {
+            for (const ek of existingKins) {
+              if (ek.id && !activeKinIds.has(ek.id)) {
+                await nextOfKinService.delete(ek.id).catch(() => {});
+              }
             }
           }
         } catch (err) {
@@ -346,22 +375,49 @@ export default function ReviewStep({
         }
       }
 
-      // 2. Save Vehicles (All items)
-      if (hasVehicle && memberId) {
+      // 2. Save Vehicles (All items - Upsert)
+      if (memberId) {
         try {
-          for (const veh of activeVehicles) {
-            if (cleanString(veh.registration_number)) {
-              const vehiclePayload = {
-                member: memberId,
-                registration_number: cleanString(veh.registration_number).toUpperCase(),
-                make: cleanString(veh.make),
-                model: cleanString(veh.model),
-                year: veh.year ? Number(veh.year) : null,
-                color: cleanString(veh.color),
-                engine_number: cleanString(veh.engine_number),
-                chassis_number: cleanString(veh.chassis_number),
-              };
-              await vehicleService.create(vehiclePayload);
+          const existingVehicles = await vehicleService.getAllByMember(memberId);
+          const activeVehicleIds = new Set<number>();
+
+          if (hasVehicle) {
+            for (const veh of activeVehicles) {
+              const regNumber = cleanString(veh.registration_number).toUpperCase();
+              if (regNumber) {
+                const vehiclePayload = {
+                  member: memberId,
+                  registration_number: regNumber,
+                  make: cleanString(veh.make),
+                  model: cleanString(veh.model),
+                  year: veh.year ? Number(veh.year) : null,
+                  color: cleanString(veh.color),
+                  engine_number: cleanString(veh.engine_number),
+                  chassis_number: cleanString(veh.chassis_number),
+                };
+
+                const target = veh.id
+                  ? existingVehicles.find((ev) => ev.id === veh.id)
+                  : existingVehicles.find(
+                      (ev) => ev.registration_number?.toUpperCase() === regNumber,
+                    );
+
+                if (target?.id) {
+                  activeVehicleIds.add(target.id);
+                  await vehicleService.update(target.id, vehiclePayload);
+                } else {
+                  const created = await vehicleService.create(vehiclePayload);
+                  if (created?.id) activeVehicleIds.add(created.id);
+                }
+              }
+            }
+          }
+
+          if (mode === "edit") {
+            for (const ev of existingVehicles) {
+              if (ev.id && !activeVehicleIds.has(ev.id)) {
+                await vehicleService.delete(ev.id).catch(() => {});
+              }
             }
           }
         } catch (err) {

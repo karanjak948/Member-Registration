@@ -38,6 +38,8 @@ import { LoanCreate } from "@/interfaces/loan";
 import loanService from "@/services/loan.service";
 import { useMembers } from "@/hooks/useMembers";
 import { useLoanProducts } from "@/hooks/useLoanProducts";
+import userService from "@/services/user.service";
+import { OrganizationUser } from "@/types/user";
 
 const today = new Date().toISOString().split("T")[0];
 
@@ -52,6 +54,7 @@ const defaultValues: LoanCreate = {
   security_provided_value: null,
   security_provided_notes: null,
   deposit_paid_amount: null,
+  loan_officer: null,
 };
 
 export default function ApplyLoanForm() {
@@ -63,6 +66,14 @@ export default function ApplyLoanForm() {
 
   const { members } = useMembers();
   const { products } = useLoanProducts();
+  const [officers, setOfficers] = useState<OrganizationUser[]>([]);
+
+  useEffect(() => {
+    userService
+      .getUsers()
+      .then((data) => setOfficers(Array.isArray(data) ? data : []))
+      .catch((err) => console.warn("Could not fetch loan officers:", err));
+  }, []);
 
   const [loading, setLoading] = useState(false);
   const [snackbar, setSnackbar] = useState<{
@@ -330,6 +341,11 @@ export default function ApplyLoanForm() {
         payload.security_provided_notes === ""
       ) {
         delete payload.security_provided_notes;
+      }
+      if (data.loan_officer) {
+        payload.loan_officer = Number(data.loan_officer);
+      } else {
+        delete payload.loan_officer;
       }
 
       if (payload.deposit_paid_amount !== null && payload.deposit_paid_amount !== undefined) {
@@ -675,6 +691,72 @@ export default function ApplyLoanForm() {
                 />
               </Grid>
             </Grid>
+
+            {/* Assigned Loan Officer */}
+            <Grid container spacing={3} mt={0.5}>
+              <Grid size={{ xs: 12, md: 6 }}>
+                <Typography variant="subtitle2" fontWeight={800} sx={{ mb: 0.8, color: "#1e293b" }}>
+                  Assigned Loan Officer
+                </Typography>
+                <Controller
+                  name="loan_officer"
+                  control={methods.control}
+                  render={({ field, fieldState }) => (
+                    <TextField
+                      {...field}
+                      select
+                      fullWidth
+                      value={field.value ?? ""}
+                      onChange={(e) =>
+                        field.onChange(e.target.value ? Number(e.target.value) : null)
+                      }
+                      error={!!fieldState.error}
+                      helperText={
+                        fieldState.error?.message ||
+                        "Assigns this loan to a loan officer for portfolio monitoring and reporting"
+                      }
+                      slotProps={{
+                        input: {
+                          startAdornment: (
+                            <InputAdornment position="start">
+                              <IconUser size={18} style={{ color: "#0284c7" }} />
+                            </InputAdornment>
+                          ),
+                          sx: {
+                            borderRadius: 2,
+                            fontWeight: 600,
+                            "& .MuiOutlinedInput-notchedOutline": { borderColor: "#cbd5e1" },
+                            "&:hover .MuiOutlinedInput-notchedOutline": { borderColor: "#0284c7" },
+                            "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
+                              borderColor: "#0284c7",
+                              borderWidth: 2,
+                            },
+                          },
+                        },
+                      }}
+                    >
+                      <MenuItem value="">-- Unassigned (General Portfolio) --</MenuItem>
+                      {officers.map((user) => {
+                        const fullName =
+                          user.first_name || user.last_name
+                            ? `${user.first_name} ${user.last_name}`.trim()
+                            : user.username;
+                        return (
+                          <MenuItem key={user.id} value={user.id}>
+                            <Stack direction="row" spacing={1} alignItems="center">
+                              <span style={{ fontWeight: 700 }}>{fullName}</span>
+                              <span style={{ color: "#64748b", fontSize: "0.8rem" }}>
+                                ({user.email || user.username})
+                              </span>
+                            </Stack>
+                          </MenuItem>
+                        );
+                      })}
+                    </TextField>
+                  )}
+                />
+              </Grid>
+            </Grid>
           </Paper>
 
           {/* Module 2: Principal Amount & Repayment Timeline */}
@@ -732,6 +814,7 @@ export default function ApplyLoanForm() {
                       placeholder={productMinAmount > 0 ? `e.g. ${productMinAmount}` : "e.g. 50000"}
                       value={field.value}
                       onChange={(e) => field.onChange(Number(e.target.value))}
+                      onWheel={(e) => (e.target as HTMLElement).blur()}
                       error={!!fieldState.error || isBelowMin || isAboveMax}
                       helperText={
                         fieldState.error?.message ||
@@ -760,6 +843,13 @@ export default function ApplyLoanForm() {
                             borderRadius: 2,
                             fontWeight: 800,
                             fontFamily: "monospace",
+                            "& input[type=number]": {
+                              MozAppearance: "textfield",
+                            },
+                            "& input[type=number]::-webkit-outer-spin-button, & input[type=number]::-webkit-inner-spin-button": {
+                              WebkitAppearance: "none",
+                              margin: 0,
+                            },
                             "& .MuiOutlinedInput-notchedOutline": {
                               borderColor: isBelowMin || isAboveMax ? "#fca5a5" : "#cbd5e1",
                             },
@@ -790,6 +880,7 @@ export default function ApplyLoanForm() {
                     <TextField
                       fullWidth
                       type="number"
+                      onWheel={(e) => (e.target as HTMLElement).blur()}
                       placeholder={productMaxPeriods ? `Up to ${productMaxPeriods}` : "e.g. 12 or 24"}
                       value={field.value ?? ""}
                       onChange={(e) => field.onChange(e.target.value === "" ? null : Number(e.target.value))}

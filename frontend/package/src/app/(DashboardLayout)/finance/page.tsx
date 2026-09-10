@@ -111,6 +111,7 @@ export default function FinancePage() {
   }, [tabParam]);
 
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedAccountCode, setSelectedAccountCode] = useState<string>("ALL");
   const [expandedTxns, setExpandedTxns] = useState<Record<number, boolean>>({});
 
   // Income Posting State
@@ -309,20 +310,55 @@ export default function FinancePage() {
     setExpandedTxns((prev) => ({ ...prev, [id]: !prev[id] }));
   };
 
-  // Financial Metrics
+  // Financial Metrics - 6 Core SACCO Accounts
   const metrics = useMemo(() => {
     let totalDisbursed = 0;
     let totalCashOut = 0;
     let totalCashIn = 0;
     let totalRevenue = 0;
 
+    let loansIssued1200 = 0;
+    let securityDeposits2100 = 0;
+    let processingFees4100 = 0;
+    let formFees4150 = 0;
+    let interestEarned4000 = 0;
+    let penaltiesCollected4200 = 0;
+
     transactions.forEach((tx) => {
       tx.entries?.forEach((e) => {
         const amt = Number(e.amount || 0);
-        if (e.account_code === "1200" && e.entry_type === "debit") {
-          totalDisbursed += amt;
+        const code = e.account_code;
+
+        if (code === "1200") {
+          if (e.entry_type === "debit") {
+            loansIssued1200 += amt;
+            totalDisbursed += amt;
+          } else if (e.entry_type === "credit") {
+            loansIssued1200 -= amt;
+          }
         }
-        if (e.account_code === "1010") {
+        if (code === "2100") {
+          if (e.entry_type === "credit") securityDeposits2100 += amt;
+          else if (e.entry_type === "debit") securityDeposits2100 -= amt;
+        }
+        if (code === "4000") {
+          if (e.entry_type === "credit") interestEarned4000 += amt;
+          else if (e.entry_type === "debit") interestEarned4000 -= amt;
+        }
+        if (code === "4100") {
+          if (e.entry_type === "credit") processingFees4100 += amt;
+          else if (e.entry_type === "debit") processingFees4100 -= amt;
+        }
+        if (code === "4150") {
+          if (e.entry_type === "credit") formFees4150 += amt;
+          else if (e.entry_type === "debit") formFees4150 -= amt;
+        }
+        if (code === "4200") {
+          if (e.entry_type === "credit") penaltiesCollected4200 += amt;
+          else if (e.entry_type === "debit") penaltiesCollected4200 -= amt;
+        }
+
+        if (code === "1010") {
           if (e.entry_type === "credit") totalCashOut += amt;
           if (e.entry_type === "debit") totalCashIn += amt;
         }
@@ -337,14 +373,28 @@ export default function FinancePage() {
       totalCashOut,
       totalCashIn,
       totalRevenue,
+      loansIssued1200: Math.max(0, loansIssued1200),
+      securityDeposits2100: Math.max(0, securityDeposits2100),
+      processingFees4100: Math.max(0, processingFees4100),
+      formFees4150: Math.max(0, formFees4150),
+      interestEarned4000: Math.max(0, interestEarned4000),
+      penaltiesCollected4200: Math.max(0, penaltiesCollected4200),
     };
   }, [transactions]);
 
-  // Filtered transactions
+  // Filtered transactions (accounting code filter + search query)
   const filteredTransactions = useMemo(() => {
-    if (!searchQuery.trim()) return transactions;
+    let result = transactions;
+
+    if (selectedAccountCode !== "ALL") {
+      result = result.filter((tx) =>
+        tx.entries?.some((e) => e.account_code === selectedAccountCode)
+      );
+    }
+
+    if (!searchQuery.trim()) return result;
     const q = searchQuery.toLowerCase();
-    return transactions.filter(
+    return result.filter(
       (tx) =>
         tx.transaction_number.toLowerCase().includes(q) ||
         tx.description.toLowerCase().includes(q) ||
@@ -356,7 +406,7 @@ export default function FinancePage() {
             e.account_code.toLowerCase().includes(q)
         )
     );
-  }, [transactions, searchQuery]);
+  }, [transactions, searchQuery, selectedAccountCode]);
 
   return (
     <PageContainer
@@ -414,6 +464,144 @@ export default function FinancePage() {
             </IconButton>
           </Stack>
         </Stack>
+
+        {/* Core SACCO Ledger Accounts (Peter Irungu Checklist 6 Core Accounts) */}
+        <Typography variant="subtitle1" fontWeight={800} color="#0f172a" mb={1.5}>
+          General Ledger Balances (Core SACCO Chart of Accounts)
+        </Typography>
+        <Grid container spacing={2} sx={{ mb: 3.5 }}>
+          {[
+            {
+              code: "1200",
+              title: "Loans Issued",
+              balance: metrics.loansIssued1200,
+              type: "ASSET",
+              color: "#059669",
+              bg: "#ecfdf5",
+              desc: "Principal credit facility balance",
+            },
+            {
+              code: "2100",
+              title: "Security Deposits",
+              balance: metrics.securityDeposits2100,
+              type: "LIABILITY",
+              color: "#7c3aed",
+              bg: "#faf5ff",
+              desc: "Collateral savings & reserves held",
+            },
+            {
+              code: "4100",
+              title: "Processing Fees",
+              balance: metrics.processingFees4100,
+              type: "REVENUE",
+              color: "#0284c7",
+              bg: "#f0f9ff",
+              desc: "Loan origination fee income",
+            },
+            {
+              code: "4150",
+              title: "Form Fees",
+              balance: metrics.formFees4150,
+              type: "REVENUE",
+              color: "#0f766e",
+              bg: "#f0fdfa",
+              desc: "Member application & form revenue",
+            },
+            {
+              code: "4000",
+              title: "Interest Earned",
+              balance: metrics.interestEarned4000,
+              type: "REVENUE",
+              color: "#d97706",
+              bg: "#fffbeb",
+              desc: "Monthly loan interest revenue",
+            },
+            {
+              code: "4200",
+              title: "Penalties Collected",
+              balance: metrics.penaltiesCollected4200,
+              type: "REVENUE",
+              color: "#e11d48",
+              bg: "#fff1f2",
+              desc: "Late payment penalty collections",
+            },
+          ].map((item) => {
+            const isSelected = selectedAccountCode === item.code;
+            return (
+              <Grid key={item.code} size={{ xs: 12, sm: 6, md: 4 }}>
+                <Card
+                  elevation={0}
+                  onClick={() => {
+                    setSelectedAccountCode((prev) => (prev === item.code ? "ALL" : item.code));
+                    setTabValue(0);
+                  }}
+                  sx={{
+                    borderRadius: 2.5,
+                    border: isSelected ? `2px solid ${item.color}` : "1px solid #e2e8f0",
+                    bgcolor: isSelected ? item.bg : "#ffffff",
+                    boxShadow: isSelected
+                      ? `0 4px 16px ${item.color}25`
+                      : "0 2px 8px rgba(0,0,0,0.03)",
+                    cursor: "pointer",
+                    transition: "all 0.2s ease",
+                    "&:hover": {
+                      borderColor: item.color,
+                      transform: "translateY(-2px)",
+                      boxShadow: `0 6px 18px ${item.color}20`,
+                    },
+                  }}
+                >
+                  <Box sx={{ height: 4, bgcolor: item.color }} />
+                  <CardContent sx={{ p: 2 }}>
+                    <Stack direction="row" justifyContent="space-between" alignItems="center">
+                      <Chip
+                        size="small"
+                        label={`Acct ${item.code}`}
+                        sx={{
+                          fontWeight: 800,
+                          fontSize: "0.72rem",
+                          fontFamily: "monospace",
+                          bgcolor: item.bg,
+                          color: item.color,
+                          border: `1px solid ${item.color}40`,
+                        }}
+                      />
+                      <Chip
+                        size="small"
+                        label={item.type}
+                        sx={{
+                          fontWeight: 700,
+                          fontSize: "0.68rem",
+                          height: 20,
+                          bgcolor: "#f1f5f9",
+                          color: "#475569",
+                        }}
+                      />
+                    </Stack>
+                    <Typography variant="subtitle2" fontWeight={800} color="#0f172a" mt={1.2}>
+                      {item.title}
+                    </Typography>
+                    <Typography variant="h5" fontWeight={900} sx={{ color: item.color, mt: 0.5 }}>
+                      KES {item.balance.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    </Typography>
+                    <Stack direction="row" justifyContent="space-between" alignItems="center" mt={0.8}>
+                      <Typography variant="caption" color="text.secondary">
+                        {item.desc}
+                      </Typography>
+                      <Typography
+                        variant="caption"
+                        fontWeight={700}
+                        sx={{ color: item.color, textDecoration: "underline" }}
+                      >
+                        {isSelected ? "Isolating" : "Filter"}
+                      </Typography>
+                    </Stack>
+                  </CardContent>
+                </Card>
+              </Grid>
+            );
+          })}
+        </Grid>
 
         {/* Executive Metric Cards */}
         <Grid container spacing={2.5} sx={{ mb: 3.5 }}>
@@ -624,6 +812,54 @@ export default function FinancePage() {
           </Box>
 
           <CardContent sx={{ p: 0 }}>
+            {tabValue === 0 && (
+              <Box sx={{ p: 2, bgcolor: "#f8fafc", borderBottom: "1px solid #e2e8f0" }}>
+                <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
+                  <Typography variant="caption" fontWeight={800} color="#64748b" textTransform="uppercase" mr={0.5}>
+                    Filter By Ledger Account:
+                  </Typography>
+                  {[
+                    { code: "ALL", label: "All Accounts" },
+                    { code: "1200", label: "1200 • Loans Issued" },
+                    { code: "2100", label: "2100 • Security Deposits" },
+                    { code: "4000", label: "4000 • Interest Earned" },
+                    { code: "4100", label: "4100 • Processing Fees" },
+                    { code: "4150", label: "4150 • Form Fees" },
+                    { code: "4200", label: "4200 • Penalties Collected" },
+                  ].map((chip) => {
+                    const isSelected = selectedAccountCode === chip.code;
+                    return (
+                      <Chip
+                        key={chip.code}
+                        label={chip.label}
+                        size="small"
+                        onClick={() => setSelectedAccountCode(chip.code)}
+                        sx={{
+                          fontWeight: 700,
+                          fontSize: "0.78rem",
+                          borderRadius: 2,
+                          bgcolor: isSelected ? "#059669" : "#ffffff",
+                          color: isSelected ? "#ffffff" : "#475569",
+                          border: `1px solid ${isSelected ? "#059669" : "#cbd5e1"}`,
+                          "&:hover": { bgcolor: isSelected ? "#047857" : "#f1f5f9" },
+                        }}
+                      />
+                    );
+                  })}
+                  {selectedAccountCode !== "ALL" && (
+                    <Button
+                      size="small"
+                      variant="text"
+                      onClick={() => setSelectedAccountCode("ALL")}
+                      sx={{ textTransform: "none", fontSize: "0.75rem", fontWeight: 700, color: "#e11d48", ml: 1 }}
+                    >
+                      Reset Filter
+                    </Button>
+                  )}
+                </Stack>
+              </Box>
+            )}
+
             {loading ? (
               <Box display="flex" justifyContent="center" alignItems="center" py={10}>
                 <CircularProgress size={36} color="primary" />

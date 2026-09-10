@@ -36,6 +36,7 @@ export interface LoanCreate {
   security_provided_value?: number | null;
   security_provided_notes?: string | null;
   deposit_paid_amount?: number | null;
+  loan_officer?: number | null;
 }
 
 /**
@@ -136,6 +137,9 @@ export interface Loan {
   loan_product_id: number;
   product_name?: string;
   product_code?: string;
+  loan_officer?: number | null;
+  loan_officer_id?: number | null;
+  loan_officer_name?: string | null;
   guarantor_member_id: number | null;
   guarantor_name?: string | null;
   guarantor_phone?: string | null;

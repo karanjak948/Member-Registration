@@ -141,7 +141,7 @@ export default function MemberToolbar({
                 <MenuItem value="" sx={{ fontWeight: 600 }}>All Categories</MenuItem>
                 <MenuItem value="Normal Member">🟢 Normal Member</MenuItem>
                 <MenuItem value="Special Member">🔵 Special Member</MenuItem>
-                <MenuItem value="Other Member">🟣 Other Member</MenuItem>
+                <MenuItem value="Other Guarantors">🟣 Other Guarantors</MenuItem>
               </Select>
             </FormControl>
           )}

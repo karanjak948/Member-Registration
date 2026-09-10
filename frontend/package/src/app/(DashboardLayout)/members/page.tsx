@@ -64,12 +64,16 @@ export default function MembersPage() {
   useEffect(() => {
     const categoryParam = searchParams.get("category") || searchParams.get("type");
     if (categoryParam) {
-      if (categoryParam.toLowerCase().includes("normal")) {
+      if (categoryParam === "1" || categoryParam.toLowerCase().includes("normal")) {
         setCategoryFilter("Normal Member");
-      } else if (categoryParam.toLowerCase().includes("special")) {
+      } else if (categoryParam === "2" || categoryParam.toLowerCase().includes("special")) {
         setCategoryFilter("Special Member");
-      } else if (categoryParam.toLowerCase().includes("other")) {
-        setCategoryFilter("Other Member");
+      } else if (
+        categoryParam === "3" ||
+        categoryParam.toLowerCase().includes("other") ||
+        categoryParam.toLowerCase().includes("guarantor")
+      ) {
+        setCategoryFilter("Other Guarantors");
       } else {
         setCategoryFilter(categoryParam);
       }
@@ -150,8 +154,10 @@ export default function MembersPage() {
           (member.category_name?.toLowerCase().includes("normal") || !member.category_name)) ||
         (categoryFilter.toLowerCase().includes("special") &&
           member.category_name?.toLowerCase().includes("special")) ||
-        (categoryFilter.toLowerCase().includes("other") &&
-          member.category_name?.toLowerCase().includes("other"));
+        ((categoryFilter.toLowerCase().includes("other") ||
+          categoryFilter.toLowerCase().includes("guarantor")) &&
+          (member.category_name?.toLowerCase().includes("other") ||
+            member.category_name?.toLowerCase().includes("guarantor")));
 
       return matchesSearch && matchesStatus && matchesStage && matchesCategory;
     });

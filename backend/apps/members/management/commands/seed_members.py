@@ -37,9 +37,9 @@ class Command(BaseCommand):
                 "description": "Special member",
             },
             {
-                "name": "Other Member",
+                "name": "Other Guarantors",
                 "code": "OTHER",
-                "description": "Other member",
+                "description": "Other guarantors (part of membership)",
             },
         ]
 

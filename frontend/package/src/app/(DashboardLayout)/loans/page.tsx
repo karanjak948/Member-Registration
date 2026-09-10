@@ -26,6 +26,10 @@ import {
   Button,
   Grid,
   InputAdornment,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
 } from "@mui/material";
 import {
   IconSearch,
@@ -42,12 +46,16 @@ import {
   IconChecklist,
   IconSettings,
   IconAlertTriangle,
+  IconUser,
+  IconSend,
 } from "@tabler/icons-react";
 import ExportButton from "@/components/common/ExportButton";
 import { useLoans } from "@/hooks/useLoans";
 import { usePermissions } from "@/hooks/usePermissions";
 import { PERMISSIONS } from "@/constants/permissions";
 import loanService from "@/services/loan.service";
+import userService from "@/services/user.service";
+import { OrganizationUser } from "@/types/user";
 import LoanApprovalDialog from "@/components/loans/dialogs/LoanApprovalDialog";
 import LoanDisbursementDialog from "@/components/loans/dialogs/LoanDisbursementDialog";
 import LoanDetailsModal from "@/components/loans/dialogs/LoanDetailsModal";
@@ -128,8 +136,41 @@ function LoansContent() {
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
+  const [officerFilter, setOfficerFilter] = useState<string>("ALL");
+  const [officers, setOfficers] = useState<OrganizationUser[]>([]);
   const [sendingOverdue, setSendingOverdue] = useState(false);
+  const [sendingDueReminders, setSendingDueReminders] = useState(false);
   const [actionFeedback, setActionFeedback] = useState<{ message: string; severity: "success" | "error" | "info" } | null>(null);
+
+  useEffect(() => {
+    userService
+      .getUsers()
+      .then((data) => setOfficers(Array.isArray(data) ? data : []))
+      .catch((err) => console.warn("Could not load loan officers:", err));
+  }, []);
+
+  const handleTriggerDueReminders = async () => {
+    if (!window.confirm("Dispatch SMS due date reminders to borrowers whose installments are due within the next 3 days?")) {
+      return;
+    }
+    try {
+      setSendingDueReminders(true);
+      const res = await loanService.sendDueDateReminders(3);
+      setActionFeedback({
+        message: res.message || "Due date SMS reminders dispatched successfully.",
+        severity: "success",
+      });
+      refresh();
+    } catch (err: any) {
+      console.error("Failed to trigger due date reminders:", err);
+      setActionFeedback({
+        message: err.response?.data?.error || "Failed to dispatch due date reminders.",
+        severity: "error",
+      });
+    } finally {
+      setSendingDueReminders(false);
+    }
+  };
 
   const handleTriggerOverdueAlerts = async () => {
     if (!window.confirm("Are you sure you want to dispatch overdue delinquency SMS notices to all borrowers with late installments?")) {
@@ -187,7 +228,7 @@ function LoansContent() {
         loan.member_id?.toString().includes(searchLower) ||
         loan.status?.toLowerCase().includes(searchLower);
 
-      let matchesStatus = true;
+        let matchesStatus = true;
       if (statusFilter !== "ALL") {
         if (statusFilter === "pending_application") {
           matchesStatus = ["pending_application", "appraised"].includes(loan.status);
@@ -196,9 +237,20 @@ function LoansContent() {
         }
       }
 
-      return matchesSearch && matchesStatus;
+      let matchesOfficer = true;
+      if (officerFilter !== "ALL") {
+        if (officerFilter === "UNASSIGNED") {
+          matchesOfficer = !loan.loan_officer && !loan.loan_officer_id;
+        } else {
+          matchesOfficer =
+            loan.loan_officer === Number(officerFilter) ||
+            loan.loan_officer_id === Number(officerFilter);
+        }
+      }
+
+      return matchesSearch && matchesStatus && matchesOfficer;
     });
-  }, [loans, search, statusFilter]);
+  }, [loans, search, statusFilter, officerFilter]);
 
   // Aggregate Metrics
   const metrics = useMemo(() => {
@@ -492,6 +544,26 @@ function LoansContent() {
 
               <Button
                 variant="outlined"
+                startIcon={<IconSend size={18} />}
+                onClick={handleTriggerDueReminders}
+                disabled={sendingDueReminders}
+                sx={{
+                  bgcolor: "rgba(14, 165, 233, 0.2)",
+                  color: "#ffffff",
+                  fontWeight: 800,
+                  borderRadius: 2.5,
+                  px: 2.25,
+                  py: 1,
+                  backdropFilter: "blur(8px)",
+                  border: "1px solid rgba(14, 165, 233, 0.45)",
+                  "&:hover": { bgcolor: "rgba(14, 165, 233, 0.35)" },
+                }}
+              >
+                {sendingDueReminders ? "Sending..." : "Due Date Reminders"}
+              </Button>
+
+              <Button
+                variant="outlined"
                 startIcon={<IconSettings size={18} />}
                 onClick={() => router.push("/loan-products")}
                 sx={{
@@ -702,6 +774,44 @@ function LoansContent() {
               }}
             />
 
+            {/* Loan Officer Filter */}
+            <FormControl size="small" sx={{ minWidth: { xs: "100%", md: 220 } }}>
+              <InputLabel id="loan-officer-filter-label" sx={{ fontWeight: 700, fontSize: "0.85rem" }}>
+                Loan Officer Portfolio
+              </InputLabel>
+              <Select
+                labelId="loan-officer-filter-label"
+                label="Loan Officer Portfolio"
+                value={officerFilter}
+                onChange={(e) => setOfficerFilter(e.target.value)}
+                sx={{
+                  borderRadius: 2.5,
+                  fontWeight: 700,
+                  bgcolor: "#f8fafc",
+                  "& .MuiOutlinedInput-notchedOutline": { borderColor: "#cbd5e1" },
+                  "&:hover .MuiOutlinedInput-notchedOutline": { borderColor: "#059669" },
+                }}
+              >
+                <MenuItem value="ALL" sx={{ fontWeight: 700 }}>
+                  👥 All Loan Officers
+                </MenuItem>
+                <MenuItem value="UNASSIGNED" sx={{ fontWeight: 600, color: "#64748b" }}>
+                  ⚪ Unassigned Portfolio
+                </MenuItem>
+                {officers.map((off) => {
+                  const name =
+                    off.first_name || off.last_name
+                      ? `${off.first_name} ${off.last_name}`.trim()
+                      : off.username;
+                  return (
+                    <MenuItem key={off.id} value={String(off.id)}>
+                      👤 {name}
+                    </MenuItem>
+                  );
+                })}
+              </Select>
+            </FormControl>
+
             {/* Quick Status Filter Chips */}
             <Stack
               direction="row"
@@ -784,6 +894,7 @@ function LoansContent() {
                   <TableCell sx={{ fontWeight: 800, color: "#1e293b", py: 2 }}>ID</TableCell>
                   <TableCell sx={{ fontWeight: 800, color: "#1e293b", py: 2 }}>Loan Ref #</TableCell>
                   <TableCell sx={{ fontWeight: 800, color: "#1e293b", py: 2 }}>Borrower ID</TableCell>
+                  <TableCell sx={{ fontWeight: 800, color: "#1e293b", py: 2 }}>Loan Officer</TableCell>
                   <TableCell sx={{ fontWeight: 800, color: "#1e293b", py: 2 }}>Product Tier</TableCell>
                   <TableCell sx={{ fontWeight: 800, color: "#1e293b", py: 2 }}>Principal Amount</TableCell>
                   <TableCell sx={{ fontWeight: 800, color: "#1e293b", py: 2 }}>Outstanding Balance</TableCell>
@@ -858,6 +969,28 @@ function LoansContent() {
                               color: "#334155",
                             }}
                           />
+                        </TableCell>
+
+                        {/* Loan Officer */}
+                        <TableCell>
+                          {loan.loan_officer_name ? (
+                            <Chip
+                              size="small"
+                              icon={<IconUser size={13} style={{ color: "#0284c7" }} />}
+                              label={loan.loan_officer_name}
+                              sx={{
+                                fontWeight: 700,
+                                fontSize: "0.72rem",
+                                bgcolor: "#f0f9ff",
+                                color: "#0369a1",
+                                border: "1px solid #bae6fd",
+                              }}
+                            />
+                          ) : (
+                            <Typography variant="caption" sx={{ color: "#94a3b8", fontStyle: "italic" }}>
+                              Unassigned
+                            </Typography>
+                          )}
                         </TableCell>
 
                         <TableCell>

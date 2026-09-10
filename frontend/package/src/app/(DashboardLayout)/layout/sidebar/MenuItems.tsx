@@ -105,10 +105,10 @@ export function getMenuItems(
         href: "/members?category=Special%20Member",
       },
       {
-        id: "other-members",
-        title: "Other Members",
+        id: "other-guarantors",
+        title: "Other Guarantors",
         icon: IconId,
-        href: "/members?category=Other%20Member",
+        href: "/members?category=Other%20Guarantors",
       },
     ],
   });

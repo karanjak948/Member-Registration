@@ -21,6 +21,8 @@ import {
 
 import api from "@/services/api";
 import { validateMember, ValidationErrors } from "@/utils/memberValidation";
+import fieldConfigurationService from "@/services/fieldConfiguration.service";
+import { FieldConfiguration } from "@/interfaces/fieldConfiguration";
 import {
   IconUser,
   IconId,
@@ -130,12 +132,42 @@ export default function MemberDetailsStep({
   const [categories, setCategories] = useState<MemberCategory[]>([]);
   const [error, setError] = useState("");
   const [errors, setErrors] = useState<ValidationErrors>({});
+  const [fieldConfigs, setFieldConfigs] = useState<FieldConfiguration[]>([]);
 
   const [form, setForm] = useState<MemberFormData>(() =>
     createFormData(initialValues),
   );
 
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+
+  // Load field configurations dynamically whenever selected category changes
+  useEffect(() => {
+    if (!form.category) {
+      setFieldConfigs([]);
+      return;
+    }
+    let isMounted = true;
+    fieldConfigurationService
+      .getAll(Number(form.category))
+      .then((configs) => {
+        if (isMounted) {
+          setFieldConfigs(Array.isArray(configs) ? configs : []);
+        }
+      })
+      .catch((err) => {
+        console.warn("Unable to load category field configs:", err);
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, [form.category]);
+
+  const kraPinConfig = fieldConfigs.find((f) => f.field_name === "kra_pin");
+  const isKraPinVisible = kraPinConfig ? kraPinConfig.is_visible : true;
+  const isKraPinEnabled = kraPinConfig ? kraPinConfig.is_enabled : true;
+  const isKraPinRequired = kraPinConfig
+    ? Boolean(kraPinConfig.is_required && kraPinConfig.is_enabled && kraPinConfig.is_visible)
+    : false;
 
   useEffect(() => {
     let mounted = true;
@@ -292,6 +324,14 @@ export default function MemberDetailsStep({
     if (loading) return;
 
     const validationErrors = validateMember(form);
+
+    // Dynamically enforce or bypass KRA PIN validation based on category configuration
+    if (isKraPinRequired && !form.kra_pin.trim()) {
+      validationErrors.kra_pin = "KRA Tax PIN is required for this member category.";
+    } else if (!isKraPinRequired) {
+      delete validationErrors.kra_pin;
+    }
+
     if (Object.keys(validationErrors).length > 0) {
       setErrors(validationErrors);
       setError(
@@ -925,52 +965,69 @@ export default function MemberDetailsStep({
               </Box>
             </Grid>
 
-            <Grid size={{ xs: 12, md: 6 }}>
-              <Box>
-                <Typography
-                  variant="subtitle2"
-                  fontWeight={800}
-                  sx={{ mb: 0.8, color: "#1e293b", fontSize: "0.875rem" }}
-                >
-                  KRA Tax PIN
-                </Typography>
-                <TextField
-                  fullWidth
-                  name="kra_pin"
-                  placeholder="e.g. A012345678Z"
-                  value={form.kra_pin}
-                  onChange={handleChange}
-                  disabled={loading}
-                  helperText="Optional for tax compliance"
-                  slotProps={{
-                    input: {
-                      startAdornment: (
-                        <InputAdornment position="start">
-                          <IconReceiptTax
-                            size={18}
-                            style={{ color: "#0284c7" }}
-                          />
-                        </InputAdornment>
-                      ),
-                      sx: {
-                        borderRadius: 2,
-                        fontWeight: 600,
-                        "& .MuiOutlinedInput-notchedOutline": {
-                          borderColor: "#cbd5e1",
-                        },
-                        "&:hover .MuiOutlinedInput-notchedOutline": {
-                          borderColor: "#0284c7",
-                        },
-                        "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
-                          borderColor: "#0284c7",
-                          borderWidth: 2,
+            {/* KRA PIN - Dynamic Category Field Configuration */}
+            {isKraPinVisible && (
+              <Grid size={{ xs: 12, md: 6 }}>
+                <Box>
+                  <Typography
+                    variant="subtitle2"
+                    fontWeight={800}
+                    sx={{ mb: 0.8, color: "#1e293b", fontSize: "0.875rem" }}
+                  >
+                    KRA Tax PIN{" "}
+                    {isKraPinRequired && (
+                      <span style={{ color: "#e11d48", fontWeight: 800 }}>*</span>
+                    )}
+                  </Typography>
+                  <TextField
+                    fullWidth
+                    name="kra_pin"
+                    placeholder="e.g. A012345678Z"
+                    value={form.kra_pin}
+                    onChange={handleChange}
+                    error={!!errors.kra_pin}
+                    disabled={loading || !isKraPinEnabled}
+                    helperText={
+                      errors.kra_pin ||
+                      (!isKraPinEnabled
+                        ? "Field disabled in SACCO configuration for this category"
+                        : isKraPinRequired
+                        ? "Mandatory for this member category"
+                        : "Optional for tax compliance")
+                    }
+                    slotProps={{
+                      input: {
+                        startAdornment: (
+                          <InputAdornment position="start">
+                            <IconReceiptTax
+                              size={18}
+                              style={{
+                                color: isKraPinEnabled ? "#0284c7" : "#94a3b8",
+                              }}
+                            />
+                          </InputAdornment>
+                        ),
+                        sx: {
+                          borderRadius: 2,
+                          fontWeight: 600,
+                          bgcolor: !isKraPinEnabled ? "#f8fafc" : "transparent",
+                          "& .MuiOutlinedInput-notchedOutline": {
+                            borderColor: "#cbd5e1",
+                          },
+                          "&:hover .MuiOutlinedInput-notchedOutline": {
+                            borderColor: isKraPinEnabled ? "#0284c7" : "#cbd5e1",
+                          },
+                          "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
+                            borderColor: "#0284c7",
+                            borderWidth: 2,
+                          },
                         },
                       },
-                    },
-                  }}
-                />
-              </Box>
-            </Grid>
+                    }}
+                  />
+                </Box>
+              </Grid>
+            )}
 
             <Grid size={{ xs: 12 }}>
               <Box>

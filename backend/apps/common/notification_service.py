@@ -224,6 +224,42 @@ class NotificationService:
         )
 
     # -------------------------------------------------------------------------
+    # 5b. Due Date Reminder Notification
+    # -------------------------------------------------------------------------
+    @classmethod
+    def notify_due_date_reminder(
+        cls, loan, installment_amount: Any, due_date: Any, days_remaining: int = 0
+    ) -> Dict[str, Any]:
+        """
+        Triggered when an upcoming loan installment is approaching maturity.
+        """
+        member = loan.member
+        first_name = member.first_name.title()
+        amt_str = _format_curr(installment_amount)
+        due_str = str(due_date)
+
+        if days_remaining == 0:
+            when_str = "TODAY"
+        elif days_remaining == 1:
+            when_str = "tomorrow"
+        else:
+            when_str = f"in {days_remaining} days on {due_str}"
+
+        message = (
+            f"Dear {first_name}, gentle reminder: your loan installment of KES {amt_str} for "
+            f"loan {loan.loan_number} is due {when_str}. "
+            f"Kindly pay promptly to keep your account current. Royal SACCO."
+        )
+
+        return cls._dispatch_and_log(
+            phone_number=member.phone_number,
+            message=message,
+            event_type=SMSEventType.DUE_DATE_REMINDER,
+            member=member,
+            recipient_name=f"{member.first_name} {member.other_names}".strip(),
+        )
+
+    # -------------------------------------------------------------------------
     # 6. Overdue Delinquency Notification
     # -------------------------------------------------------------------------
     @classmethod

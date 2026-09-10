@@ -332,6 +332,10 @@ export default function RegistrationWizard({
     if (key === "member" || key === "review") {
       return true;
     }
+    if (key === "vehicle") {
+      // Per SACCO policy update, vehicle registration is optional for all members (including Normal members)
+      return false;
+    }
     return isNormalMember;
   }
 
@@ -362,12 +366,29 @@ export default function RegistrationWizard({
 
       case "vehicle":
         return (
-          <VehicleStep
-            required={required}
-            onBack={handleBack}
-            onComplete={handleNext}
-            onSkip={handleNext}
-          />
+          <Box>
+            {!required && (
+              <Alert
+                severity="info"
+                sx={{
+                  mb: 3,
+                  borderRadius: 2.5,
+                  bgcolor: "#eff6ff",
+                  color: "#1e40af",
+                  border: "1px solid #dbeafe",
+                  fontWeight: 600,
+                }}
+              >
+                <strong>Vehicle Asset</strong> information is optional for this member. You can register transport or collateral vehicles if applicable, or click <strong>Skip Step</strong> or <strong>Continue to Guarantor</strong> to proceed.
+              </Alert>
+            )}
+            <VehicleStep
+              required={required}
+              onBack={handleBack}
+              onComplete={handleNext}
+              onSkip={handleNext}
+            />
+          </Box>
         );
 
       case "guarantor":

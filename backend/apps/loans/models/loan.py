@@ -131,6 +131,15 @@ class Loan(AuditModel):
     )
     rejected_at = models.DateTimeField(null=True, blank=True)
 
+    loan_officer = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="managed_loans",
+        help_text="Assigned Loan Officer portfolio owner",
+    )
+
     organization = models.ForeignKey(
         "organizations.Organization",
         on_delete=models.PROTECT,

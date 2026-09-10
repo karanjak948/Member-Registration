@@ -103,6 +103,8 @@ class LoanListSerializer(serializers.ModelSerializer):
     member_phone = serializers.CharField(source="member.phone_number", read_only=True)
     product_name = serializers.CharField(source="loan_product.product_name", read_only=True)
     product_code = serializers.CharField(source="loan_product.product_code", read_only=True)
+    loan_officer_id = serializers.IntegerField(source="loan_officer.id", read_only=True)
+    loan_officer_name = serializers.SerializerMethodField()
     repayments_count = serializers.SerializerMethodField()
 
     class Meta:
@@ -110,6 +112,9 @@ class LoanListSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "loan_number",
+            "loan_officer",
+            "loan_officer_id",
+            "loan_officer_name",
             "member",
             "member_id",
             "member_name",
@@ -147,6 +152,12 @@ class LoanListSerializer(serializers.ModelSerializer):
     def get_member_name(self, obj):
         return f"{obj.member.first_name} {obj.member.other_names}".strip()
 
+    def get_loan_officer_name(self, obj):
+        if obj.loan_officer:
+            full = f"{obj.loan_officer.first_name} {obj.loan_officer.last_name}".strip()
+            return full or obj.loan_officer.username
+        return None
+
     def get_repayments_count(self, obj):
         return obj.repayments.count()
 
@@ -156,6 +167,8 @@ class LoanDetailSerializer(serializers.ModelSerializer):
     loan_product_id = serializers.IntegerField(source="loan_product.id", read_only=True)
     guarantor_member_id = serializers.SerializerMethodField()
     member_name = serializers.SerializerMethodField()
+    loan_officer_id = serializers.IntegerField(source="loan_officer.id", read_only=True)
+    loan_officer_name = serializers.SerializerMethodField()
     repayments_count = serializers.SerializerMethodField()
     membership_number = serializers.CharField(source="member.membership_number", read_only=True)
     member_phone = serializers.CharField(source="member.phone_number", read_only=True)
@@ -171,6 +184,9 @@ class LoanDetailSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "loan_number",
+            "loan_officer",
+            "loan_officer_id",
+            "loan_officer_name",
             "member",
             "member_id",
             "member_name",
@@ -227,6 +243,12 @@ class LoanDetailSerializer(serializers.ModelSerializer):
     def get_member_name(self, obj):
         return f"{obj.member.first_name} {obj.member.other_names}".strip()
 
+    def get_loan_officer_name(self, obj):
+        if obj.loan_officer:
+            full = f"{obj.loan_officer.first_name} {obj.loan_officer.last_name}".strip()
+            return full or obj.loan_officer.username
+        return None
+
     def get_repayments_count(self, obj):
         return obj.repayments.count()
 
@@ -257,6 +279,7 @@ class LoanApplicationSerializer(serializers.ModelSerializer):
         model = Loan
         fields = [
             "id",
+            "loan_officer",
             "member",
             "member_id",
             "loan_product",

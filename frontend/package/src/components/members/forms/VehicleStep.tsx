@@ -71,7 +71,7 @@ export default function VehicleStep({
   onComplete,
   onBack,
   onSkip,
-  required = true,
+  required = false,
 }: VehicleStepProps) {
   const dispatch = useAppDispatch();
   const vehicles = useAppSelector((state) => state.registration.vehicles);
