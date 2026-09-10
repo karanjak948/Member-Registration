@@ -47,6 +47,10 @@ class MpesaTransactionSerializer(serializers.ModelSerializer):
             "loan_number",
             "repayment",
             "repayment_number",
+            "unique_serial",
+            "verify_url",
+            "is_verified",
+            "verification_response",
             "error_message",
             "created_at",
             "updated_at",
@@ -61,16 +65,30 @@ class MpesaTransactionSerializer(serializers.ModelSerializer):
 
 class MpesaC2BConfirmationView(APIView):
     """
-    Safaricom Daraja M-Pesa C2B Paybill Confirmation Endpoint.
-    Receives JSON callbacks whenever a customer pays via Paybill.
-    Must respond with {"ResultCode": 0, "ResultDesc": "Accepted"} within < 5s.
+    Safaricom Daraja M-Pesa C2B Paybill Confirmation Endpoint &
+    Royal SACCO Relay Verification Endpoint.
+
+    Receives either:
+    1. Direct Safaricom Daraja C2B confirmation:
+       {"TransactionType": "Pay Bill", "TransID": "...", ...}
+    2. Relay callback with verification handshake:
+       {
+         "unique_serial": 1548,
+         "verify_url": "https://system.royalltd.co.ke/payments/verifypayment",
+         "paymentPayload": {
+           "TransactionType": "Pay Bill",
+           "TransID": "...",
+           ...
+         }
+       }
+       Header: X-API-Key: <key>
     """
     permission_classes = [permissions.AllowAny]
     authentication_classes = []
 
     def post(self, request, *args, **kwargs):
         payload = request.data
-        logger.info(f"Incoming Safaricom C2B Confirmation: {payload}")
+        logger.info(f"Incoming M-Pesa Confirmation / Relay Request: {payload}")
 
         try:
             if not isinstance(payload, dict):
@@ -80,8 +98,112 @@ class MpesaC2BConfirmationView(APIView):
                     status=status.HTTP_200_OK,
                 )
 
-            tx, res = MpesaC2BService.process_confirmation(payload)
-            logger.info(f"C2B Confirmation processed successfully: TransID={tx.trans_id}, Status={tx.status}")
+            # 1. API Key Authentication (if configured in settings)
+            from django.conf import settings
+            configured_api_key = getattr(settings, "ROYAL_PAYMENTS_API_KEY", "")
+            incoming_api_key = (
+                request.headers.get("X-API-Key")
+                or request.headers.get("x-api-key")
+                or request.META.get("HTTP_X_API_KEY")
+            )
+
+            # 2. Check if this is a relay-wrapped payload or direct C2B callback
+            unique_serial = payload.get("unique_serial")
+            verify_url = payload.get("verify_url")
+            payment_payload = payload.get("paymentPayload")
+
+            is_relay = (unique_serial is not None) or bool(payment_payload)
+
+            # If an API key is configured and either incoming key was provided OR it is a relay request, validate the key
+            if configured_api_key:
+                if is_relay or incoming_api_key:
+                    if incoming_api_key != configured_api_key:
+                        logger.warning(
+                            f"Unauthorized M-Pesa request: Invalid or missing X-API-Key. Received: {incoming_api_key}"
+                        )
+                        return Response(
+                            {"error": "Unauthorized: Invalid or missing X-API-Key."},
+                            status=status.HTTP_401_UNAUTHORIZED,
+                        )
+
+            # Extract actual payment payload
+            if isinstance(payment_payload, dict):
+                actual_payload = payment_payload
+            else:
+                actual_payload = payload
+
+            # 3. Handle Relay Handshake Flow
+            if unique_serial is not None:
+                if not verify_url:
+                    verify_url = getattr(
+                        settings,
+                        "ROYAL_PAYMENTS_DEFAULT_VERIFY_URL",
+                        "https://system.royalltd.co.ke/payments/verifypayment",
+                    )
+
+                logger.info(
+                    f"Initiating relay verification for unique_serial={unique_serial} against {verify_url}"
+                )
+                is_valid, verify_data = MpesaC2BService.verify_with_relay(
+                    verify_url=verify_url,
+                    unique_serial=unique_serial,
+                    api_key=incoming_api_key or configured_api_key,
+                )
+
+                if not is_valid:
+                    logger.error(f"Relay verification handshake rejected serial {unique_serial}: {verify_data}")
+                    tx, _ = MpesaC2BService.process_confirmation(
+                        payload=actual_payload,
+                        unique_serial=unique_serial,
+                        verify_url=verify_url,
+                        is_verified=False,
+                        verification_data={"error": verify_data},
+                    )
+                    return Response(
+                        {"ResultCode": 1, "ResultDesc": f"Verification failed: {verify_data}"},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
+                # Cross-check verify response against payment payload
+                matches, match_msg = MpesaC2BService.validate_payload_match(actual_payload, verify_data)
+                if not matches:
+                    logger.error(f"Relay payload verification mismatch for serial {unique_serial}: {match_msg}")
+                    tx, _ = MpesaC2BService.process_confirmation(
+                        payload=actual_payload,
+                        unique_serial=unique_serial,
+                        verify_url=verify_url,
+                        is_verified=False,
+                        verification_data={"error": match_msg, "relay_response": verify_data},
+                    )
+                    return Response(
+                        {"ResultCode": 1, "ResultDesc": f"Payload mismatch: {match_msg}"},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
+                # Relay verification succeeded!
+                tx, res = MpesaC2BService.process_confirmation(
+                    payload=actual_payload,
+                    unique_serial=unique_serial,
+                    verify_url=verify_url,
+                    is_verified=True,
+                    verification_data=verify_data,
+                )
+                logger.info(
+                    f"Relay M-Pesa transaction {tx.trans_id} processed successfully. Status: {tx.status}"
+                )
+                return Response(
+                    {"ResultCode": 0, "ResultDesc": "Accepted", "unique_serial": unique_serial, "status": tx.status},
+                    status=status.HTTP_200_OK,
+                )
+
+            # 4. Direct Safaricom Daraja C2B Callback Flow
+            tx, res = MpesaC2BService.process_confirmation(
+                payload=actual_payload,
+                unique_serial=None,
+                verify_url=None,
+                is_verified=True,
+            )
+            logger.info(f"Direct C2B Confirmation processed successfully: TransID={tx.trans_id}, Status={tx.status}")
             return Response(res, status=status.HTTP_200_OK)
 
         except Exception as exc:

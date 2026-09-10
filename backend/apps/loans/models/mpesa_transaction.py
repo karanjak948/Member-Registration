@@ -6,6 +6,7 @@ class MpesaTransactionStatus(models.TextChoices):
     COMPLETED = "COMPLETED", "Completed & Allocated"
     UNALLOCATED = "UNALLOCATED", "Received (Unallocated)"
     FAILED = "FAILED", "Failed / Error"
+    VERIFICATION_FAILED = "VERIFICATION_FAILED", "Relay Verification Failed"
 
 
 class MpesaTransaction(models.Model):
@@ -101,6 +102,29 @@ class MpesaTransaction(models.Model):
     error_message = models.TextField(
         blank=True,
         default="",
+    )
+    # Royal SACCO Payment Relay & Verification Handshake Tracking
+    unique_serial = models.CharField(
+        max_length=100,
+        blank=True,
+        null=True,
+        db_index=True,
+        help_text="Unique relay batch or payment serial ID from system.royalltd.co.ke",
+    )
+    verify_url = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
+        help_text="Verification endpoint URL called for confirmation handshake",
+    )
+    is_verified = models.BooleanField(
+        default=False,
+        help_text="True if system.royalltd.co.ke verified this transaction",
+    )
+    verification_response = models.JSONField(
+        null=True,
+        blank=True,
+        help_text="Raw payload returned by verification URL",
     )
     created_at = models.DateTimeField(
         auto_now_add=True,

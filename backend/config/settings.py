@@ -221,3 +221,11 @@ STATICFILES_DIRS = [
 MEDIA_URL = "/media/"
 
 MEDIA_ROOT = BASE_DIR / "media"
+
+# Royal SACCO Payment Relay & Handshake Verification
+ROYAL_PAYMENTS_API_KEY = os.getenv("ROYAL_PAYMENTS_API_KEY", "")
+ROYAL_PAYMENTS_VERIFY_TIMEOUT = int(os.getenv("ROYAL_PAYMENTS_VERIFY_TIMEOUT", "10"))
+ROYAL_PAYMENTS_DEFAULT_VERIFY_URL = os.getenv(
+    "ROYAL_PAYMENTS_DEFAULT_VERIFY_URL",
+    "https://system.royalltd.co.ke/payments/verifypayment",
+)
