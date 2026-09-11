@@ -220,3 +220,30 @@ def calculate_compound_interest(
         balance = closing_balance
 
     return schedule
+
+
+def recalculate_remaining_reducing_balance(
+    remaining_principal: Decimal | float | int,
+    interest_rate_pct: Decimal | float | int,
+    remaining_periods: int,
+    interest_period: Literal["monthly", "yearly"] = "monthly",
+    repayment_frequency: Literal["daily", "weekly", "monthly", "yearly"] = "monthly",
+) -> list[ReducingBalanceRow]:
+    """
+    Recalculates reducing-balance schedule for remaining periods after an extra principal prepayment.
+    Charges interest strictly on the actual remaining principal balance.
+    """
+    P = _to_d(remaining_principal)
+    if P <= Decimal("0"):
+        return []
+    n = int(remaining_periods)
+    if n <= 0:
+        return []
+    return calculate_reducing_balance_schedule(
+        principal=P,
+        interest_rate_pct=interest_rate_pct,
+        num_periods=n,
+        interest_period=interest_period,
+        repayment_frequency=repayment_frequency,
+    )
+

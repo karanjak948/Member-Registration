@@ -239,7 +239,7 @@ class LoanViewSet(viewsets.ModelViewSet):
         notes = request.data.get("notes", "")
         loan.status = LoanStatus.APPRAISED
         loan.appraisal_notes = notes
-        loan.appraised_by = request.user
+        loan.appraised_by = request.user if request.user and request.user.is_authenticated else None
         loan.appraised_at = timezone.now()
         loan.save()
         return Response(LoanDetailSerializer(loan).data)
@@ -273,7 +273,7 @@ class LoanViewSet(viewsets.ModelViewSet):
         loan.approved_amount = approved_amount
         loan.approval_date = approval_date
         loan.approval_notes = notes
-        loan.approved_by = request.user
+        loan.approved_by = request.user if request.user and request.user.is_authenticated else None
         loan.approved_at = timezone.now()
 
         # Update principal to approved amount for ongoing balances
@@ -302,7 +302,7 @@ class LoanViewSet(viewsets.ModelViewSet):
         reason = request.data.get("reason", "Loan application rejected.")
         loan.status = LoanStatus.REJECTED
         loan.rejection_reason = reason
-        loan.rejected_by = request.user
+        loan.rejected_by = request.user if request.user and request.user.is_authenticated else None
         loan.rejected_at = timezone.now()
         loan.save()
         return Response(LoanDetailSerializer(loan).data)
@@ -358,7 +358,8 @@ class LoanViewSet(viewsets.ModelViewSet):
 
         total_interest = sum(item.expected_interest for item in schedule)
 
-        # Calculate upfront fees
+        # Calculate upfront fees with explicit itemization and account codes
+        itemized_fees = []
         total_upfront_fees = Decimal("0.00")
         for fee in product.fees.all():
             calc = calculate_fee(
@@ -369,8 +370,34 @@ class LoanViewSet(viewsets.ModelViewSet):
                 principal=principal,
                 affects_principal=fee.affects_principal,
             )
+            code = "4100"
+            acct_type = "revenue"
+            name = fee.ledger_account_name or calc.fee_name
+            name_lower = fee.fee_name.lower()
+
+            if "form" in name_lower:
+                code = "4150"
+                name = "Loan Form Fee Income"
+                acct_type = "revenue"
+            elif "security" in name_lower or "deposit" in name_lower:
+                code = "2100"
+                name = "Security Deposit Funds"
+                acct_type = "liability"
+            elif "processing" in name_lower:
+                code = "4100"
+                name = "Loan Processing Fee Income"
+                acct_type = "revenue"
+
             if not fee.affects_principal:
                 total_upfront_fees += calc.calculated_amount
+
+            itemized_fees.append({
+                "fee_name": calc.fee_name,
+                "amount": calc.calculated_amount,
+                "account_code": code,
+                "account_name": name,
+                "account_type": acct_type,
+            })
 
         # Create schedule entries in DB
         entries_to_create = []
@@ -400,18 +427,19 @@ class LoanViewSet(viewsets.ModelViewSet):
         loan.disbursement_notes = disbursement_notes
         loan.disbursed_at = timezone.now()
         loan.status = LoanStatus.ACTIVE
-        loan.disbursed_by = request.user
+        loan.disbursed_by = request.user if request.user and request.user.is_authenticated else None
         loan.principal_balance = principal
         loan.interest_balance = total_interest
         loan.outstanding_balance = principal + total_interest
         loan.save()
 
-        # Post Double-Entry Journal Transaction
+        # Post Double-Entry Journal Transaction with itemized fee lines
         record_disbursement_journal(
             loan=loan,
             disbursement_date=disb_date,
             disbursed_amount=principal,
             fee_deductions=total_upfront_fees,
+            itemized_fees=itemized_fees,
         )
 
         # Trigger Loan Disbursement Confirmation SMS (Disbursed amount + Regular installment)

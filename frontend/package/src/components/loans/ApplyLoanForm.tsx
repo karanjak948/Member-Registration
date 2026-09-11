@@ -143,9 +143,16 @@ export default function ApplyLoanForm() {
     const rate = Number(selectedProduct.interest_rate || 0);
     const method = selectedProduct.interest_method || "reducing_balance";
     const isYearly = selectedProduct.interest_period === "yearly";
+    const freq = selectedProduct.repayment_frequency || "monthly";
 
     // Immediate calculation for zero-latency feedback
-    const periodicRate = isYearly ? (rate / 100) / 12 : (rate / 100);
+    let periodicRate = rate / 100;
+    if (isYearly) {
+      periodicRate = freq === "weekly" ? (rate / 100) / 52 : (rate / 100) / 12;
+    } else {
+      periodicRate = freq === "weekly" ? ((rate / 100) * 12) / 52 : rate / 100;
+    }
+
     let installment = 0;
     let totalInterest = 0;
     let totalPayable = 0;
@@ -163,14 +170,28 @@ export default function ApplyLoanForm() {
       installment = totalPayable / periods;
     }
 
+    // Build itemized fees list
+    const productFees: Array<{ fee_name: string; amount: string }> = (selectedProduct.fees || []).map((f: any) => ({
+      fee_name: f.fee_name,
+      amount: f.fee_type === "percentage" ? String((principal * Number(f.fee_value) / 100).toFixed(2)) : String(Number(f.fee_value).toFixed(2)),
+    }));
+
+    // Add security deposit if product requires security and not already in fees
+    const hasSecInFees = productFees.some(f => f.fee_name.toLowerCase().includes("security") || f.fee_name.toLowerCase().includes("deposit"));
+    if (!hasSecInFees && selectedProduct.requires_security && selectedProduct.security_value) {
+      const secVal = Number(selectedProduct.security_value);
+      const secAmt = selectedProduct.security_type === "percentage" ? (principal * secVal / 100) : secVal;
+      productFees.push({
+        fee_name: "Security Deposit (25%)",
+        amount: String(secAmt.toFixed(2)),
+      });
+    }
+
     setPreviewData({
       installment: Math.round(installment * 100) / 100,
       totalInterest: Math.round(totalInterest * 100) / 100,
       totalPayable: Math.round(totalPayable * 100) / 100,
-      fees: (selectedProduct.fees || []).map((f: any) => ({
-        fee_name: f.fee_name,
-        amount: f.fee_type === "percentage" ? String((principal * Number(f.fee_value) / 100).toFixed(2)) : String(Number(f.fee_value).toFixed(2)),
-      })),
+      fees: productFees,
     });
 
     // Query engine preview for exact backend calculations
@@ -187,7 +208,7 @@ export default function ApplyLoanForm() {
               installment: Number(res.regular_installment),
               totalInterest: Number(res.total_interest),
               totalPayable: Number(res.total_payable),
-              fees: res.fees || [],
+              fees: (res.fees && res.fees.length > 0) ? res.fees : productFees,
             });
           }
         })
@@ -871,7 +892,7 @@ export default function ApplyLoanForm() {
               {/* Repayment Periods */}
               <Grid size={{ xs: 12, md: 6 }}>
                 <Typography variant="subtitle2" fontWeight={800} sx={{ mb: 0.8, color: "#1e293b" }}>
-                  Repayment Duration (Months / Periods)
+                  Repayment Duration ({selectedProduct?.repayment_frequency === "weekly" ? "Weeks" : selectedProduct?.repayment_frequency === "monthly" ? "Months" : "Installments"})
                 </Typography>
                 <Controller
                   name="num_periods"
@@ -881,15 +902,15 @@ export default function ApplyLoanForm() {
                       fullWidth
                       type="number"
                       onWheel={(e) => (e.target as HTMLElement).blur()}
-                      placeholder={productMaxPeriods ? `Up to ${productMaxPeriods}` : "e.g. 12 or 24"}
+                      placeholder={productMaxPeriods ? `Up to ${productMaxPeriods}` : "e.g. 3 or 12"}
                       value={field.value ?? ""}
                       onChange={(e) => field.onChange(e.target.value === "" ? null : Number(e.target.value))}
                       error={isExceedingPeriods}
                       helperText={
                         isExceedingPeriods
-                          ? `⚠️ Maximum allowed duration is ${productMaxPeriods} periods.`
+                          ? `⚠️ Maximum allowed duration is ${productMaxPeriods} ${selectedProduct?.repayment_frequency === "weekly" ? "weeks" : "months"}.`
                           : productMaxPeriods
-                          ? `Allowed Duration: Up to ${productMaxPeriods} repayment periods`
+                          ? `Allowed Duration: Up to ${productMaxPeriods} ${selectedProduct?.repayment_frequency === "weekly" ? "weeks" : "months"} repayment periods`
                           : "Repayment duration in installments"
                       }
                       slotProps={{
@@ -1076,16 +1097,21 @@ export default function ApplyLoanForm() {
                       <Grid size={{ xs: 12, sm: 6, md: 3 }}>
                         <Paper elevation={0} sx={{ p: 1.8, borderRadius: 2, bgcolor: "#ffffff", border: "1px solid #bbf7d0" }}>
                           <Typography variant="caption" sx={{ color: "#d97706", fontWeight: 800, textTransform: "uppercase" }}>
-                            Upfront Fees & Charges
+                            Upfront Fees &amp; Charges
                           </Typography>
                           <Typography variant="h6" fontWeight={900} sx={{ color: "#b45309", fontFamily: "monospace", mt: 0.5 }}>
                             {previewData.fees.length > 0
-                              ? `KES ${previewData.fees.reduce((acc, f) => acc + Number(f.amount || 0), 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`
+                              ? `KES ${previewData.fees.reduce((acc, f) => acc + Number(f.amount || 0), 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
                               : "KES 0.00 (None)"}
                           </Typography>
-                          <Typography variant="caption" sx={{ color: "#6b7280" }}>
-                            {previewData.fees.length > 0 ? previewData.fees.map(f => f.fee_name).join(", ") : "No extra origination fees"}
-                          </Typography>
+                          <Stack spacing={0.3} sx={{ mt: 0.8 }}>
+                            {previewData.fees.map((f, i) => (
+                              <Typography key={i} variant="caption" sx={{ color: "#475569", display: "flex", justifyContent: "space-between", fontSize: "0.7rem", fontWeight: 600 }}>
+                                <span>• {f.fee_name}:</span>
+                                <span style={{ fontWeight: 800, color: "#0f172a" }}>KES {Number(f.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                              </Typography>
+                            ))}
+                          </Stack>
                         </Paper>
                       </Grid>
                     </Grid>

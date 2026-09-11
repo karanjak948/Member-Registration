@@ -294,6 +294,12 @@ export function getMenuItems(
         icon: IconSearch,
         href: "/finance?tab=audit",
       },
+      {
+        id: "finance-income-report",
+        title: "Fee & Income Report",
+        icon: IconCoin,
+        href: "/finance?tab=income-report",
+      },
     ],
   });
 

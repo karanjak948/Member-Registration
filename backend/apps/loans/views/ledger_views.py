@@ -83,13 +83,30 @@ class LedgerTransactionViewSet(viewsets.ModelViewSet):
     General ledger journal entries and manual income posting.
     Supports administrative deletion/voiding of transactions (Admin/Owner only).
     """
-    queryset = LedgerTransaction.objects.all().prefetch_related("entries", "entries__account").select_related("loan")
+    queryset = LedgerTransaction.objects.all().prefetch_related("entries", "entries__account").select_related("loan", "loan__member")
     serializer_class = LedgerTransactionSerializer
     permission_classes = [permissions.IsAuthenticated]
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ["transaction_number", "reference_type", "reference_id", "loan__loan_number", "description"]
     ordering_fields = ["transaction_date", "created_at"]
     ordering = ["-transaction_date", "-created_at"]
+
+    def get_queryset(self):
+        qs = LedgerTransaction.objects.all().prefetch_related("entries", "entries__account").select_related("loan", "loan__member")
+        start_date = self.request.query_params.get("start_date")
+        end_date = self.request.query_params.get("end_date")
+        account_code = self.request.query_params.get("account_code")
+        ref_type = self.request.query_params.get("reference_type")
+
+        if start_date:
+            qs = qs.filter(transaction_date__gte=start_date)
+        if end_date:
+            qs = qs.filter(transaction_date__lte=end_date)
+        if ref_type:
+            qs = qs.filter(reference_type__iexact=ref_type)
+        if account_code and account_code != "ALL":
+            qs = qs.filter(entries__account__account_code=account_code).distinct()
+        return qs
 
     @transaction.atomic
     def destroy(self, request, *args, **kwargs):
@@ -107,6 +124,113 @@ class LedgerTransactionViewSet(viewsets.ModelViewSet):
         txn.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
+    @action(detail=False, methods=["get"], url_path="income-report")
+    def income_report(self, request):
+        """
+        Period-based breakdown of all SACCO fee incomes, form fees, processing fees,
+        security deposits, and interest incomes within an optional date window.
+        """
+        start_date = request.query_params.get("start_date")
+        end_date = request.query_params.get("end_date")
+        account_filter = request.query_params.get("account_code")
+
+        entries_qs = (
+            LedgerEntry.objects.filter(
+                entry_type=LedgerEntry.EntryType.CREDIT,
+                account__account_code__in=["4150", "4100", "2100", "4000", "4200"],
+            )
+            .select_related("transaction", "transaction__loan", "transaction__loan__member", "account")
+            .order_by("-transaction__transaction_date", "-id")
+        )
+
+        if start_date:
+            entries_qs = entries_qs.filter(transaction__transaction_date__gte=start_date)
+        if end_date:
+            entries_qs = entries_qs.filter(transaction__transaction_date__lte=end_date)
+        if account_filter and account_filter != "ALL":
+            entries_qs = entries_qs.filter(account__account_code=account_filter)
+
+        total_form_fees = Decimal("0.00")
+        total_processing_fees = Decimal("0.00")
+        total_security_deposits = Decimal("0.00")
+        total_interest_income = Decimal("0.00")
+        total_penalties = Decimal("0.00")
+        items = []
+
+        for e in entries_qs:
+            amt = e.amount
+            code = e.account.account_code
+            if code == "4150":
+                total_form_fees += amt
+                category = "Loan Form Fee"
+            elif code == "4100":
+                total_processing_fees += amt
+                category = "Loan Processing Fee"
+            elif code == "2100":
+                total_security_deposits += amt
+                category = "Security Deposit"
+            elif code == "4000":
+                total_interest_income += amt
+                category = "Interest Income"
+            elif code == "4200":
+                total_penalties += amt
+                category = "Penalty Income"
+            else:
+                category = e.account.account_name
+
+            loan = e.transaction.loan
+            member_name = "—"
+            member_id = None
+            if loan and loan.member:
+                member_name = f"{loan.member.first_name} {loan.member.other_names}".strip()
+                member_id = loan.member.id
+
+            items.append({
+                "id": e.id,
+                "entry_id": e.id,
+                "transaction_id": e.transaction.id,
+                "transaction_number": e.transaction.transaction_number,
+                "transaction_date": e.transaction.transaction_date.isoformat(),
+                "reference_type": e.transaction.reference_type,
+                "reference_id": e.transaction.reference_id,
+                "loan_number": loan.loan_number if loan else None,
+                "loan_id": loan.id if loan else None,
+                "member_name": member_name,
+                "member_id": member_id,
+                "account_code": code,
+                "account_name": e.account.account_name,
+                "account_type": e.account.account_type,
+                "entry_type": e.entry_type,
+                "income_category": category,
+                "amount": float(amt),
+                "narration": e.narration or e.transaction.description,
+            })
+
+        grand_total = (
+            total_form_fees
+            + total_processing_fees
+            + total_security_deposits
+            + total_interest_income
+            + total_penalties
+        )
+
+        return Response({
+            "start_date": start_date,
+            "end_date": end_date,
+            "account_filter": account_filter or "ALL",
+            "summary": {
+                "total_form_fees": float(total_form_fees),
+                "total_processing_fees": float(total_processing_fees),
+                "total_security_deposits": float(total_security_deposits),
+                "total_interest_income": float(total_interest_income),
+                "total_penalties": float(total_penalties),
+                "grand_total": float(grand_total),
+                "record_count": len(items),
+            },
+            "records": items,
+            "entries": items,
+            "count": len(items),
+        })
 
     @action(detail=False, methods=["post"], url_path="post-income")
     @transaction.atomic

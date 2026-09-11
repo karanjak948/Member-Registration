@@ -39,10 +39,10 @@ def calculate_fee(
     ledger_account_name: str = "Loan Processing Fee Income",
 ) -> CalculatedFee:
     val = _to_d(fee_value)
-    p = _to_d(principal)
-    sav = _to_d(savings_balance)
-    dep = _to_d(deposit_amount)
-    bal = _to_d(loan_balance)
+    p = _to_d(principal) if not isinstance(principal, bool) else Decimal("0")
+    sav = _to_d(savings_balance) if not isinstance(savings_balance, bool) else Decimal("0")
+    dep = _to_d(deposit_amount) if not isinstance(deposit_amount, bool) else Decimal("0")
+    bal = _to_d(loan_balance) if not isinstance(loan_balance, bool) else Decimal("0")
 
     if fee_type == "fixed_amount":
         amount = round2(val)

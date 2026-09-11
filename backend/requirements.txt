@@ -1,25 +1,38 @@
-asgiref==3.11.1
-certifi==2026.6.17
-cffi==2.1.0
-charset-normalizer==3.4.9
-cryptography==49.0.0
+# Core Framework & APIs
 Django==6.0.7
-django-cors-headers==4.9.0
-django-extensions==4.1.0
-django-oauth-toolkit==3.3.0
 djangorestframework==3.17.1
-idna==3.18
-jwcrypto==1.5.8
+django-cors-headers==4.9.0
+django-oauth-toolkit==3.3.0
+django-extensions==4.1.0
+
+# Database & Environment
 mysqlclient==2.2.8
-oauthlib==3.3.1
-pycparser==3.0
 python-dotenv==1.2.2
-requests==2.34.2
 sqlparse==0.5.5
-typing_extensions==4.16.0
-gunicorn==23.0.0
-Pillow>=10.0.0
+tzdata==2026.3
+
+# Authentication, Cryptography & Security
+oauthlib==3.3.1
+jwcrypto==1.5.8
+cryptography==49.0.0
+cffi==2.1.0
+pycparser==3.0
+
+# HTTP & Network Requests (M-Pesa Daraja, BulkSMS, Webhooks)
+requests==2.34.2
+urllib3==2.7.0
+certifi==2026.6.17
+charset-normalizer==3.4.9
+idna==3.18
+
+# Document, Image & Spreadsheet Processing
 openpyxl==3.1.5
 et_xmlfile==2.0.0
-tzdata==2026.3
-urllib3==2.7.0
+Pillow>=10.0.0
+
+# Asynchronous & Typing Utilities
+asgiref==3.11.1
+typing_extensions==4.16.0
+
+# Production WSGI Server (Linux/Production Deployment)
+gunicorn==23.0.0

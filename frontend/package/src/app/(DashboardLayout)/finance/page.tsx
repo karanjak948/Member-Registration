@@ -56,6 +56,10 @@ import {
   IconTrash,
   IconPower,
   IconAlertTriangle,
+  IconDownload,
+  IconFilter,
+  IconReportMoney,
+  IconCalendar,
 } from "@tabler/icons-react";
 
 interface LedgerEntry {
@@ -100,11 +104,99 @@ export default function FinancePage() {
   const tabParam = searchParams.get("tab");
   const [tabValue, setTabValue] = useState<number>(0);
 
+  // Fee & Income Period Report State
+  const [incomeReport, setIncomeReport] = useState<{
+    start_date?: string;
+    end_date?: string;
+    account_code?: string;
+    summary: {
+      total_form_fees: number;
+      total_processing_fees: number;
+      total_security_deposits: number;
+      total_interest_income: number;
+      total_penalties: number;
+      grand_total: number;
+    };
+    count: number;
+    entries: Array<{
+      entry_id: number;
+      transaction_id: number;
+      transaction_number: string;
+      transaction_date: string;
+      account_code: string;
+      account_name: string;
+      account_type: string;
+      entry_type: "debit" | "credit";
+      amount: number;
+      narration: string;
+      loan_id?: number;
+      loan_number?: string;
+      reference_type: string;
+      reference_id: string;
+    }>;
+  } | null>(null);
+  const [incomeLoading, setIncomeLoading] = useState(false);
+  const [incomeStartDate, setIncomeStartDate] = useState("");
+  const [incomeEndDate, setIncomeEndDate] = useState("");
+  const [incomeAccountCode, setIncomeAccountCode] = useState("ALL");
+  const [incomeSearchQuery, setIncomeSearchQuery] = useState("");
+
+  const fetchIncomeReport = async (overrideParams?: {
+    start_date?: string;
+    end_date?: string;
+    account_code?: string;
+  }) => {
+    setIncomeLoading(true);
+    try {
+      const sDate = overrideParams?.start_date !== undefined ? overrideParams.start_date : incomeStartDate;
+      const eDate = overrideParams?.end_date !== undefined ? overrideParams.end_date : incomeEndDate;
+      const aCode = overrideParams?.account_code !== undefined ? overrideParams.account_code : incomeAccountCode;
+
+      const data = await loanService.getIncomeReport({
+        start_date: sDate || undefined,
+        end_date: eDate || undefined,
+        account_code: aCode === "ALL" ? undefined : aCode,
+      });
+      setIncomeReport(data);
+    } catch (err) {
+      console.error("Failed to load fee & income period report:", err);
+    } finally {
+      setIncomeLoading(false);
+    }
+  };
+
+  const exportIncomeCSV = () => {
+    if (!incomeReport || !incomeReport.entries.length) return;
+    const headers = ["Date", "Transaction #", "Loan #", "Account Code", "Account Name", "Category", "Flow (DR/CR)", "Amount (KES)", "Narration"];
+    const rows = incomeReport.entries.map((e) => [
+      e.transaction_date,
+      e.transaction_number,
+      e.loan_number || "-",
+      e.account_code,
+      `"${(e.account_name || "").replace(/"/g, '""')}"`,
+      `"${(e.account_type || "").toUpperCase()}"`,
+      e.entry_type.toUpperCase(),
+      e.amount,
+      `"${(e.narration || "").replace(/"/g, '""')}"`,
+    ]);
+    const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `sacco_fee_income_report_${incomeStartDate || "all"}_to_${incomeEndDate || "latest"}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   useEffect(() => {
     if (tabParam === "accounts") {
       setTabValue(1);
     } else if (tabParam === "audit") {
       setTabValue(2);
+    } else if (tabParam === "income-report" || tabParam === "income" || tabParam === "fees") {
+      setTabValue(3);
+      fetchIncomeReport();
     } else if (tabParam === "ledger") {
       setTabValue(0);
     }
@@ -755,10 +847,13 @@ export default function FinancePage() {
                 value={tabValue}
                 onChange={(_, v) => {
                   setTabValue(v);
-                  const tabNames = ["ledger", "accounts", "audit"];
+                  const tabNames = ["ledger", "accounts", "audit", "income-report"];
                   const newTab = tabNames[v] || "ledger";
                   if (typeof window !== "undefined") {
                     window.history.replaceState(null, "", `/finance?tab=${newTab}`);
+                  }
+                  if (v === 3 && !incomeReport) {
+                    fetchIncomeReport();
                   }
                 }}
                 sx={{
@@ -787,6 +882,12 @@ export default function FinancePage() {
                   icon={<IconSearch size={18} />}
                   iconPosition="start"
                   label={`Audit Log (${filteredTransactions.length})`}
+                />
+                <Tab
+                  value={3}
+                  icon={<IconReportMoney size={18} />}
+                  iconPosition="start"
+                  label="Fee & Income Period Report"
                 />
               </Tabs>
 
@@ -1158,7 +1259,7 @@ export default function FinancePage() {
                   </TableBody>
                 </Table>
               </TableContainer>
-            ) : (
+            ) : tabValue === 2 ? (
               /* TAB 3: Audit Log */
               <TableContainer>
                 <Table>
@@ -1252,6 +1353,331 @@ export default function FinancePage() {
                   </TableBody>
                 </Table>
               </TableContainer>
+            ) : (
+              /* TAB 4: Fee & Income Period Report */
+              <Box sx={{ p: 3 }}>
+                {/* Period & Stream Filter Toolbar */}
+                <Paper
+                  elevation={0}
+                  sx={{
+                    p: 2.5,
+                    mb: 3,
+                    borderRadius: 2.5,
+                    bgcolor: "#f8fafc",
+                    border: "1px solid #e2e8f0",
+                  }}
+                >
+                  <Grid container spacing={2} alignItems="center">
+                    <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                      <TextField
+                        type="date"
+                        fullWidth
+                        size="small"
+                        label="From Date"
+                        value={incomeStartDate}
+                        onChange={(e) => setIncomeStartDate(e.target.value)}
+                        slotProps={{ inputLabel: { shrink: true } }}
+                      />
+                    </Grid>
+                    <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                      <TextField
+                        type="date"
+                        fullWidth
+                        size="small"
+                        label="To Date"
+                        value={incomeEndDate}
+                        onChange={(e) => setIncomeEndDate(e.target.value)}
+                        slotProps={{ inputLabel: { shrink: true } }}
+                      />
+                    </Grid>
+                    <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                      <TextField
+                        select
+                        fullWidth
+                        size="small"
+                        label="Fee / Account Stream"
+                        value={incomeAccountCode}
+                        onChange={(e) => setIncomeAccountCode(e.target.value)}
+                      >
+                        <MenuItem value="ALL">All Revenue &amp; Fee Streams</MenuItem>
+                        <MenuItem value="4150">4150 - Loan Form Fees (KES 300)</MenuItem>
+                        <MenuItem value="4100">4100 - Processing Fees (6%)</MenuItem>
+                        <MenuItem value="2100">2100 - Security Deposits (25%)</MenuItem>
+                        <MenuItem value="4000">4000 - Interest Earned</MenuItem>
+                        <MenuItem value="4200">4200 - Penalties Collected</MenuItem>
+                      </TextField>
+                    </Grid>
+                    <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                      <Stack direction="row" spacing={1}>
+                        <Button
+                          variant="contained"
+                          startIcon={<IconFilter size={18} />}
+                          onClick={() => fetchIncomeReport()}
+                          disabled={incomeLoading}
+                          sx={{
+                            bgcolor: "#059669",
+                            "&:hover": { bgcolor: "#047857" },
+                            fontWeight: 700,
+                            textTransform: "none",
+                            borderRadius: 2,
+                            flex: 1,
+                          }}
+                        >
+                          {incomeLoading ? "Loading..." : "Filter"}
+                        </Button>
+                        <Button
+                          variant="outlined"
+                          startIcon={<IconDownload size={18} />}
+                          onClick={exportIncomeCSV}
+                          disabled={!incomeReport || !incomeReport.entries.length}
+                          sx={{
+                            borderColor: "#cbd5e1",
+                            color: "#334155",
+                            fontWeight: 700,
+                            textTransform: "none",
+                            borderRadius: 2,
+                          }}
+                        >
+                          Export CSV
+                        </Button>
+                      </Stack>
+                    </Grid>
+                  </Grid>
+
+                  {/* Second filter row: Search inside results */}
+                  <Stack direction="row" justifyContent="space-between" alignItems="center" mt={2} pt={2} sx={{ borderTop: "1px dashed #cbd5e1" }}>
+                    <Typography variant="body2" color="text.secondary">
+                      Showing {incomeReport?.entries ? incomeReport.entries.length : 0} itemized entries for selected criteria
+                    </Typography>
+                    <TextField
+                      size="small"
+                      placeholder="Search loan #, narration..."
+                      value={incomeSearchQuery}
+                      onChange={(e) => setIncomeSearchQuery(e.target.value)}
+                      slotProps={{
+                        input: {
+                          startAdornment: (
+                            <InputAdornment position="start">
+                              <IconSearch size={16} color="#64748b" />
+                            </InputAdornment>
+                          ),
+                        },
+                      }}
+                      sx={{ width: { xs: "100%", sm: 260 } }}
+                    />
+                  </Stack>
+                </Paper>
+
+                {/* Period Summary Metric Cards */}
+                {incomeReport?.summary && (
+                  <Grid container spacing={2} sx={{ mb: 3 }}>
+                    <Grid size={{ xs: 12, sm: 6, md: 2.4 }}>
+                      <Card elevation={0} sx={{ p: 2, borderRadius: 2, bgcolor: "#f0fdfa", border: "1px solid #ccfbf1" }}>
+                        <Typography variant="caption" fontWeight={800} color="#0f766e" letterSpacing={0.5}>
+                          FORM FEES (4150)
+                        </Typography>
+                        <Typography variant="h6" fontWeight={800} color="#0f766e" mt={0.5}>
+                          KES {incomeReport.summary.total_form_fees.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          KES 300 / loan application
+                        </Typography>
+                      </Card>
+                    </Grid>
+
+                    <Grid size={{ xs: 12, sm: 6, md: 2.4 }}>
+                      <Card elevation={0} sx={{ p: 2, borderRadius: 2, bgcolor: "#f0f9ff", border: "1px solid #bae6fd" }}>
+                        <Typography variant="caption" fontWeight={800} color="#0284c7" letterSpacing={0.5}>
+                          PROCESSING FEES (4100)
+                        </Typography>
+                        <Typography variant="h6" fontWeight={800} color="#0284c7" mt={0.5}>
+                          KES {incomeReport.summary.total_processing_fees.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          6% loan origination fee
+                        </Typography>
+                      </Card>
+                    </Grid>
+
+                    <Grid size={{ xs: 12, sm: 6, md: 2.4 }}>
+                      <Card elevation={0} sx={{ p: 2, borderRadius: 2, bgcolor: "#faf5ff", border: "1px solid #e9d5ff" }}>
+                        <Typography variant="caption" fontWeight={800} color="#7c3aed" letterSpacing={0.5}>
+                          SECURITY DEPOSITS (2100)
+                        </Typography>
+                        <Typography variant="h6" fontWeight={800} color="#7c3aed" mt={0.5}>
+                          KES {incomeReport.summary.total_security_deposits.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          25% collateral liability
+                        </Typography>
+                      </Card>
+                    </Grid>
+
+                    <Grid size={{ xs: 12, sm: 6, md: 2.4 }}>
+                      <Card elevation={0} sx={{ p: 2, borderRadius: 2, bgcolor: "#fffbeb", border: "1px solid #fef3c7" }}>
+                        <Typography variant="caption" fontWeight={800} color="#d97706" letterSpacing={0.5}>
+                          INTEREST EARNED (4000)
+                        </Typography>
+                        <Typography variant="h6" fontWeight={800} color="#d97706" mt={0.5}>
+                          KES {incomeReport.summary.total_interest_income.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          Monthly reducing balance
+                        </Typography>
+                      </Card>
+                    </Grid>
+
+                    <Grid size={{ xs: 12, sm: 6, md: 2.4 }}>
+                      <Card elevation={0} sx={{ p: 2, borderRadius: 2, bgcolor: "#ecfdf5", border: "1px solid #a7f3d0" }}>
+                        <Typography variant="caption" fontWeight={800} color="#059669" letterSpacing={0.5}>
+                          GRAND TOTAL
+                        </Typography>
+                        <Typography variant="h6" fontWeight={900} color="#059669" mt={0.5}>
+                          KES {incomeReport.summary.grand_total.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          Period collections total
+                        </Typography>
+                      </Card>
+                    </Grid>
+                  </Grid>
+                )}
+
+                {/* Itemized Table */}
+                {incomeLoading ? (
+                  <Box sx={{ display: "flex", justifyContent: "center", py: 8 }}>
+                    <CircularProgress color="success" />
+                  </Box>
+                ) : (
+                  <TableContainer component={Paper} elevation={0} sx={{ border: "1px solid #e2e8f0", borderRadius: 2 }}>
+                    <Table size="small">
+                      <TableHead sx={{ bgcolor: "#f8fafc" }}>
+                        <TableRow>
+                          <TableCell sx={{ fontWeight: 700, color: "#475569" }}>Date</TableCell>
+                          <TableCell sx={{ fontWeight: 700, color: "#475569" }}>Txn Number</TableCell>
+                          <TableCell sx={{ fontWeight: 700, color: "#475569" }}>Loan #</TableCell>
+                          <TableCell sx={{ fontWeight: 700, color: "#475569" }}>Account</TableCell>
+                          <TableCell sx={{ fontWeight: 700, color: "#475569" }}>Category</TableCell>
+                          <TableCell sx={{ fontWeight: 700, color: "#475569" }} align="center">Flow</TableCell>
+                          <TableCell sx={{ fontWeight: 700, color: "#475569" }} align="right">Amount (KES)</TableCell>
+                          <TableCell sx={{ fontWeight: 700, color: "#475569" }}>Narration</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {(() => {
+                          const entries = (incomeReport?.entries || []).filter((e) => {
+                            if (!incomeSearchQuery.trim()) return true;
+                            const q = incomeSearchQuery.toLowerCase();
+                            return (
+                              e.transaction_number.toLowerCase().includes(q) ||
+                              (e.loan_number && e.loan_number.toLowerCase().includes(q)) ||
+                              e.account_code.toLowerCase().includes(q) ||
+                              e.account_name.toLowerCase().includes(q) ||
+                              (e.narration && e.narration.toLowerCase().includes(q))
+                            );
+                          });
+
+                          if (!entries.length) {
+                            return (
+                              <TableRow>
+                                <TableCell colSpan={8} align="center" sx={{ py: 6, color: "text.secondary" }}>
+                                  <Typography variant="body2">
+                                    No itemized ledger entries found for the selected period and filter criteria.
+                                  </Typography>
+                                </TableCell>
+                              </TableRow>
+                            );
+                          }
+
+                          return entries.map((entry) => (
+                            <TableRow key={`income-entry-${entry.entry_id}`} hover>
+                              <TableCell sx={{ color: "#475569", whiteSpace: "nowrap" }}>
+                                {entry.transaction_date}
+                              </TableCell>
+                              <TableCell sx={{ fontWeight: 700, color: "#0f172a" }}>
+                                {entry.transaction_number}
+                              </TableCell>
+                              <TableCell sx={{ fontWeight: 600, color: "#0284c7" }}>
+                                {entry.loan_number || "-"}
+                              </TableCell>
+                              <TableCell>
+                                <Typography variant="body2" fontWeight={600} color="#0f172a">
+                                  {entry.account_name}
+                                </Typography>
+                                <Typography variant="caption" color="text.secondary">
+                                  Code: {entry.account_code}
+                                </Typography>
+                              </TableCell>
+                              <TableCell>
+                                <Chip
+                                  label={
+                                    entry.account_code === "4150"
+                                      ? "Loan Form Fee"
+                                      : entry.account_code === "4100"
+                                      ? "Processing Fee"
+                                      : entry.account_code === "2100"
+                                      ? "Security Deposit"
+                                      : entry.account_code === "4000"
+                                      ? "Interest Income"
+                                      : entry.account_code === "4200"
+                                      ? "Penalty"
+                                      : entry.account_type?.toUpperCase()
+                                  }
+                                  size="small"
+                                  sx={{
+                                    fontWeight: 700,
+                                    fontSize: "0.7rem",
+                                    bgcolor:
+                                      entry.account_code === "4150"
+                                        ? "#f0fdfa"
+                                        : entry.account_code === "4100"
+                                        ? "#f0f9ff"
+                                        : entry.account_code === "2100"
+                                        ? "#faf5ff"
+                                        : entry.account_code === "4000"
+                                        ? "#fffbeb"
+                                        : "#f1f5f9",
+                                    color:
+                                      entry.account_code === "4150"
+                                        ? "#0f766e"
+                                        : entry.account_code === "4100"
+                                        ? "#0284c7"
+                                        : entry.account_code === "2100"
+                                        ? "#7c3aed"
+                                        : entry.account_code === "4000"
+                                        ? "#d97706"
+                                        : "#475569",
+                                  }}
+                                />
+                              </TableCell>
+                              <TableCell align="center">
+                                <Chip
+                                  label={entry.entry_type === "credit" ? "CR (Inflow)" : "DR (Outflow)"}
+                                  size="small"
+                                  sx={{
+                                    fontWeight: 700,
+                                    fontSize: "0.68rem",
+                                    bgcolor: entry.entry_type === "credit" ? "#ecfdf5" : "#fef2f2",
+                                    color: entry.entry_type === "credit" ? "#059669" : "#dc2626",
+                                  }}
+                                />
+                              </TableCell>
+                              <TableCell align="right" sx={{ fontWeight: 800, color: entry.entry_type === "credit" ? "#059669" : "#dc2626" }}>
+                                KES {Number(entry.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                              </TableCell>
+                              <TableCell sx={{ color: "text.secondary", maxWidth: 260 }}>
+                                <Typography variant="caption" noWrap display="block">
+                                  {entry.narration || "-"}
+                                </Typography>
+                              </TableCell>
+                            </TableRow>
+                          ));
+                        })()}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                )}
+              </Box>
             )}
           </CardContent>
         </Card>

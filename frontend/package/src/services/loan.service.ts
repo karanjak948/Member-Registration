@@ -258,6 +258,47 @@ class LoanService {
     const response = await api.patch(`/ledger-accounts/${id}/`, data);
     return response.data;
   }
+
+  /**
+   * GET /api/ledger-transactions/income-report/
+   */
+  async getIncomeReport(params?: {
+    start_date?: string;
+    end_date?: string;
+    account_code?: string;
+  }): Promise<{
+    start_date?: string;
+    end_date?: string;
+    account_code?: string;
+    summary: {
+      total_form_fees: number;
+      total_processing_fees: number;
+      total_security_deposits: number;
+      total_interest_income: number;
+      total_penalties: number;
+      grand_total: number;
+    };
+    count: number;
+    entries: Array<{
+      entry_id: number;
+      transaction_id: number;
+      transaction_number: string;
+      transaction_date: string;
+      account_code: string;
+      account_name: string;
+      account_type: string;
+      entry_type: "debit" | "credit";
+      amount: number;
+      narration: string;
+      loan_id?: number;
+      loan_number?: string;
+      reference_type: string;
+      reference_id: string;
+    }>;
+  }> {
+    const response = await api.get("/ledger-transactions/income-report/", { params });
+    return response.data;
+  }
 }
 
 export default new LoanService();

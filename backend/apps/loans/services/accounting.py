@@ -45,13 +45,14 @@ def record_disbursement_journal(
     disbursement_date: date,
     disbursed_amount: Decimal,
     fee_deductions: Decimal = Decimal("0.00"),
+    itemized_fees: list[dict] | None = None,
     payout_account_code: str = "1010",  # Cash / Bank / Mpesa Asset
 ) -> LedgerTransaction:
     """
     Record loan disbursement double-entry:
       DR: Loan Portfolio Asset (Full Principal)
-      CR: Cash/Bank Account (Net Payout = Principal - Upfront Fees)
-      CR: Fee Income Account (if any upfront fees deducted)
+      CR: Cash/Bank Account (Net Payout = Principal - Upfront Fees/Deposits)
+      CR: Individual Fee & Deposit Accounts (each fee/deposit posted independently)
     """
     org = loan.organization
     portfolio_acct = get_or_create_default_account(
@@ -60,13 +61,18 @@ def record_disbursement_journal(
     payout_acct = get_or_create_default_account(
         payout_account_code, "Cash and Bank Balances", AccountType.ASSET, org
     )
-    fee_acct = get_or_create_default_account(
-        "4100", "Loan Processing Fee Income", AccountType.REVENUE, org
-    )
 
-    principal = round2(loan.principal_amount)
+    principal = round2(disbursed_amount or loan.principal_amount)
     fees = round2(fee_deductions)
+
+    if itemized_fees:
+        total_from_items = sum(round2(f.get("amount", 0)) for f in itemized_fees)
+        if total_from_items > Decimal("0.00"):
+            fees = total_from_items
+
     net_payout = round2(principal - fees)
+    if net_payout < Decimal("0.00"):
+        net_payout = Decimal("0.00")
 
     txn = LedgerTransaction.objects.create(
         transaction_number=f"TXN-DISB-{loan.loan_number}",
@@ -95,8 +101,28 @@ def record_disbursement_journal(
         narration=f"Net payout for {loan.loan_number}",
     )
 
-    # Credit Fee Income if deducted
-    if fees > Decimal("0.00"):
+    # Credit Individual Fee & Deposit Accounts independently
+    if itemized_fees and len(itemized_fees) > 0:
+        for fee_item in itemized_fees:
+            fee_amt = round2(fee_item.get("amount", Decimal("0.00")))
+            if fee_amt <= Decimal("0.00"):
+                continue
+            code = str(fee_item.get("account_code") or "4100")
+            name = str(fee_item.get("account_name") or fee_item.get("fee_name") or "Loan Fee Income")
+            acct_type = fee_item.get("account_type") or AccountType.REVENUE
+            target_acct = get_or_create_default_account(code, name, acct_type, org)
+
+            LedgerEntry.objects.create(
+                transaction=txn,
+                account=target_acct,
+                entry_type=LedgerEntry.EntryType.CREDIT,
+                amount=fee_amt,
+                narration=f"{fee_item.get('fee_name', 'Upfront Fee')} on {loan.loan_number}",
+            )
+    elif fees > Decimal("0.00"):
+        fee_acct = get_or_create_default_account(
+            "4100", "Loan Processing Fee Income", AccountType.REVENUE, org
+        )
         LedgerEntry.objects.create(
             transaction=txn,
             account=fee_acct,
@@ -106,6 +132,7 @@ def record_disbursement_journal(
         )
 
     return txn
+
 
 
 @transaction.atomic

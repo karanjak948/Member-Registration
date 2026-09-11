@@ -8,6 +8,7 @@ from apps.loans.models import (
     RepaymentFrequency,
     SecurityType,
     FeeType,
+    DepositType,
 )
 from apps.organizations.models import Organization
 
@@ -139,6 +140,56 @@ class Command(BaseCommand):
                 "allocation_order": "penalty,fees,interest,principal",
                 "fees": [],
             },
+            {
+                "product_code": "JIN-001",
+                "product_name": "Jiinue loan",
+                "interest_method": InterestMethod.REDUCING_BALANCE,
+                "interest_rate": Decimal("20.0000"),
+                "interest_period": InterestPeriod.MONTHLY,
+                "repayment_frequency": RepaymentFrequency.MONTHLY,
+                "min_repayment_period": 1,
+                "max_repayment_period": 12,
+                "min_amount": Decimal("5000.00"),
+                "max_amount": Decimal("500000.00"),
+                "requires_guarantor": False,
+                "min_guarantors": 0,
+                "is_multiple_of_savings": False,
+                "requires_security": True,
+                "security_type": SecurityType.PERCENTAGE,
+                "security_value": Decimal("25.0000"),
+                "requires_deposit": True,
+                "deposit_type": DepositType.PERCENTAGE,
+                "deposit_value": Decimal("25.0000"),
+                "effective_date": "2026-01-01",
+                "is_active": True,
+                "allocation_order": "penalty,fees,interest,principal",
+                "fees": [
+                    {
+                        "fee_name": "Loan Form Fee",
+                        "fee_type": FeeType.FIXED_AMOUNT,
+                        "fee_value": Decimal("300.0000"),
+                        "fee_basis": "principal",
+                        "show_in_statement": True,
+                        "ledger_account_name": "Loan Form Fee Income",
+                    },
+                    {
+                        "fee_name": "Loan Processing Fee",
+                        "fee_type": FeeType.PERCENTAGE,
+                        "fee_value": Decimal("6.0000"),
+                        "fee_basis": "principal",
+                        "show_in_statement": True,
+                        "ledger_account_name": "Loan Processing Fee Income",
+                    },
+                    {
+                        "fee_name": "Security Deposit",
+                        "fee_type": FeeType.PERCENTAGE,
+                        "fee_value": Decimal("25.0000"),
+                        "fee_basis": "principal",
+                        "show_in_statement": True,
+                        "ledger_account_name": "Security Deposit Funds",
+                    },
+                ],
+            },
         ]
 
         created_count = 0
@@ -146,7 +197,7 @@ class Command(BaseCommand):
             fees_data = pdata.pop("fees", [])
             code = pdata["product_code"]
 
-            product, created = LoanProduct.objects.get_or_create(
+            product, created = LoanProduct.objects.update_or_create(
                 product_code=code,
                 defaults={**pdata, "organization": org},
             )
@@ -155,13 +206,14 @@ class Command(BaseCommand):
                 created_count += 1
                 self.stdout.write(self.style.SUCCESS(f"Created loan product: {product.product_name} ({code})"))
             else:
-                self.stdout.write(f"Loan product already exists: {product.product_name} ({code})")
+                self.stdout.write(f"Updated loan product: {product.product_name} ({code})")
 
             for fee_data in fees_data:
-                LoanProductFee.objects.get_or_create(
+                LoanProductFee.objects.update_or_create(
                     product=product,
                     fee_name=fee_data["fee_name"],
                     defaults=fee_data,
                 )
 
-        self.stdout.write(self.style.SUCCESS(f"Successfully seeded {created_count} loan products."))
+        self.stdout.write(self.style.SUCCESS(f"Successfully processed {len(products_data)} loan products."))
+
