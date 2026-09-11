@@ -62,13 +62,39 @@ class RepaymentSerializer(serializers.ModelSerializer):
         count = Repayment.objects.filter(loan=loan).count() + 1
         repayment_number = f"RPY-{loan.loan_number}-{count:03d}"
 
+        # Determine due interest:
+        # In financial accounting (especially reducing balance), interest accrues over time.
+        # Unpaid schedule entries beyond the current active installment have NOT accrued interest yet.
+        # Therefore, due interest for the repayment waterfall is only the accrued interest on overdue
+        # installments plus the active installment being served. Prepayments / lump-sum payments
+        # must pay down principal, not future unaccrued interest.
+        unpaid_entries = list(loan.schedule_entries.filter(is_paid=False).order_by("period_number"))
+
+        due_penalty = loan.penalty_balance
+        due_fees = loan.fees_balance
+
+        if unpaid_entries:
+            # Overdue entries (due_date <= payment_date) plus the current active installment
+            overdue_entries = [e for e in unpaid_entries if e.due_date <= payment_date]
+            if overdue_entries:
+                accrued_entries = overdue_entries
+            else:
+                accrued_entries = [unpaid_entries[0]]
+
+            due_interest = sum(
+                max(Decimal("0.00"), e.expected_interest - e.paid_interest)
+                for e in accrued_entries
+            )
+        else:
+            due_interest = loan.interest_balance
+
         # Run Waterfall Allocation
         order = loan.loan_product.allocation_order or "penalty,fees,interest,principal"
         alloc = allocate_repayment_waterfall(
             payment_amount=amount,
-            outstanding_penalty=loan.penalty_balance,
-            outstanding_fees=loan.fees_balance,
-            outstanding_interest=loan.interest_balance,
+            outstanding_penalty=due_penalty,
+            outstanding_fees=due_fees,
+            outstanding_interest=due_interest,
             outstanding_principal=loan.principal_balance,
             allocation_order=order,
         )
@@ -98,7 +124,11 @@ class RepaymentSerializer(serializers.ModelSerializer):
         rem_fee_alloc = alloc.allocated_fees
         rem_pen_alloc = alloc.allocated_penalty
 
-        unpaid_entries = loan.schedule_entries.filter(is_paid=False).order_by("period_number")
+        # For reducing balance loans, the active installment absorbs any extra principal prepayment
+        # so that subsequent unpaid installments can be dynamically recalculated with 0 paid.
+        is_reducing = loan.interest_method == "reducing_balance"
+        active_entry = unpaid_entries[0] if unpaid_entries else None
+
         for entry in unpaid_entries:
             if rem_pen_alloc > Decimal("0"):
                 due_pen = max(Decimal("0"), entry.expected_penalty - entry.paid_penalty)
@@ -124,9 +154,17 @@ class RepaymentSerializer(serializers.ModelSerializer):
                 entry.paid_principal += pay
                 rem_prn_alloc -= pay
 
-            if entry.total_due <= Decimal("0.01"):
+                # If reducing balance and this is the active entry, absorb any lump-sum principal prepayment
+                if is_reducing and entry == active_entry and rem_prn_alloc > Decimal("0"):
+                    entry.paid_principal += rem_prn_alloc
+                    rem_prn_alloc = Decimal("0.00")
+
+            if entry.remaining_principal <= Decimal("0.01") and entry.remaining_interest <= Decimal("0.01"):
                 entry.is_paid = True
                 entry.paid_date = payment_date
+
+            if entry.paid_principal > Decimal("0.00"):
+                entry.closing_balance = max(Decimal("0.00"), entry.opening_balance - entry.paid_principal)
 
             entry.save()
 
@@ -153,7 +191,7 @@ class RepaymentSerializer(serializers.ModelSerializer):
                 total_sched_count = loan.schedule_entries.count()
                 active_unpaid = loan.schedule_entries.filter(is_paid=False).order_by("period_number")
                 num_rem = active_unpaid.count()
-                if num_rem > 0 and total_sched_count >= loan.num_periods:
+                if num_rem > 0 and total_sched_count >= loan.num_periods and (not active_entry or active_entry.is_paid):
                     cur_bal = loan.principal_balance
                     prn_each = round2(cur_bal / Decimal(str(num_rem)))
                     for idx, rem_entry in enumerate(active_unpaid, 1):
