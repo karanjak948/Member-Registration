@@ -190,6 +190,11 @@ class Member(AuditModel):
 
         super().save(*args, **kwargs)
 
+    @property
+    def full_name(self) -> str:
+        """Returns the member's full name."""
+        return f"{self.first_name} {self.other_names}".strip()
+
     def __str__(self):
         return (
             f"{self.membership_number} - "

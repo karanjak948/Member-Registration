@@ -133,4 +133,5 @@ class SavingsPayment(AuditModel):
         super().save(*args, **kwargs)
 
     def __str__(self):
-        return f"{self.document_no} - {self.member.full_name} ({self.get_savings_type_display()} KES {self.amount})"
+        member_name = self.member.full_name if self.member else "—"
+        return f"{self.document_no} - {member_name} ({self.get_savings_type_display()} KES {self.amount})"
