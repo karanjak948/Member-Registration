@@ -458,6 +458,47 @@ class LoanViewSet(viewsets.ModelViewSet):
 
         return Response(LoanDetailSerializer(loan).data)
 
+    @action(detail=True, methods=["get"], url_path="settlement-quote")
+    def settlement_quote(self, request, pk=None):
+        """
+        Calculate early payoff quote:
+        - Remaining principal
+        - Accrued/overdue interest
+        - Accrued/overdue fees and penalties
+        - Future unearned interest waived
+        - Net settlement amount to clear the loan in full
+        """
+        loan = self.get_object()
+        today = timezone.now().date()
+        unpaid_entries = list(loan.schedule_entries.filter(is_paid=False).order_by("period_number"))
+
+        overdue_entries = [e for e in unpaid_entries if e.due_date <= today]
+        overdue_interest = sum(
+            max(Decimal("0.00"), e.expected_interest - e.paid_interest)
+            for e in overdue_entries
+        )
+        total_future_interest = sum(
+            max(Decimal("0.00"), e.expected_interest - e.paid_interest)
+            for e in unpaid_entries if e.due_date > today
+        )
+
+        outstanding_principal = loan.principal_balance
+        outstanding_penalty = loan.penalty_balance
+        outstanding_fees = loan.fees_balance
+        net_payoff = outstanding_principal + overdue_interest + outstanding_penalty + outstanding_fees
+
+        return Response({
+            "loan_id": loan.id,
+            "loan_number": loan.loan_number,
+            "principal_balance": float(outstanding_principal),
+            "accrued_interest": float(overdue_interest),
+            "penalty_balance": float(outstanding_penalty),
+            "fees_balance": float(outstanding_fees),
+            "waived_future_interest": float(total_future_interest),
+            "net_payoff_amount": float(net_payoff),
+            "is_closed": loan.status == LoanStatus.CLOSED,
+        })
+
     @action(detail=False, methods=["get"], url_path="aging_report")
     def aging_report(self, request):
         """

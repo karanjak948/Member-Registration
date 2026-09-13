@@ -14,6 +14,7 @@ class RepaymentSerializer(serializers.ModelSerializer):
     membership_number = serializers.CharField(
         source="loan.member.membership_number", read_only=True
     )
+    is_early_settlement = serializers.BooleanField(required=False, default=False, write_only=True)
 
     class Meta:
         model = Repayment
@@ -33,6 +34,7 @@ class RepaymentSerializer(serializers.ModelSerializer):
             "allocated_fees",
             "allocated_penalty",
             "unallocated_amount",
+            "is_early_settlement",
             "notes",
             "recorded_by",
             "created_at",
@@ -54,6 +56,7 @@ class RepaymentSerializer(serializers.ModelSerializer):
 
     @transaction.atomic
     def create(self, validated_data):
+        is_early_settlement = validated_data.pop("is_early_settlement", False)
         loan: Loan = validated_data["loan"]
         amount = round2(validated_data["amount_paid"])
         payment_date = validated_data.get("payment_date") or timezone.now().date()
@@ -64,27 +67,35 @@ class RepaymentSerializer(serializers.ModelSerializer):
 
         # Determine due interest:
         # In financial accounting (especially reducing balance), interest accrues over time.
-        # Unpaid schedule entries beyond the current active installment have NOT accrued interest yet.
-        # Therefore, due interest for the repayment waterfall is only the accrued interest on overdue
-        # installments plus the active installment being served. Prepayments / lump-sum payments
-        # must pay down principal, not future unaccrued interest.
+        # Unpaid schedule entries beyond active or matured installments have NOT accrued interest yet.
+        # When a borrower clears the loan early (early payoff), future unaccrued interest is waived.
         unpaid_entries = list(loan.schedule_entries.filter(is_paid=False).order_by("period_number"))
 
         due_penalty = loan.penalty_balance
         due_fees = loan.fees_balance
 
-        if unpaid_entries:
-            # Overdue entries (due_date <= payment_date) plus the current active installment
-            overdue_entries = [e for e in unpaid_entries if e.due_date <= payment_date]
-            if overdue_entries:
-                accrued_entries = overdue_entries
-            else:
-                accrued_entries = [unpaid_entries[0]]
+        # Overdue entries whose due_date <= payment_date
+        overdue_entries = [e for e in unpaid_entries if e.due_date <= payment_date]
+        overdue_interest = sum(
+            max(Decimal("0.00"), e.expected_interest - e.paid_interest)
+            for e in overdue_entries
+        )
 
-            due_interest = sum(
-                max(Decimal("0.00"), e.expected_interest - e.paid_interest)
-                for e in accrued_entries
-            )
+        # Early payoff condition: either explicitly flagged OR the amount clears the remaining principal + any overdue obligations
+        is_full_payoff = (
+            is_early_settlement
+            or (amount >= (loan.principal_balance + due_penalty + due_fees + overdue_interest))
+        )
+
+        if is_full_payoff:
+            # On early payoff, only accrued overdue interest is collected; unaccrued future interest is waived!
+            due_interest = overdue_interest
+        elif unpaid_entries:
+            if overdue_entries:
+                due_interest = overdue_interest
+            else:
+                # Regular installment payment within active cycle
+                due_interest = max(Decimal("0.00"), unpaid_entries[0].expected_interest - unpaid_entries[0].paid_interest)
         else:
             due_interest = loan.interest_balance
 
@@ -124,8 +135,6 @@ class RepaymentSerializer(serializers.ModelSerializer):
         rem_fee_alloc = alloc.allocated_fees
         rem_pen_alloc = alloc.allocated_penalty
 
-        # For reducing balance loans, the active installment absorbs any extra principal prepayment
-        # so that subsequent unpaid installments can be dynamically recalculated with 0 paid.
         is_reducing = loan.interest_method == "reducing_balance"
         active_entry = unpaid_entries[0] if unpaid_entries else None
 
@@ -174,54 +183,56 @@ class RepaymentSerializer(serializers.ModelSerializer):
         loan.interest_balance = max(Decimal("0"), loan.interest_balance - alloc.allocated_interest)
         loan.principal_balance = max(Decimal("0"), loan.principal_balance - alloc.allocated_principal)
 
-        # If reducing balance, dynamically recalculate future unaccrued interest when principal was paid down
-        if loan.interest_method == "reducing_balance" and alloc.allocated_principal > Decimal("0.00"):
-            if loan.principal_balance > Decimal("0.00"):
-                product = loan.loan_product
-                r_pct = Decimal(str(loan.interest_rate))
-                if getattr(product, "interest_period", "monthly") == "yearly":
-                    annual_rate = r_pct / Decimal("100")
-                else:
-                    annual_rate = (r_pct / Decimal("100")) * Decimal("12")
-
-                from apps.loans.services.engine.interest import PERIODS_PER_YEAR
-                freq_py = Decimal(str(PERIODS_PER_YEAR.get(loan.repayment_frequency, 12)))
-                r_per = annual_rate / freq_py
-
-                total_sched_count = loan.schedule_entries.count()
-                active_unpaid = loan.schedule_entries.filter(is_paid=False).order_by("period_number")
-                num_rem = active_unpaid.count()
-                if num_rem > 0 and total_sched_count >= loan.num_periods and (not active_entry or active_entry.is_paid):
-                    cur_bal = loan.principal_balance
-                    prn_each = round2(cur_bal / Decimal(str(num_rem)))
-                    for idx, rem_entry in enumerate(active_unpaid, 1):
-                        rem_entry.opening_balance = round2(cur_bal)
-                        rem_entry.expected_interest = round2(cur_bal * r_per)
-                        if idx == num_rem:
-                            rem_entry.expected_principal = cur_bal
-                            rem_entry.closing_balance = Decimal("0.00")
-                        else:
-                            rem_entry.expected_principal = min(cur_bal, prn_each)
-                            rem_entry.closing_balance = max(Decimal("0.00"), round2(cur_bal - rem_entry.expected_principal))
-                        rem_entry.expected_amount = round2(rem_entry.expected_principal + rem_entry.expected_interest)
-                        cur_bal = rem_entry.closing_balance
-                        rem_entry.save()
-
-                    rem_interest = sum(
-                        max(Decimal("0.00"), e.expected_interest - e.paid_interest)
-                        for e in loan.schedule_entries.filter(is_paid=False)
-                    )
-                    loan.interest_balance = round2(rem_interest)
+        # Check if principal is fully cleared or if full payoff
+        if is_full_payoff or loan.principal_balance <= Decimal("0.01"):
+            loan.principal_balance = Decimal("0.00")
+            loan.interest_balance = Decimal("0.00")
+            # Close all remaining schedule entries (waiving unearned future interest)
+            for rem_entry in loan.schedule_entries.filter(is_paid=False):
+                rem_entry.expected_interest = rem_entry.paid_interest
+                rem_entry.expected_principal = rem_entry.paid_principal
+                rem_entry.expected_amount = rem_entry.paid_principal + rem_entry.paid_interest
+                rem_entry.closing_balance = Decimal("0.00")
+                rem_entry.is_paid = True
+                rem_entry.paid_date = payment_date
+                rem_entry.save()
+        elif loan.interest_method == "reducing_balance" and alloc.allocated_principal > Decimal("0.00"):
+            # If reducing balance and partial principal paid down, dynamically recalculate future unaccrued interest
+            product = loan.loan_product
+            r_pct = Decimal(str(loan.interest_rate))
+            if getattr(product, "interest_period", "monthly") == "yearly":
+                annual_rate = r_pct / Decimal("100")
             else:
-                # Principal fully cleared: close unaccrued schedule entries
-                for rem_entry in loan.schedule_entries.filter(is_paid=False):
-                    rem_entry.expected_interest = rem_entry.paid_interest
-                    rem_entry.expected_principal = rem_entry.paid_principal
-                    rem_entry.expected_amount = rem_entry.paid_principal + rem_entry.paid_interest
-                    rem_entry.is_paid = True
-                    rem_entry.paid_date = payment_date
+                annual_rate = (r_pct / Decimal("100")) * Decimal("12")
+
+            from apps.loans.services.engine.interest import PERIODS_PER_YEAR
+            freq_py = Decimal(str(PERIODS_PER_YEAR.get(loan.repayment_frequency, 12)))
+            r_per = annual_rate / freq_py
+
+            total_sched_count = loan.schedule_entries.count()
+            active_unpaid = loan.schedule_entries.filter(is_paid=False).order_by("period_number")
+            num_rem = active_unpaid.count()
+            if num_rem > 0 and total_sched_count >= loan.num_periods and (not active_entry or active_entry.is_paid):
+                cur_bal = loan.principal_balance
+                prn_each = round2(cur_bal / Decimal(str(num_rem)))
+                for idx, rem_entry in enumerate(active_unpaid, 1):
+                    rem_entry.opening_balance = round2(cur_bal)
+                    rem_entry.expected_interest = round2(cur_bal * r_per)
+                    if idx == num_rem:
+                        rem_entry.expected_principal = cur_bal
+                        rem_entry.closing_balance = Decimal("0.00")
+                    else:
+                        rem_entry.expected_principal = min(cur_bal, prn_each)
+                        rem_entry.closing_balance = max(Decimal("0.00"), round2(cur_bal - rem_entry.expected_principal))
+                    rem_entry.expected_amount = round2(rem_entry.expected_principal + rem_entry.expected_interest)
+                    cur_bal = rem_entry.closing_balance
                     rem_entry.save()
-                loan.interest_balance = Decimal("0.00")
+
+                rem_interest = sum(
+                    max(Decimal("0.00"), e.expected_interest - e.paid_interest)
+                    for e in loan.schedule_entries.filter(is_paid=False)
+                )
+                loan.interest_balance = round2(rem_interest)
 
         loan.outstanding_balance = (
             loan.principal_balance

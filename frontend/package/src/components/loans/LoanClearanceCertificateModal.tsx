@@ -154,14 +154,14 @@ export default function LoanClearanceCertificateModal({
             outlineOffset: "-6px",
           }}
         >
-          {/* Official SACCO Header */}
-          <Stack alignItems="center" textAlign="center" spacing={0.75} mb={2.5}>
+          {/* Clean SACCO Header */}
+          <Stack alignItems="center" textAlign="center" spacing={0.5} mb={2}>
             <Box
               sx={{
-                width: 52,
-                height: 52,
+                width: 48,
+                height: 48,
                 borderRadius: "50%",
-                background: "linear-gradient(135deg, #064e3b 0%, #047857 70%, #b45309 100%)",
+                background: "linear-gradient(135deg, #064e3b 0%, #047857 100%)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
@@ -170,7 +170,7 @@ export default function LoanClearanceCertificateModal({
                 mb: 0.5,
               }}
             >
-              <IconCertificate size={30} stroke={2} />
+              <IconCertificate size={28} stroke={2} />
             </Box>
 
             <Typography
@@ -178,47 +178,27 @@ export default function LoanClearanceCertificateModal({
               fontWeight={900}
               sx={{
                 color: "#064e3b",
-                fontFamily: "serif",
-                letterSpacing: "0.5px",
-                fontSize: { xs: "1.25rem", sm: "1.6rem" },
+                letterSpacing: "1px",
+                fontSize: { xs: "1.3rem", sm: "1.6rem" },
                 textTransform: "uppercase",
               }}
             >
-              Royal Savings &amp; Credit Co-operative Society Ltd
+              ROYAL SACCO
             </Typography>
 
             <Typography
               variant="caption"
               fontWeight={700}
-              sx={{ color: "#b45309", letterSpacing: "1px", textTransform: "uppercase", fontSize: "0.75rem" }}
+              sx={{ color: "#059669", letterSpacing: "1.5px", textTransform: "uppercase", fontSize: "0.75rem" }}
             >
-              Incorporated Under The Co-operative Societies Act • Licensed &amp; Regulated by SASRA
+              LOAN CLEARANCE CERTIFICATE
             </Typography>
 
-            <Typography variant="caption" color="text.secondary" sx={{ fontSize: "0.72rem" }}>
-              Royal Plaza, Upper Hill, P.O. Box 48291-00100 Nairobi, Kenya • info@royalltd.co.ke
-            </Typography>
-
-            <Divider sx={{ width: "100%", mt: 1, mb: 1.5, borderColor: "#064e3b", borderWidth: 1 }} />
+            <Divider sx={{ width: "100%", mt: 1, mb: 1.5, borderColor: "#059669", borderWidth: 1 }} />
           </Stack>
 
-          {/* Certificate Title & Metadata Bar */}
+          {/* Certificate Metadata Bar */}
           <Box textAlign="center" mb={2}>
-            <Typography
-              variant="h6"
-              fontWeight={900}
-              sx={{
-                color: "#0f172a",
-                fontFamily: "serif",
-                letterSpacing: "1.5px",
-                textTransform: "uppercase",
-                fontSize: { xs: "1.1rem", sm: "1.35rem" },
-                mb: 1,
-              }}
-            >
-              Certificate of Loan Clearance
-            </Typography>
-
             <Stack
               direction="row"
               justifyContent="center"
@@ -226,9 +206,9 @@ export default function LoanClearanceCertificateModal({
               spacing={{ xs: 1.5, sm: 3 }}
               sx={{
                 py: 0.75,
-                px: 2,
+                px: 2.5,
                 bgcolor: "#f8fafc",
-                borderRadius: 1,
+                borderRadius: 1.5,
                 border: "1px solid #e2e8f0",
                 display: "inline-flex",
               }}
@@ -256,16 +236,14 @@ export default function LoanClearanceCertificateModal({
               lineHeight: 1.7,
               textAlign: "center",
               color: "#1e293b",
-              fontFamily: "serif",
-              fontSize: { xs: "0.92rem", sm: "1.02rem" },
+              fontSize: { xs: "0.95rem", sm: "1.05rem" },
               my: 2,
               px: { xs: 1, sm: 2 },
             }}
           >
-            This is to certify that <strong>{certificate.memberName}</strong>, holder of Membership No.{" "}
-            <strong style={{ color: "#064e3b" }}>{certificate.membershipNumber}</strong> and National ID / Passport{" "}
-            <strong>{certificate.nationalId || "VERIFIED"}</strong>, has fully satisfied, settled, and liquidated all
-            outstanding obligations under credit facility <strong>{certificate.loanNumber}</strong>.
+            This is to certify that <strong>{certificate.memberName}</strong> (Membership No:{" "}
+            <strong style={{ color: "#064e3b" }}>{certificate.membershipNumber}</strong>) has fully repaid, settled, and cleared
+            all outstanding obligations under loan facility <strong>{certificate.loanNumber}</strong>.
           </Typography>
 
           {/* Simple Particulars Card */}
@@ -345,8 +323,7 @@ export default function LoanClearanceCertificateModal({
               px: 2,
             }}
           >
-            The Society confirms that there are no continuing liabilities on this facility. All associated guarantors,
-            pledges, and securities are unconditionally released and discharged.
+            This credit facility has been settled in full with KES 0.00 outstanding balance. The loan is officially closed and all obligations are discharged.
           </Typography>
 
           {/* Signatures on Either Side & Official Seal in Center */}

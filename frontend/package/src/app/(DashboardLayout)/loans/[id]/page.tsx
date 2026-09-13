@@ -58,6 +58,7 @@ import {
 import loanService from "@/services/loan.service";
 import LoanApprovalDialog from "@/components/loans/dialogs/LoanApprovalDialog";
 import LoanDisbursementDialog from "@/components/loans/dialogs/LoanDisbursementDialog";
+import ExportButton from "@/components/common/ExportButton";
 import memberService from "@/services/member.service";
 import guarantorService from "@/services/guarantor.service";
 import nextOfKinService from "@/services/nextOfKin.service";
@@ -197,6 +198,7 @@ export default function LoanDetailPage() {
   const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split("T")[0]);
   const [paymentNotes, setPaymentNotes] = useState("");
   const [paymentSubmitting, setPaymentSubmitting] = useState(false);
+  const [isEarlySettlement, setIsEarlySettlement] = useState(false);
 
   const [snackbar, setSnackbar] = useState<{
     open: boolean;
@@ -236,6 +238,7 @@ export default function LoanDetailPage() {
 
     try {
       setPaymentSubmitting(true);
+      const isEarly = isEarlySettlement || Number(paymentAmount) >= Number(loan.principal_balance);
       const notesCombined = `${paymentMode} ${paymentMpesaRef ? `Ref: ${paymentMpesaRef} ` : ""}- ${paymentNotes}`.trim();
       const res = await fetch(`/api/loans/${loan.id}/repayments`, {
         method: "POST",
@@ -246,6 +249,7 @@ export default function LoanDetailPage() {
           amount_paid: Number(paymentAmount),
           payment_method: paymentMode.toLowerCase(),
           transaction_reference: paymentMpesaRef || `TXN-${Date.now()}`,
+          is_early_settlement: isEarly,
           notes: notesCombined,
         }),
       });
@@ -347,6 +351,17 @@ export default function LoanDetailPage() {
   useEffect(() => {
     loadLoan();
   }, [identifier]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && loan?.status === "active") {
+      const searchParams = new URLSearchParams(window.location.search);
+      if (searchParams.get("action") === "repay") {
+        setPaymentAmount("");
+        setIsEarlySettlement(false);
+        setPaymentDialogOpen(true);
+      }
+    }
+  }, [loan?.status]);
 
   // Engine Lifecycle Actions
   const handleAppraise = async () => {
@@ -1416,7 +1431,22 @@ export default function LoanDetailPage() {
             </Stack>
 
             {loan.schedule_entries && loan.schedule_entries.length > 0 && (
-              <Stack direction="row" spacing={1} alignItems="center">
+              <Stack direction="row" spacing={1.5} alignItems="center">
+                <ExportButton
+                  data={loan.schedule_entries}
+                  columns={[
+                    { header: "Period #", key: "period_number" },
+                    { header: "Due Date", key: "due_date" },
+                    { header: "Opening Balance", accessor: (r) => Math.round(Number(r.opening_balance || 0)).toLocaleString() },
+                    { header: "Principal", accessor: (r) => Math.round(Number(r.expected_principal || 0)).toLocaleString() },
+                    { header: "Interest", accessor: (r) => Math.round(Number(r.expected_interest || 0)).toLocaleString() },
+                    { header: "Expected Installment", accessor: (r) => Math.round(Number(r.expected_amount || 0)).toLocaleString() },
+                    { header: "Status", accessor: (r) => r.is_paid ? "Paid" : "Pending" },
+                  ]}
+                  filename={`Amortization_Schedule_${loan.loan_number}`}
+                  title={`Amortization Repayment Schedule - ${loan.loan_number}`}
+                  size="small"
+                />
                 <Chip
                   size="small"
                   label={`${loan.schedule_entries.filter((s) => s.is_paid).length} of ${loan.schedule_entries.length} Paid`}
@@ -1553,25 +1583,46 @@ export default function LoanDetailPage() {
               </Box>
             </Stack>
 
-            {isActive && (
-              <Button
-                variant="contained"
-                size="small"
-                startIcon={<IconCash size={16} />}
-                onClick={() => {
-                  setPaymentAmount("");
-                  setPaymentDialogOpen(true);
-                }}
-                sx={{
-                  bgcolor: "#2563eb",
-                  fontWeight: 800,
-                  borderRadius: 2,
-                  "&:hover": { bgcolor: "#1d4ed8" },
-                }}
-              >
-                Record Repayment
-              </Button>
-            )}
+            <Stack direction="row" spacing={1.5} alignItems="center">
+              {repayments.length > 0 && (
+                <ExportButton
+                  data={repayments}
+                  columns={[
+                    { header: "Repayment #", key: "repayment_number" },
+                    { header: "Payment Date", key: "payment_date" },
+                    { header: "Amount Paid (KES)", accessor: (r) => Number(r.amount_paid).toLocaleString() },
+                    { header: "Principal (KES)", accessor: (r) => Number(r.allocated_principal || 0).toLocaleString() },
+                    { header: "Interest (KES)", accessor: (r) => Number(r.allocated_interest || 0).toLocaleString() },
+                    { header: "Penalty (KES)", accessor: (r) => Number(r.allocated_penalty || 0).toLocaleString() },
+                    { header: "Channel", accessor: (r) => r.payment_method?.toUpperCase() || "MPESA" },
+                    { header: "Reference", key: "transaction_reference" },
+                  ]}
+                  filename={`Repayments_History_${loan.loan_number}`}
+                  title={`Repayments History - ${loan.loan_number}`}
+                  size="small"
+                />
+              )}
+              {isActive && (
+                <Button
+                  variant="contained"
+                  size="small"
+                  startIcon={<IconCash size={16} />}
+                  onClick={() => {
+                    setPaymentAmount("");
+                    setIsEarlySettlement(false);
+                    setPaymentDialogOpen(true);
+                  }}
+                  sx={{
+                    bgcolor: "#2563eb",
+                    fontWeight: 800,
+                    borderRadius: 2,
+                    "&:hover": { bgcolor: "#1d4ed8" },
+                  }}
+                >
+                  Record Repayment
+                </Button>
+              )}
+            </Stack>
           </Stack>
 
           {repayments.length === 0 ? (
@@ -2255,7 +2306,7 @@ export default function LoanDetailPage() {
               elevation={0}
               sx={{
                 p: 2,
-                mb: 3,
+                mb: 2.5,
                 bgcolor: "#f8fafc",
                 borderRadius: 2.5,
                 border: "1px solid #e2e8f0",
@@ -2263,7 +2314,15 @@ export default function LoanDetailPage() {
             >
               <Stack direction="row" justifyContent="space-between" mb={1}>
                 <Typography variant="body2" color="text.secondary">
-                  Current Outstanding Balance:
+                  Remaining Principal Balance:
+                </Typography>
+                <Typography variant="body2" fontWeight={800} color="#047857">
+                  KES {Number(loan.principal_balance || 0).toLocaleString()}
+                </Typography>
+              </Stack>
+              <Stack direction="row" justifyContent="space-between" mb={1}>
+                <Typography variant="body2" color="text.secondary">
+                  Total Outstanding Balance:
                 </Typography>
                 <Typography variant="body2" fontWeight={800} color="error.main">
                   KES {Number(loan.outstanding_balance || 0).toLocaleString()}
@@ -2278,6 +2337,51 @@ export default function LoanDetailPage() {
                 </Typography>
               </Stack>
             </Paper>
+
+            {Number(loan.principal_balance || 0) > 0 && (
+              <Paper
+                elevation={0}
+                sx={{
+                  p: 2,
+                  mb: 2.5,
+                  bgcolor: "#ecfdf5",
+                  borderRadius: 2.5,
+                  border: "1px solid #a7f3d0",
+                }}
+              >
+                <Stack direction="row" justifyContent="space-between" alignItems="center" mb={0.5}>
+                  <Typography variant="subtitle2" fontWeight={800} color="#065f46">
+                    Early Loan Settlement / Full Payoff
+                  </Typography>
+                  <Chip
+                    size="small"
+                    label="Zero Future Interest"
+                    sx={{ bgcolor: "#d1fae5", color: "#047857", fontWeight: 800, fontSize: "0.7rem" }}
+                  />
+                </Stack>
+                <Typography variant="caption" color="#047857" display="block" mb={1.5}>
+                  Clear the remaining principal balance in full (KES {Number(loan.principal_balance).toLocaleString()}). Unaccrued future interest will be waived and the facility immediately closed.
+                </Typography>
+                <Button
+                  size="small"
+                  variant="contained"
+                  onClick={() => {
+                    setPaymentAmount(String(loan.principal_balance));
+                    setIsEarlySettlement(true);
+                  }}
+                  sx={{
+                    bgcolor: "#047857",
+                    "&:hover": { bgcolor: "#065f46" },
+                    fontWeight: 800,
+                    textTransform: "none",
+                    borderRadius: 2,
+                    fontSize: "0.8rem",
+                  }}
+                >
+                  Clear Principal Balance (KES {Number(loan.principal_balance).toLocaleString()})
+                </Button>
+              </Paper>
+            )}
 
             <Stack spacing={2.5}>
               <TextField

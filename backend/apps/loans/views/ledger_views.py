@@ -35,6 +35,14 @@ class LedgerAccountViewSet(viewsets.ModelViewSet):
             )
         return super().create(request, *args, **kwargs)
 
+    def perform_create(self, serializer):
+        org = getattr(self.request.user, "organization", None)
+        if not org and hasattr(self.request.user, "memberships"):
+            membership = self.request.user.memberships.first()
+            if membership:
+                org = membership.organization
+        serializer.save(organization=org)
+
     def update(self, request, *args, **kwargs):
         if not is_admin_or_owner_user(request.user):
             return Response(

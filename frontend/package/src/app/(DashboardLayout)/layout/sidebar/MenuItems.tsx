@@ -200,7 +200,7 @@ export function getMenuItems(
     children: [
       {
         id: "receive-payment",
-        title: "Receive Payment",
+        title: "Receive Collections",
         icon: IconCash,
         href: "/collections/receive",
       },

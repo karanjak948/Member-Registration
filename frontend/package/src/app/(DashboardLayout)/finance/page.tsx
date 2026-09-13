@@ -39,6 +39,9 @@ import PageContainer from "@/app/(DashboardLayout)/components/container/PageCont
 import api from "@/services/api";
 import loanService from "@/services/loan.service";
 import { usePermissions } from "@/hooks/usePermissions";
+import AddLedgerAccountDialog from "@/components/finance/AddLedgerAccountDialog";
+import ExportButton from "@/components/common/ExportButton";
+import { ExportColumn } from "@/utils/exportGrid";
 import {
   IconBuildingBank,
   IconCoins,
@@ -248,6 +251,7 @@ export default function FinancePage() {
     canDeactivate: false,
   });
 
+  const [addAccountOpen, setAddAccountOpen] = useState(false);
   const [togglingAccountId, setTogglingAccountId] = useState<number | null>(null);
   const [feedbackSnackbar, setFeedbackSnackbar] = useState<{
     open: boolean;
@@ -891,24 +895,113 @@ export default function FinancePage() {
                 />
               </Tabs>
 
-              {(tabValue === 0 || tabValue === 2) && (
-                <TextField
-                  size="small"
-                  placeholder={tabValue === 0 ? "Search journal entries..." : "Search audit logs..."}
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  slotProps={{
-                    input: {
-                      startAdornment: (
-                        <InputAdornment position="start">
-                          <IconSearch size={16} color="#64748b" />
-                        </InputAdornment>
-                      ),
-                    },
-                  }}
-                  sx={{ width: { xs: "100%", sm: 260 }, pb: { xs: 2, sm: 0 } }}
-                />
-              )}
+              <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} alignItems="center" sx={{ pb: { xs: 2, sm: 0 }, width: { xs: "100%", md: "auto" } }}>
+                {(tabValue === 0 || tabValue === 2) && (
+                  <TextField
+                    size="small"
+                    placeholder={tabValue === 0 ? "Search journal entries..." : "Search audit logs..."}
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    slotProps={{
+                      input: {
+                        startAdornment: (
+                          <InputAdornment position="start">
+                            <IconSearch size={16} color="#64748b" />
+                          </InputAdornment>
+                        ),
+                      },
+                    }}
+                    sx={{ width: { xs: "100%", sm: 240 } }}
+                  />
+                )}
+
+                {tabValue === 0 && (
+                  <ExportButton
+                    data={filteredTransactions}
+                    columns={[
+                      { header: "Tx #", key: "transaction_number" },
+                      { header: "Date", key: "transaction_date" },
+                      { header: "Reference Type", key: "reference_type" },
+                      { header: "Reference ID", key: "reference_id" },
+                      { header: "Loan #", accessor: (r: LedgerTransaction) => r.loan_number || "-" },
+                      { header: "Borrower", accessor: (r: LedgerTransaction) => (r as any).loan?.member ? `${(r as any).loan.member.first_name} ${(r as any).loan.member.other_names}`.trim() : "-" },
+                      { header: "Description", key: "description" },
+                      {
+                        header: "Total DR (KES)",
+                        accessor: (r: LedgerTransaction) => {
+                          const sum = r.entries?.filter((e: LedgerEntry) => e.entry_type === "debit").reduce((acc: number, e: LedgerEntry) => acc + Number(e.amount), 0) || 0;
+                          return sum.toLocaleString();
+                        }
+                      },
+                      {
+                        header: "Total CR (KES)",
+                        accessor: (r: LedgerTransaction) => {
+                          const sum = r.entries?.filter((e: LedgerEntry) => e.entry_type === "credit").reduce((acc: number, e: LedgerEntry) => acc + Number(e.amount), 0) || 0;
+                          return sum.toLocaleString();
+                        }
+                      },
+                    ]}
+                    filename="General_Ledger_Journal"
+                    title="General Ledger Journal Registry"
+                    size="small"
+                  />
+                )}
+
+                {tabValue === 1 && (
+                  <Stack direction="row" spacing={1.5} alignItems="center">
+                    <ExportButton
+                      data={accounts}
+                      columns={[
+                        { header: "Account Code", key: "account_code" },
+                        { header: "Account Name", key: "account_name" },
+                        { header: "Account Type", accessor: (r: LedgerAccount) => r.account_type.toUpperCase() },
+                        { header: "Description", accessor: (r: LedgerAccount) => r.description || "-" },
+                        { header: "Status", accessor: (r: LedgerAccount) => r.is_active ? "Active" : "Inactive" },
+                      ]}
+                      filename="Chart_of_Accounts"
+                      title="SACCO Chart of Accounts Registry"
+                      size="small"
+                    />
+                    {isAdmin && (
+                      <Button
+                        variant="contained"
+                        size="small"
+                        startIcon={<IconPlus size={16} />}
+                        onClick={() => setAddAccountOpen(true)}
+                        sx={{
+                          bgcolor: "#047857",
+                          "&:hover": { bgcolor: "#065f46" },
+                          fontWeight: 800,
+                          textTransform: "none",
+                          borderRadius: 2.5,
+                          px: 2,
+                          py: 0.8,
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        Define Ledger Account
+                      </Button>
+                    )}
+                  </Stack>
+                )}
+
+                {tabValue === 2 && (
+                  <ExportButton
+                    data={filteredTransactions}
+                    columns={[
+                      { header: "Tx #", key: "transaction_number" },
+                      { header: "Date", key: "transaction_date" },
+                      { header: "Reference Type", key: "reference_type" },
+                      { header: "Reference ID", key: "reference_id" },
+                      { header: "Description", key: "description" },
+                      { header: "Status", accessor: () => "VERIFIED / BALANCED" },
+                    ]}
+                    filename="General_Ledger_Audit_Log"
+                    title="General Ledger Audit Log"
+                    size="small"
+                  />
+                )}
+              </Stack>
             </Stack>
           </Box>
 
@@ -1408,7 +1501,7 @@ export default function FinancePage() {
                       </TextField>
                     </Grid>
                     <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-                      <Stack direction="row" spacing={1}>
+                      <Stack direction="row" spacing={1} alignItems="center">
                         <Button
                           variant="contained"
                           startIcon={<IconFilter size={18} />}
@@ -1420,26 +1513,29 @@ export default function FinancePage() {
                             fontWeight: 700,
                             textTransform: "none",
                             borderRadius: 2,
-                            flex: 1,
+                            px: 2.5,
                           }}
                         >
                           {incomeLoading ? "Loading..." : "Filter"}
                         </Button>
-                        <Button
-                          variant="outlined"
-                          startIcon={<IconDownload size={18} />}
-                          onClick={exportIncomeCSV}
-                          disabled={!incomeReport || !incomeReport.entries.length}
-                          sx={{
-                            borderColor: "#cbd5e1",
-                            color: "#334155",
-                            fontWeight: 700,
-                            textTransform: "none",
-                            borderRadius: 2,
-                          }}
-                        >
-                          Export CSV
-                        </Button>
+                        <ExportButton
+                          data={incomeReport?.entries || []}
+                          columns={[
+                            { header: "Date", key: "transaction_date" },
+                            { header: "Category", key: "income_category" },
+                            { header: "Tx #", key: "transaction_number" },
+                            { header: "Reference", key: "reference_id" },
+                            { header: "Borrower", key: "member_name" },
+                            { header: "Loan #", accessor: (r: any) => r.loan_number || "-" },
+                            { header: "Account Code", key: "account_code" },
+                            { header: "Account Name", key: "account_name" },
+                            { header: "Amount (KES)", accessor: (r: any) => Number(r.amount).toLocaleString() },
+                            { header: "Narration", accessor: (r: any) => r.narration || "-" },
+                          ]}
+                          filename="Fee_and_Income_Report"
+                          title="Fee & Income Period Report"
+                          size="medium"
+                        />
                       </Stack>
                     </Grid>
                   </Grid>
@@ -1941,6 +2037,21 @@ export default function FinancePage() {
             )}
           </DialogActions>
         </Dialog>
+
+        {/* Define Ledger Account Dialog */}
+        <AddLedgerAccountDialog
+          open={addAccountOpen}
+          onClose={() => setAddAccountOpen(false)}
+          onSuccess={(newAccount) => {
+            setAddAccountOpen(false);
+            fetchData();
+            setFeedbackSnackbar({
+              open: true,
+              message: `Ledger account ${newAccount.account_code} - ${newAccount.account_name} defined successfully!`,
+              severity: "success",
+            });
+          }}
+        />
 
         {/* Feedback Snackbar */}
         <Snackbar

@@ -245,6 +245,20 @@ class LoanService {
   }
 
   /**
+   * POST /api/ledger-accounts/
+   */
+  async createLedgerAccount(data: {
+    account_code: string;
+    account_name: string;
+    account_type: string;
+    description?: string;
+    is_active?: boolean;
+  }): Promise<any> {
+    const response = await api.post(`/ledger-accounts/`, data);
+    return response.data;
+  }
+
+  /**
    * DELETE /api/ledger-accounts/{id}/
    */
   async deleteLedgerAccount(id: number): Promise<void> {
@@ -258,6 +272,25 @@ class LoanService {
     const response = await api.patch(`/ledger-accounts/${id}/`, data);
     return response.data;
   }
+
+  /**
+   * GET /api/loans/{id}/settlement-quote/
+   */
+  async getSettlementQuote(loanId: number): Promise<{
+    loan_id: number;
+    loan_number: string;
+    principal_balance: number;
+    accrued_interest: number;
+    penalty_balance: number;
+    fees_balance: number;
+    waived_future_interest: number;
+    net_payoff_amount: number;
+    is_closed: boolean;
+  }> {
+    const response = await api.get(`/loans/${loanId}/settlement-quote/`);
+    return response.data;
+  }
+
 
   /**
    * GET /api/ledger-transactions/income-report/

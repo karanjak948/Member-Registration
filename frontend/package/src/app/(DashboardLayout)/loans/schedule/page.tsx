@@ -25,6 +25,7 @@ import {
   IconCoins,
 } from "@tabler/icons-react";
 import PageContainer from "@/app/(DashboardLayout)/components/container/PageContainer";
+import ExportButton from "@/components/common/ExportButton";
 
 export default function RepaymentSchedulePage() {
   const router = useRouter();
@@ -110,6 +111,21 @@ export default function RepaymentSchedulePage() {
                 >
                   Refresh
                 </Button>
+
+                <ExportButton
+                  data={loans}
+                  columns={[
+                    { header: "Loan #", key: "loan_number" },
+                    { header: "Member ID", accessor: (r: any) => `Member #${r.member_id}` },
+                    { header: "Disbursement Date", accessor: (r: any) => r.disbursement_date || "-" },
+                    { header: "Principal (KES)", accessor: (r: any) => Number(r.principal_amount || 0).toLocaleString() },
+                    { header: "Outstanding Balance (KES)", accessor: (r: any) => Number(r.outstanding_balance || 0).toLocaleString() },
+                    { header: "Frequency", accessor: (r: any) => r.repayment_frequency || "monthly" },
+                    { header: "Status", key: "status" },
+                  ]}
+                  filename="Repayment_Schedule_Overview"
+                  title="Weekly Repayment Schedule Overview"
+                />
 
                 <Button
                   variant="contained"

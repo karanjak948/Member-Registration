@@ -27,6 +27,7 @@ import {
 } from "@mui/material";
 import PageContainer from "@/app/(DashboardLayout)/components/container/PageContainer";
 import { IconCash, IconReceipt, IconRefresh, IconCheck, IconSearch } from "@tabler/icons-react";
+import ExportButton from "@/components/common/ExportButton";
 
 interface LoanItem {
   id: number;
@@ -34,6 +35,8 @@ interface LoanItem {
   member_id: number;
   principal_amount: string;
   outstanding_balance: string;
+  principal_balance?: string;
+  interest_balance?: string;
   status: string;
 }
 
@@ -59,6 +62,7 @@ function ReceivePaymentContent() {
   const [paymentMode, setPaymentMode] = useState("MPESA");
   const [mpesaRef, setMpesaRef] = useState("");
   const [notes, setNotes] = useState("");
+  const [isEarlySettlement, setIsEarlySettlement] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [toast, setToast] = useState<{ open: boolean; message: string; severity: "success" | "error" }>({
     open: false,
@@ -82,10 +86,11 @@ function ReceivePaymentContent() {
         const list = Array.isArray(data) ? data : [];
         setLoans(list);
         if (list.length > 0) {
+          const activeLoans = list.filter((l: any) => l.status === "active");
           if (initialLoanId && list.some((l: any) => l.id === Number(initialLoanId))) {
             setSelectedLoanId(Number(initialLoanId));
           } else if (!selectedLoanId) {
-            setSelectedLoanId(list[0].id);
+            setSelectedLoanId(activeLoans.length > 0 ? activeLoans[0].id : list[0].id);
           }
         }
       }
@@ -121,6 +126,7 @@ function ReceivePaymentContent() {
           payment_date: paymentDate,
           amount_paid: Number(amountPaid),
           notes: paymentNotes,
+          is_early_settlement: isEarlySettlement,
         }),
       });
 
@@ -221,13 +227,16 @@ function ReceivePaymentContent() {
                       fullWidth
                       label="Select Active Loan *"
                       value={selectedLoanId}
-                      onChange={(e) => setSelectedLoanId(Number(e.target.value))}
+                      onChange={(e) => {
+                        setSelectedLoanId(Number(e.target.value));
+                        setIsEarlySettlement(false);
+                      }}
                       disabled={loading || loans.length === 0}
                       helperText={loans.length === 0 && !loading ? "No active loans found on Loan Engine" : ""}
                     >
                       {loans.map((loan) => (
                         <MenuItem key={loan.id} value={loan.id}>
-                          {loan.loan_number} (Member #{loan.member_id} - Bal: KES {Number(loan.outstanding_balance || 0).toLocaleString()})
+                          {loan.loan_number} (Member #{loan.member_id} - Bal: KES {Number(loan.outstanding_balance || 0).toLocaleString()}) - [{loan.status.replace("_", " ").toUpperCase()}]
                         </MenuItem>
                       ))}
                     </TextField>
@@ -245,10 +254,60 @@ function ReceivePaymentContent() {
                           </Stack>
                           <Stack direction="row" justifyContent="space-between">
                             <Typography variant="caption" color="text.secondary">Outstanding Balance:</Typography>
-                            <Typography variant="caption" fontWeight={700} color="error.main">KES {Number(selectedLoan.outstanding_balance || 0).toLocaleString()}</Typography>
+                            <Typography variant="caption" fontWeight={700} color={Number(selectedLoan.outstanding_balance || 0) > 0 ? "error.main" : "success.main"}>
+                              KES {Number(selectedLoan.outstanding_balance || 0).toLocaleString()}
+                            </Typography>
                           </Stack>
                         </Stack>
                       </Box>
+                    )}
+
+                    {selectedLoan && selectedLoan.status === "active" && Number(selectedLoan.outstanding_balance || 0) > 0 && (
+                      <Paper
+                        elevation={0}
+                        sx={{
+                          p: 1.5,
+                          bgcolor: "#ecfdf5",
+                          border: "1px solid #a7f3d0",
+                          borderRadius: 2,
+                        }}
+                      >
+                        <Stack direction="row" justifyContent="space-between" alignItems="center">
+                          <Box>
+                            <Typography variant="caption" fontWeight={800} sx={{ color: "#065f46", display: "block" }}>
+                              Early Loan Settlement / Full Clearance
+                            </Typography>
+                            <Typography variant="caption" sx={{ color: "#047857", fontSize: "0.72rem" }}>
+                              {Number(selectedLoan.principal_balance || 0) > 0
+                                ? `Clear principal (KES ${Number(selectedLoan.principal_balance).toLocaleString()}) & waive unaccrued interest`
+                                : "Clear full outstanding balance"}
+                            </Typography>
+                          </Box>
+                          <Button
+                            size="small"
+                            variant="contained"
+                            onClick={() => {
+                              const payoffAmount = selectedLoan.principal_balance && Number(selectedLoan.principal_balance) > 0
+                                ? String(selectedLoan.principal_balance)
+                                : String(selectedLoan.outstanding_balance);
+                              setAmountPaid(payoffAmount);
+                              setIsEarlySettlement(true);
+                            }}
+                            sx={{
+                              fontSize: "0.72rem",
+                              fontWeight: 800,
+                              bgcolor: "#059669",
+                              color: "#ffffff",
+                              textTransform: "none",
+                              borderRadius: 1.5,
+                              px: 1.5,
+                              "&:hover": { bgcolor: "#047857" },
+                            }}
+                          >
+                            Payoff
+                          </Button>
+                        </Stack>
+                      </Paper>
                     )}
 
                     <TextField
@@ -340,18 +399,33 @@ function ReceivePaymentContent() {
                     </Typography>
                   </Stack>
 
-                  <TextField
-                    size="small"
-                    placeholder="Search loan or member..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    slotProps={{
-                      input: {
-                        startAdornment: <IconSearch size={16} style={{ marginRight: 6, color: "#94a3b8" }} />,
-                      },
-                    }}
-                    sx={{ width: 220 }}
-                  />
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    <TextField
+                      size="small"
+                      placeholder="Search loan or member..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      slotProps={{
+                        input: {
+                          startAdornment: <IconSearch size={16} style={{ marginRight: 6, color: "#94a3b8" }} />,
+                        },
+                      }}
+                      sx={{ width: 180 }}
+                    />
+                    <ExportButton
+                      data={filteredLoans}
+                      columns={[
+                        { header: "Loan #", key: "loan_number" },
+                        { header: "Member ID", accessor: (r) => `Member #${r.member_id}` },
+                        { header: "Principal (KES)", accessor: (r) => Number(r.principal_amount || 0).toLocaleString() },
+                        { header: "Outstanding Balance (KES)", accessor: (r) => Number(r.outstanding_balance || 0).toLocaleString() },
+                        { header: "Status", key: "status" },
+                      ]}
+                      filename="Loans_Collections_Registry"
+                      title="Active Loans Collections Registry"
+                      size="small"
+                    />
+                  </Stack>
                 </Stack>
 
                 <Divider sx={{ mb: 2 }} />

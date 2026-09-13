@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   Dialog,
   DialogTitle,
@@ -43,6 +44,7 @@ import {
 } from "@tabler/icons-react";
 import { Loan, LoanScheduleEntry } from "@/interfaces/loan";
 import loanService from "@/services/loan.service";
+import ExportButton from "@/components/common/ExportButton";
 
 interface LoanDetailsModalProps {
   open: boolean;
@@ -123,6 +125,7 @@ export default function LoanDetailsModal({
   onClose,
   onOpenDossier,
 }: LoanDetailsModalProps) {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState(0);
   const [loading, setLoading] = useState(false);
   const [loan, setLoan] = useState<Loan | null>(null);
@@ -252,6 +255,29 @@ export default function LoanDetailsModal({
           </Stack>
 
           <Stack direction="row" spacing={1} alignItems="center">
+            {loan?.status === "active" && (
+              <Button
+                variant="contained"
+                size="small"
+                startIcon={<IconCash size={15} />}
+                onClick={() => {
+                  onClose();
+                  router.push(`/loans/${loan.id}?action=repay`);
+                }}
+                sx={{
+                  bgcolor: "#059669",
+                  color: "#ffffff",
+                  fontWeight: 800,
+                  textTransform: "none",
+                  borderRadius: 2,
+                  fontSize: "0.8rem",
+                  boxShadow: "0 2px 8px rgba(5, 150, 105, 0.25)",
+                  "&:hover": { bgcolor: "#047857" },
+                }}
+              >
+                Record Repayment
+              </Button>
+            )}
             {onOpenDossier && loan && (
               <Button
                 variant="outlined"
@@ -742,11 +768,28 @@ export default function LoanDetailsModal({
                           Rate: {loan.interest_rate}% / monthly · Repayment: {loan.repayment_frequency || "monthly"} · {loan.schedule_entries?.length || 0} installments
                         </Typography>
                       </Box>
-                      <Chip
-                        size="small"
-                        label="Generated at disbursement"
-                        sx={{ bgcolor: "rgba(16, 185, 129, 0.2)", color: "#34d399", fontWeight: 800, fontSize: "0.72rem", border: "1px solid rgba(16, 185, 129, 0.4)" }}
-                      />
+                      <Stack direction="row" spacing={1.5} alignItems="center">
+                        <ExportButton
+                          data={loan.schedule_entries || []}
+                          columns={[
+                            { header: "Period #", key: "period_number" },
+                            { header: "Due Date", accessor: (r: LoanScheduleEntry) => formatDate(r.due_date) },
+                            { header: "Opening Balance", accessor: (r: LoanScheduleEntry) => Math.round(Number(r.opening_balance || 0)).toLocaleString() },
+                            { header: "Principal", accessor: (r: LoanScheduleEntry) => Math.round(Number(r.expected_principal || 0)).toLocaleString() },
+                            { header: "Interest", accessor: (r: LoanScheduleEntry) => Math.round(Number(r.expected_interest || 0)).toLocaleString() },
+                            { header: "Expected Installment", accessor: (r: LoanScheduleEntry) => Math.round(Number(r.expected_amount || 0)).toLocaleString() },
+                            { header: "Status", accessor: (r: LoanScheduleEntry) => r.is_paid ? "Paid" : "Pending" },
+                          ]}
+                          filename={`Repayment_Schedule_${loan.loan_number}`}
+                          title={`Repayment Schedule - ${loan.loan_number} (${loan.member_name || "Borrower"})`}
+                          size="small"
+                        />
+                        <Chip
+                          size="small"
+                          label="Generated at disbursement"
+                          sx={{ bgcolor: "rgba(16, 185, 129, 0.2)", color: "#34d399", fontWeight: 800, fontSize: "0.72rem", border: "1px solid rgba(16, 185, 129, 0.4)" }}
+                        />
+                      </Stack>
                     </Stack>
                   </Box>
 
@@ -906,13 +949,53 @@ export default function LoanDetailsModal({
                           {repayments.length} repayment transaction{repayments.length === 1 ? "" : "s"} recorded on this facility
                         </Typography>
                       </Box>
-                      {loan.last_payment_date && (
-                        <Chip
+                      <Stack direction="row" spacing={1} alignItems="center">
+                        {loan.status === "active" && (
+                          <Button
+                            size="small"
+                            variant="contained"
+                            startIcon={<IconCash size={15} />}
+                            onClick={() => {
+                              onClose();
+                              router.push(`/loans/${loan.id}?action=repay`);
+                            }}
+                            sx={{
+                              bgcolor: "#059669",
+                              color: "#ffffff",
+                              fontWeight: 800,
+                              textTransform: "none",
+                              borderRadius: 2,
+                              fontSize: "0.78rem",
+                              "&:hover": { bgcolor: "#047857" },
+                            }}
+                          >
+                            Record Repayment
+                          </Button>
+                        )}
+                        <ExportButton
+                          data={repayments}
+                          columns={[
+                            { header: "Repayment Ref", accessor: (r: any) => r.repayment_number || r.transaction_reference || "-" },
+                            { header: "Payment Date", accessor: (r: any) => formatDate(r.payment_date) },
+                            { header: "Amount Paid (KES)", accessor: (r: any) => formatCurrency(r.amount_paid) },
+                            { header: "Principal (KES)", accessor: (r: any) => formatCurrency(r.allocated_principal || 0) },
+                            { header: "Interest (KES)", accessor: (r: any) => formatCurrency(r.allocated_interest || 0) },
+                            { header: "Penalty (KES)", accessor: (r: any) => formatCurrency(r.allocated_penalty || 0) },
+                            { header: "Channel / Ref", accessor: (r: any) => r.transaction_reference || r.payment_method || "Paid" },
+                            { header: "Notes", accessor: (r: any) => r.notes || "-" },
+                          ]}
+                          filename={`Repayments_Ledger_${loan.loan_number}`}
+                          title={`Repayments Ledger - ${loan.loan_number}`}
                           size="small"
-                          label={`Last Paid: ${formatDate(loan.last_payment_date)}`}
-                          sx={{ bgcolor: "#ecfdf5", color: "#059669", fontWeight: 800, fontSize: "0.74rem" }}
                         />
-                      )}
+                        {loan.last_payment_date && (
+                          <Chip
+                            size="small"
+                            label={`Last Paid: ${formatDate(loan.last_payment_date)}`}
+                            sx={{ bgcolor: "#ecfdf5", color: "#059669", fontWeight: 800, fontSize: "0.74rem" }}
+                          />
+                        )}
+                      </Stack>
                     </Stack>
                   </Box>
 
@@ -990,20 +1073,43 @@ export default function LoanDetailsModal({
         <Typography variant="caption" sx={{ color: "#64748b", fontWeight: 700 }}>
           CONFIDENTIAL SACCO CREDIT FACILITY REGISTRY
         </Typography>
-        <Button
-          variant="contained"
-          onClick={onClose}
-          sx={{
-            fontWeight: 800,
-            borderRadius: 2,
-            px: 3,
-            bgcolor: "#059669",
-            color: "#ffffff",
-            "&:hover": { bgcolor: "#047857" },
-          }}
-        >
-          Close View
-        </Button>
+        <Stack direction="row" spacing={1.5} alignItems="center">
+          {loan?.status === "active" && (
+            <Button
+              variant="contained"
+              startIcon={<IconCash size={16} />}
+              onClick={() => {
+                onClose();
+                router.push(`/loans/${loan.id}?action=repay`);
+              }}
+              sx={{
+                fontWeight: 800,
+                borderRadius: 2,
+                px: 2.5,
+                bgcolor: "#059669",
+                color: "#ffffff",
+                boxShadow: "0 2px 8px rgba(5, 150, 105, 0.25)",
+                "&:hover": { bgcolor: "#047857" },
+              }}
+            >
+              Record Repayment
+            </Button>
+          )}
+          <Button
+            variant="contained"
+            onClick={onClose}
+            sx={{
+              fontWeight: 800,
+              borderRadius: 2,
+              px: 3,
+              bgcolor: loan?.status === "active" ? "#475569" : "#059669",
+              color: "#ffffff",
+              "&:hover": { bgcolor: loan?.status === "active" ? "#334155" : "#047857" },
+            }}
+          >
+            Close View
+          </Button>
+        </Stack>
       </DialogActions>
     </Dialog>
   );

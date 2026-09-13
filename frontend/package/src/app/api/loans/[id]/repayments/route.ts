@@ -59,6 +59,7 @@ export async function POST(
       payment_date: body.payment_date,
       payment_method: body.payment_method || "mpesa",
       transaction_reference: body.transaction_reference || `TXN-${Date.now()}`,
+      is_early_settlement: Boolean(body.is_early_settlement),
       notes: body.notes,
     };
 

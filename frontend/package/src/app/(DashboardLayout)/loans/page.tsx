@@ -1156,6 +1156,29 @@ function LoansContent() {
                               Quick Preview
                             </Button>
 
+                            {loan.status === "active" && (
+                              <Button
+                                size="small"
+                                variant="contained"
+                                startIcon={<IconCash size={14} />}
+                                onClick={() => router.push(`/loans/${loan.id}?action=repay`)}
+                                sx={{
+                                  bgcolor: "#059669",
+                                  color: "#ffffff",
+                                  fontWeight: 800,
+                                  textTransform: "none",
+                                  borderRadius: 2,
+                                  fontSize: "0.76rem",
+                                  py: 0.4,
+                                  px: 1.2,
+                                  boxShadow: "0 2px 8px rgba(5, 150, 105, 0.25)",
+                                  "&:hover": { bgcolor: "#047857" },
+                                }}
+                              >
+                                Repay
+                              </Button>
+                            )}
+
                             <Button
                               size="small"
                               variant="outlined"
