@@ -28,7 +28,12 @@ from apps.loans.models.ledger import (
     AccountType,
 )
 from apps.loans.models.reschedule import LoanReschedule
-from apps.loans.models.mpesa_transaction import MpesaTransaction, MpesaTransactionStatus
+from apps.loans.models.mpesa_transaction import (
+    MpesaTransaction,
+    MpesaTransactionStatus,
+    MpesaReceivedPayment,
+    MpesaReceivedPaymentStatus,
+)
 
 __all__ = [
     "LoanProduct",
@@ -56,4 +61,7 @@ __all__ = [
     "LoanReschedule",
     "MpesaTransaction",
     "MpesaTransactionStatus",
+    "MpesaReceivedPayment",
+    "MpesaReceivedPaymentStatus",
 ]
+

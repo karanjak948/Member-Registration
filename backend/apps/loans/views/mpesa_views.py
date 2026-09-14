@@ -12,7 +12,13 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.decorators import action
 
-from apps.loans.models import MpesaTransaction, MpesaTransactionStatus, Loan
+from apps.loans.models import (
+    MpesaTransaction,
+    MpesaTransactionStatus,
+    MpesaReceivedPayment,
+    MpesaReceivedPaymentStatus,
+    Loan,
+)
 from apps.loans.serializers.repayment_serializers import RepaymentSerializer
 from apps.loans.services.mpesa_service import MpesaC2BService
 from rest_framework import serializers
@@ -90,9 +96,54 @@ class MpesaC2BConfirmationView(APIView):
         payload = request.data
         logger.info(f"Incoming M-Pesa Confirmation / Relay Request: {payload}")
 
+        # Extract Client IP
+        x_forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR")
+        if x_forwarded_for:
+            client_ip = x_forwarded_for.split(",")[0].strip()
+        else:
+            client_ip = request.META.get("REMOTE_ADDR")
+
+        # Create raw incoming log record in mpesa_receivedmpesapayments
+        log_entry = None
+        try:
+            import json
+            raw_serial = payload.get("unique_serial") if isinstance(payload, dict) else None
+            serial_int = None
+            if raw_serial is not None:
+                try:
+                    serial_int = int(raw_serial)
+                except (ValueError, TypeError):
+                    pass
+
+            raw_trans_id = None
+            if isinstance(payload, dict):
+                pp = payload.get("paymentPayload")
+                if isinstance(pp, dict):
+                    raw_trans_id = pp.get("TransID") or pp.get("trans_id")
+                if not raw_trans_id:
+                    raw_trans_id = payload.get("TransID") or payload.get("trans_id")
+
+            payload_str = json.dumps(payload) if isinstance(payload, (dict, list)) else str(payload)
+            verify_url_val = payload.get("verify_url") if isinstance(payload, dict) else None
+
+            log_entry = MpesaReceivedPayment.objects.create(
+                unique_serial=serial_int,
+                mpesa_payload=payload_str,
+                transID=str(raw_trans_id)[:40] if raw_trans_id else None,
+                verify_url=str(verify_url_val)[:255] if verify_url_val else None,
+                status=MpesaReceivedPaymentStatus.RECEIVED,
+                ipaddress=str(client_ip)[:45] if client_ip else None,
+            )
+        except Exception as log_err:
+            logger.warning(f"Could not record incoming payment log: {log_err}")
+
         try:
             if not isinstance(payload, dict):
                 logger.warning(f"Unexpected non-dict payload received: {payload}")
+                if log_entry:
+                    log_entry.status = MpesaReceivedPaymentStatus.FAILED
+                    log_entry.message = "Non-dict payload received"
+                    log_entry.save(update_fields=["status", "message"])
                 return Response(
                     {"ResultCode": 0, "ResultDesc": "Accepted"},
                     status=status.HTTP_200_OK,
@@ -121,6 +172,10 @@ class MpesaC2BConfirmationView(APIView):
                         logger.warning(
                             f"Unauthorized M-Pesa request: Invalid or missing X-API-Key. Received: {incoming_api_key}"
                         )
+                        if log_entry:
+                            log_entry.status = MpesaReceivedPaymentStatus.FAILED
+                            log_entry.message = "Unauthorized: Invalid or missing X-API-Key"
+                            log_entry.save(update_fields=["status", "message"])
                         return Response(
                             {"error": "Unauthorized: Invalid or missing X-API-Key."},
                             status=status.HTTP_401_UNAUTHORIZED,
@@ -159,6 +214,11 @@ class MpesaC2BConfirmationView(APIView):
                         is_verified=False,
                         verification_data={"error": verify_data},
                     )
+                    if log_entry:
+                        log_entry.status = MpesaReceivedPaymentStatus.FAILED
+                        log_entry.verification_response = str(verify_data)
+                        log_entry.message = f"Relay verification handshake rejected: {verify_data}"
+                        log_entry.save(update_fields=["status", "verification_response", "message"])
                     return Response(
                         {"ResultCode": 1, "ResultDesc": f"Verification failed: {verify_data}"},
                         status=status.HTTP_400_BAD_REQUEST,
@@ -175,6 +235,11 @@ class MpesaC2BConfirmationView(APIView):
                         is_verified=False,
                         verification_data={"error": match_msg, "relay_response": verify_data},
                     )
+                    if log_entry:
+                        log_entry.status = MpesaReceivedPaymentStatus.FAILED
+                        log_entry.verification_response = str(verify_data)
+                        log_entry.message = f"Payload mismatch: {match_msg}"
+                        log_entry.save(update_fields=["status", "verification_response", "message"])
                     return Response(
                         {"ResultCode": 1, "ResultDesc": f"Payload mismatch: {match_msg}"},
                         status=status.HTTP_400_BAD_REQUEST,
@@ -191,6 +256,13 @@ class MpesaC2BConfirmationView(APIView):
                 logger.info(
                     f"Relay M-Pesa transaction {tx.trans_id} processed successfully. Status: {tx.status}"
                 )
+                if log_entry:
+                    log_entry.status = MpesaReceivedPaymentStatus.PROCESSED
+                    log_entry.transID = tx.trans_id
+                    log_entry.verification_response = str(verify_data)
+                    log_entry.message = f"Accepted. Status: {tx.status}. TransID: {tx.trans_id}"
+                    log_entry.save(update_fields=["status", "transID", "verification_response", "message"])
+
                 return Response(
                     {"ResultCode": 0, "ResultDesc": "Accepted", "unique_serial": unique_serial, "status": tx.status},
                     status=status.HTTP_200_OK,
@@ -204,10 +276,20 @@ class MpesaC2BConfirmationView(APIView):
                 is_verified=True,
             )
             logger.info(f"Direct C2B Confirmation processed successfully: TransID={tx.trans_id}, Status={tx.status}")
+            if log_entry:
+                log_entry.status = MpesaReceivedPaymentStatus.PROCESSED
+                log_entry.transID = tx.trans_id
+                log_entry.message = f"Accepted. Status: {tx.status}. TransID: {tx.trans_id}"
+                log_entry.save(update_fields=["status", "transID", "message"])
+
             return Response(res, status=status.HTTP_200_OK)
 
         except Exception as exc:
             logger.exception(f"Fatal error handling M-Pesa confirmation callback: {exc}")
+            if log_entry:
+                log_entry.status = MpesaReceivedPaymentStatus.FAILED
+                log_entry.message = f"Fatal error: {exc}"
+                log_entry.save(update_fields=["status", "message"])
             # Safaricom requires 200 OK with ResultCode: 0 to acknowledge receipt
             return Response(
                 {"ResultCode": 0, "ResultDesc": "Accepted"},
@@ -226,11 +308,29 @@ class MpesaC2BValidationView(APIView):
     def post(self, request, *args, **kwargs):
         payload = request.data
         logger.info(f"Incoming Safaricom C2B Validation: {payload}")
+
+        # Optional audit log
+        try:
+            import json
+            x_forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR")
+            client_ip = x_forwarded_for.split(",")[0].strip() if x_forwarded_for else request.META.get("REMOTE_ADDR")
+            raw_trans_id = payload.get("TransID") if isinstance(payload, dict) else None
+            MpesaReceivedPayment.objects.create(
+                mpesa_payload=json.dumps(payload) if isinstance(payload, (dict, list)) else str(payload),
+                transID=str(raw_trans_id)[:40] if raw_trans_id else None,
+                status=MpesaReceivedPaymentStatus.PROCESSED,
+                message="Validation Accepted",
+                ipaddress=str(client_ip)[:45] if client_ip else None,
+            )
+        except Exception:
+            pass
+
         # Accept transaction by default
         return Response(
             {"ResultCode": 0, "ResultDesc": "Accepted"},
             status=status.HTTP_200_OK,
         )
+
 
 
 class MpesaTransactionViewSet(viewsets.ReadOnlyModelViewSet):

@@ -140,3 +140,77 @@ class MpesaTransaction(models.Model):
 
     def __str__(self):
         return f"{self.trans_id} - KES {self.trans_amount} ({self.bill_ref_number}) [{self.status}]"
+
+
+class MpesaReceivedPaymentStatus(models.TextChoices):
+    RECEIVED = "received", "Received"
+    VERIFIED = "verified", "Verified"
+    PROCESSED = "processed", "Processed"
+    FAILED = "failed", "Failed"
+
+
+class MpesaReceivedPayment(models.Model):
+    """
+    Audit log of all incoming M-Pesa webhook calls on confirmation/validation endpoints.
+    Maps directly to the database table mpesa_receivedmpesapayments.
+    """
+    unique_serial = models.IntegerField(
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text="Source mpesa_transactions id / unique serial",
+    )
+    mpesa_payload = models.TextField(
+        null=True,
+        blank=True,
+        help_text="Full posted JSON",
+    )
+    transID = models.CharField(
+        max_length=40,
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text="M-Pesa TransID",
+    )
+    verify_url = models.CharField(
+        max_length=255,
+        null=True,
+        blank=True,
+        help_text="Source verification URL",
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=MpesaReceivedPaymentStatus.choices,
+        default=MpesaReceivedPaymentStatus.RECEIVED,
+        help_text="Receive status",
+    )
+    message = models.TextField(
+        null=True,
+        blank=True,
+        help_text="Processing or error message",
+    )
+    verification_response = models.TextField(
+        null=True,
+        blank=True,
+        help_text="Callback verification response",
+    )
+    createdon = models.DateTimeField(
+        default=timezone.now,
+        help_text="Timestamp received",
+    )
+    ipaddress = models.CharField(
+        max_length=45,
+        null=True,
+        blank=True,
+        help_text="Client IP address",
+    )
+
+    class Meta:
+        db_table = "mpesa_receivedmpesapayments"
+        ordering = ["-createdon"]
+        verbose_name = "Received M-Pesa Payment"
+        verbose_name_plural = "Received M-Pesa Payments"
+
+    def __str__(self):
+        return f"[{self.status}] {self.transID or self.unique_serial or self.id} ({self.createdon})"
+
