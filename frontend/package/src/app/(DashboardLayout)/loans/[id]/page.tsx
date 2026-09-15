@@ -238,7 +238,7 @@ export default function LoanDetailPage() {
 
     try {
       setPaymentSubmitting(true);
-      const isEarly = isEarlySettlement || Number(paymentAmount) >= Number(loan.principal_balance);
+      const isEarly = Boolean(isEarlySettlement);
       const notesCombined = `${paymentMode} ${paymentMpesaRef ? `Ref: ${paymentMpesaRef} ` : ""}- ${paymentNotes}`.trim();
       const res = await fetch(`/api/loans/${loan.id}/repayments`, {
         method: "POST",

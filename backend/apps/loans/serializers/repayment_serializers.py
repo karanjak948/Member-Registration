@@ -81,23 +81,44 @@ class RepaymentSerializer(serializers.ModelSerializer):
             for e in overdue_entries
         )
 
-        # Early payoff condition: either explicitly flagged OR the amount clears the remaining principal + any overdue obligations
-        is_full_payoff = (
-            is_early_settlement
-            or (amount >= (loan.principal_balance + due_penalty + due_fees + overdue_interest))
-        )
+        # Determine due interest:
+        # 1. Explicit early settlement: only accrued/overdue interest is collected; unaccrued future interest is waived.
+        # 2. Full payoff: payment covers the full loan obligation (principal + remaining interest + fees + penalties).
+        # 3. Multi-installment / installment payment: calculate interest across the installments covered by this payment amount.
+        total_full_payoff = loan.principal_balance + loan.interest_balance + due_penalty + due_fees
 
-        if is_full_payoff:
-            # On early payoff, only accrued overdue interest is collected; unaccrued future interest is waived!
+        if is_early_settlement:
             due_interest = overdue_interest
-        elif unpaid_entries:
-            if overdue_entries:
-                due_interest = overdue_interest
-            else:
-                # Regular installment payment within active cycle
-                due_interest = max(Decimal("0.00"), unpaid_entries[0].expected_interest - unpaid_entries[0].paid_interest)
-        else:
+        elif amount >= total_full_payoff:
             due_interest = loan.interest_balance
+        elif not unpaid_entries:
+            due_interest = loan.interest_balance
+        else:
+            # Calculate interest across the unpaid installments that this payment amount covers
+            rem_for_installments = max(Decimal("0.00"), amount - due_penalty - due_fees)
+            accumulated_interest = Decimal("0.00")
+            for entry in unpaid_entries:
+                if rem_for_installments <= Decimal("0.00"):
+                    break
+                rem_entry_int = max(Decimal("0.00"), entry.expected_interest - entry.paid_interest)
+                rem_entry_prn = max(Decimal("0.00"), entry.expected_principal - entry.paid_principal)
+                rem_entry_fee = max(Decimal("0.00"), entry.expected_fees - entry.paid_fees)
+                rem_entry_pen = max(Decimal("0.00"), entry.expected_penalty - entry.paid_penalty)
+                installment_total = rem_entry_pen + rem_entry_fee + rem_entry_int + rem_entry_prn
+
+                if rem_for_installments >= installment_total:
+                    accumulated_interest += rem_entry_int
+                    rem_for_installments -= installment_total
+                else:
+                    # Partial installment: interest is prioritized
+                    accumulated_interest += min(rem_for_installments, rem_entry_int)
+                    rem_for_installments = Decimal("0.00")
+                    break
+
+            if rem_for_installments > Decimal("0.00"):
+                accumulated_interest = min(loan.interest_balance, accumulated_interest + rem_for_installments)
+
+            due_interest = min(loan.interest_balance, accumulated_interest)
 
         # Run Waterfall Allocation
         order = loan.loan_product.allocation_order or "penalty,fees,interest,principal"
@@ -183,15 +204,23 @@ class RepaymentSerializer(serializers.ModelSerializer):
         loan.interest_balance = max(Decimal("0"), loan.interest_balance - alloc.allocated_interest)
         loan.principal_balance = max(Decimal("0"), loan.principal_balance - alloc.allocated_principal)
 
-        # Check if principal is fully cleared or if full payoff
-        if is_full_payoff or loan.principal_balance <= Decimal("0.01"):
+        # Check if early settlement concession or if loan obligations are cleared
+        if is_early_settlement:
             loan.principal_balance = Decimal("0.00")
             loan.interest_balance = Decimal("0.00")
-            # Close all remaining schedule entries (waiving unearned future interest)
+            # Close all remaining schedule entries (waiving unearned future interest on explicit early settlement)
             for rem_entry in loan.schedule_entries.filter(is_paid=False):
                 rem_entry.expected_interest = rem_entry.paid_interest
                 rem_entry.expected_principal = rem_entry.paid_principal
                 rem_entry.expected_amount = rem_entry.paid_principal + rem_entry.paid_interest
+                rem_entry.closing_balance = Decimal("0.00")
+                rem_entry.is_paid = True
+                rem_entry.paid_date = payment_date
+                rem_entry.save()
+        elif loan.principal_balance <= Decimal("0.01") and loan.interest_balance <= Decimal("0.01"):
+            loan.principal_balance = Decimal("0.00")
+            loan.interest_balance = Decimal("0.00")
+            for rem_entry in loan.schedule_entries.filter(is_paid=False):
                 rem_entry.closing_balance = Decimal("0.00")
                 rem_entry.is_paid = True
                 rem_entry.paid_date = payment_date
