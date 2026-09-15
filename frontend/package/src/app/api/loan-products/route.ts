@@ -17,7 +17,10 @@ export async function GET(req: NextRequest) {
       headers["Authorization"] = `Bearer ${session.accessToken}`;
     }
 
-    const response = await fetch(`${API_BASE_URL.replace(/\/$/, "")}/loan-products/`, {
+    const searchParams = req.nextUrl.searchParams.toString();
+    const url = `${API_BASE_URL.replace(/\/$/, "")}/loan-products/${searchParams ? `?${searchParams}` : ""}`;
+
+    const response = await fetch(url, {
       method: "GET",
       headers,
       cache: "no-store",

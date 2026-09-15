@@ -44,6 +44,14 @@ export default function LoanProductTable({ products, loading = false }: Props) {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"ALL" | "ACTIVE" | "INACTIVE">("ACTIVE");
 
+  const isProductActive = (product: LoanProduct) =>
+    product.is_active === true ||
+    product.is_active === 1 ||
+    (product as any).is_active === "1" ||
+    (product as any).status === 1 ||
+    (product as any).status === "1" ||
+    (product as any).status === "active";
+
   const filteredProducts = useMemo(() => {
     const term = search.trim().toLowerCase();
 
@@ -60,10 +68,11 @@ export default function LoanProductTable({ products, loading = false }: Props) {
           .toLowerCase()
           .includes(term);
 
+      const active = isProductActive(product);
       const matchesStatus =
         statusFilter === "ALL" ||
-        (statusFilter === "ACTIVE" && product.is_active) ||
-        (statusFilter === "INACTIVE" && !product.is_active);
+        (statusFilter === "ACTIVE" && active) ||
+        (statusFilter === "INACTIVE" && !active);
 
       return matchesSearch && matchesStatus;
     });
@@ -72,7 +81,7 @@ export default function LoanProductTable({ products, loading = false }: Props) {
   // Compute KPI metrics
   const metrics = useMemo(() => {
     const totalCount = products.length;
-    const activeCount = products.filter((p) => p.is_active).length;
+    const activeCount = products.filter(isProductActive).length;
     const rates = products.map((p) => Number(p.interest_rate) || 0).filter((r) => r > 0);
     const minRate = rates.length ? Math.min(...rates) : 0;
     const maxRate = rates.length ? Math.max(...rates) : 0;
@@ -97,7 +106,7 @@ export default function LoanProductTable({ products, loading = false }: Props) {
       { header: "Repayment Frequency", accessor: (p: LoanProduct) => p.repayment_frequency },
       { header: "Max Period", accessor: (p: LoanProduct) => `${p.max_repayment_period} Months` },
       { header: "Requires Guarantor", accessor: (p: LoanProduct) => (p.requires_guarantor ? "Yes" : "No") },
-      { header: "Status", accessor: (p: LoanProduct) => (p.is_active ? "Active" : "Inactive") },
+      { header: "Status", accessor: (p: LoanProduct) => (isProductActive(p) ? "Active" : "Inactive") },
     ],
     [],
   );
@@ -243,19 +252,22 @@ export default function LoanProductTable({ products, loading = false }: Props) {
       headerName: "Status",
       flex: 1,
       minWidth: 120,
-      renderCell: ({ value }) => (
-        <Chip
-          label={value ? "Active Tier" : "Archived"}
-          size="small"
-          sx={{
-            fontWeight: 800,
-            bgcolor: value ? "#ecfdf5" : "#f1f5f9",
-            color: value ? "#047857" : "#64748b",
-            border: `1px solid ${value ? "#a7f3d0" : "#cbd5e1"}`,
-            borderRadius: 2,
-          }}
-        />
-      ),
+      renderCell: ({ row, value }) => {
+        const isActive = isProductActive(row) || value === true || value === 1 || value === "1";
+        return (
+          <Chip
+            label={isActive ? "Active Tier" : "Archived"}
+            size="small"
+            sx={{
+              fontWeight: 800,
+              bgcolor: isActive ? "#ecfdf5" : "#f1f5f9",
+              color: isActive ? "#047857" : "#64748b",
+              border: `1px solid ${isActive ? "#a7f3d0" : "#cbd5e1"}`,
+              borderRadius: 2,
+            }}
+          />
+        );
+      },
     },
     {
       field: "actions",

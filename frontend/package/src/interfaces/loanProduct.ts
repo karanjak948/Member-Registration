@@ -65,6 +65,10 @@ export interface LoanProductCreate {
 
   product_name: string;
 
+  is_active?: boolean | number;
+
+  status?: number | string;
+
   effective_date: string;
 
   interest_method: InterestMethod;
@@ -151,7 +155,9 @@ export interface LoanProduct {
 
   product_name: string;
 
-  is_active: boolean;
+  is_active: boolean | number;
+
+  status?: number | string;
 
   effective_date: string;
 

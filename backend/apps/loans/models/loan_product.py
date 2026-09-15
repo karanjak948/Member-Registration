@@ -172,6 +172,10 @@ class LoanProduct(AuditModel):
         ordering = ["product_code", "-version_number"]
         unique_together = [("product_code", "version_number")]
 
+    @property
+    def status(self) -> int:
+        return 1 if self.is_active else 0
+
     def __str__(self):
         return f"{self.product_name} ({self.product_code} v{self.version_number})"
 

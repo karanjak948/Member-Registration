@@ -52,11 +52,21 @@ class LoanProductViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         qs = super().get_queryset()
+        status_param = self.request.query_params.get("status")
+        if status_param is not None:
+            if status_param in ("1", "active", "true", "True"):
+                return qs.filter(is_active=True)
+            elif status_param in ("0", "inactive", "false", "False", "archived"):
+                return qs.filter(is_active=False)
+            elif status_param in ("all", "ALL"):
+                return qs
+
         include_archived = self.request.query_params.get("include_archived")
         if include_archived in ("true", "1", "True"):
             return qs
         active_only = self.request.query_params.get("active_only")
         if active_only in ("false", "0", "False"):
             return qs
+        # Default: display only loan products that have status 1 (is_active=True)
         return qs.filter(is_active=True)
 

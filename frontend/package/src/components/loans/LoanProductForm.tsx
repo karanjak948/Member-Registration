@@ -39,6 +39,8 @@ import FormActions from "./sections/FormActions";
 const defaultValues: LoanProductCreate = {
   product_code: "",
   product_name: "",
+  is_active: 1,
+  status: 1,
   effective_date: "",
 
   interest_method: "flat",

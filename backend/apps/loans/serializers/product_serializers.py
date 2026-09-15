@@ -53,10 +53,21 @@ class LoanProductSerializer(serializers.ModelSerializer):
     fees = LoanProductFeeSerializer(many=True, required=False)
     penalties = LoanProductPenaltySerializer(many=True, required=False)
     active_loans_count = serializers.SerializerMethodField()
+    status = serializers.SerializerMethodField()
+
+    def get_status(self, obj) -> int:
+        return 1 if obj.is_active else 0
 
     def to_internal_value(self, data):
         if isinstance(data, dict):
             data = data.copy()
+
+            # Normalize status / is_active: default to 1 (True) if not explicitly provided
+            if "status" in data and "is_active" not in data:
+                raw_status = data.get("status")
+                data["is_active"] = bool(raw_status in (1, "1", True, "active", "ACTIVE"))
+            elif "is_active" not in data:
+                data["is_active"] = True
             # Normalize "fixed" to "fixed_amount" for all percentage/fixed fields
             for f in [
                 "security_type",
@@ -109,6 +120,7 @@ class LoanProductSerializer(serializers.ModelSerializer):
             "version_number",
             "product_name",
             "is_active",
+            "status",
             "effective_date",
             "interest_method",
             "interest_rate",
@@ -173,9 +185,13 @@ class LoanProductSerializer(serializers.ModelSerializer):
         else:
             version_number = 1
 
+        # Ensure is_active is retrieved from validated_data or defaults to True
+        is_active = validated_data.pop("is_active", True)
+        validated_data.pop("version_number", None)
+
         product = LoanProduct.objects.create(
             version_number=version_number,
-            is_active=True,
+            is_active=is_active,
             **validated_data
         )
 
@@ -198,11 +214,15 @@ class LoanProductSerializer(serializers.ModelSerializer):
         fees_data = validated_data.pop("fees", None)
         penalties_data = validated_data.pop("penalties", None)
         validated_data.pop("version_number", None)
+        is_active = validated_data.pop("is_active", None)
 
         # Update fields on instance
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
-        instance.is_active = True
+        if is_active is not None:
+            instance.is_active = is_active
+        else:
+            instance.is_active = True
         instance.save()
 
         # Update nested fees if provided
