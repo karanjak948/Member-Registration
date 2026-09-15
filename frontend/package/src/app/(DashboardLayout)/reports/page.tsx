@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import {
   Box,
   Button,
@@ -20,6 +21,8 @@ import {
   TableRow,
   Typography,
   IconButton,
+  Tabs,
+  Tab,
 } from "@mui/material";
 import PageContainer from "@/app/(DashboardLayout)/components/container/PageContainer";
 import dynamic from "next/dynamic";
@@ -34,12 +37,37 @@ import {
   IconAlertTriangle,
   IconRefresh,
   IconShieldCheck,
+  IconReceipt,
+  IconDatabase,
 } from "@tabler/icons-react";
 import { useMembers } from "@/hooks/useMembers";
+import MpesaReportsView from "@/components/reports/MpesaReportsView";
+import MpesaWebhooksView from "@/components/reports/MpesaWebhooksView";
 
 const Chart = dynamic(() => import("react-apexcharts"), { ssr: false });
 
 export default function ReportsPage() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const tabParam = searchParams.get("tab");
+
+  const [activeTab, setActiveTab] = useState(
+    tabParam === "mpesa" ? 1 : tabParam === "webhooks" ? 2 : 0
+  );
+
+  useEffect(() => {
+    const tab = searchParams.get("tab");
+    if (tab === "mpesa") setActiveTab(1);
+    else if (tab === "webhooks") setActiveTab(2);
+    else if (tab === "performance") setActiveTab(0);
+  }, [searchParams]);
+
+  const handleTabChange = (_: React.SyntheticEvent, newValue: number) => {
+    setActiveTab(newValue);
+    const tabName = newValue === 1 ? "mpesa" : newValue === 2 ? "webhooks" : "performance";
+    router.push(`/reports?tab=${tabName}`, { scroll: false });
+  };
+
   const { members, loading: membersLoading } = useMembers();
   const [loans, setLoans] = useState<any[]>([]);
   const [loansLoading, setLoansLoading] = useState(true);
@@ -269,12 +297,49 @@ export default function ReportsPage() {
           </Stack>
         </Box>
 
-        {loading ? (
-          <Box display="flex" justifyContent="center" alignItems="center" py={12}>
-            <CircularProgress size={48} />
-          </Box>
-        ) : (
-          <>
+        {/* Navigation Tabs Bar */}
+        <Box sx={{ borderBottom: 1, borderColor: "divider", mb: 3 }}>
+          <Tabs
+            value={activeTab}
+            onChange={handleTabChange}
+            sx={{
+              "& .MuiTab-root": {
+                fontWeight: 700,
+                fontSize: "0.92rem",
+                textTransform: "none",
+                minHeight: 48,
+                px: 3,
+              },
+            }}
+          >
+            <Tab
+              icon={<IconReportAnalytics size={19} />}
+              iconPosition="start"
+              label="SACCO Portfolio & Performance"
+              id="reports-tab-performance"
+            />
+            <Tab
+              icon={<IconReceipt size={19} />}
+              iconPosition="start"
+              label="M-Pesa Transaction Logs & Audit"
+              id="reports-tab-mpesa"
+            />
+            <Tab
+              icon={<IconDatabase size={19} />}
+              iconPosition="start"
+              label="Incoming Webhook Logs"
+              id="reports-tab-webhooks"
+            />
+          </Tabs>
+        </Box>
+
+        {activeTab === 0 && (
+          loading ? (
+            <Box display="flex" justifyContent="center" alignItems="center" py={12}>
+              <CircularProgress size={48} />
+            </Box>
+          ) : (
+            <>
             {/* Primary KPI Metrics Grid */}
             <Grid container spacing={2.5} sx={{ mb: 4 }}>
               <Grid size={{ xs: 12, sm: 6, md: 3 }}>
@@ -498,7 +563,11 @@ export default function ReportsPage() {
               </CardContent>
             </Card>
           </>
-        )}
+        ))}
+
+        {activeTab === 1 && <MpesaReportsView />}
+
+        {activeTab === 2 && <MpesaWebhooksView />}
       </Box>
 
       {/* ========================================================================= */}

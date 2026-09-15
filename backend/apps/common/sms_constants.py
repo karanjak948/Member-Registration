@@ -11,6 +11,7 @@ class SMSEventType(models.TextChoices):
     OVERDUE_ALERT = "overdue_alert", "Overdue Delinquency Alert"
     LOAN_COMPLETION = "loan_completion", "Loan Completion"
     WELCOME = "welcome", "Welcome Registration"
+    MPESA_PAYMENT_RECEIVED = "mpesa_payment_received", "M-Pesa Payment Received"
     GENERAL = "general", "General Notification"
 
 

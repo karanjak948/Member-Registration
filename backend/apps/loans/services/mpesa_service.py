@@ -363,6 +363,14 @@ class MpesaC2BService:
                     f"M-Pesa payment {trans_id} recorded as UNALLOCATED. Ref: '{bill_ref}', Member: {member}."
                 )
 
+                # Send notification directly to registered member mobile number
+                if member and getattr(member, "phone_number", None):
+                    try:
+                        from apps.common.notification_service import NotificationService
+                        NotificationService.notify_mpesa_unallocated(mpesa_tx, member=member)
+                    except Exception as notif_err:
+                        logger.error(f"Failed to dispatch unallocated M-Pesa SMS for {trans_id}: {notif_err}")
+
         except Exception as err:
             logger.exception(f"Error processing M-Pesa transaction {trans_id}: {err}")
             mpesa_tx.error_message = str(err)

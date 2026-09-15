@@ -177,6 +177,7 @@ class NotificationService:
     def notify_repayment(cls, repayment, remaining_balance: Any = None) -> Dict[str, Any]:
         """
         Triggered upon recording a loan repayment.
+        Sends notification directly to the registered member's mobile number.
         """
         loan = repayment.loan
         member = loan.member
@@ -185,18 +186,61 @@ class NotificationService:
         rem_bal_str = _format_curr(remaining_balance if remaining_balance is not None else loan.outstanding_balance)
         txn_ref = repayment.transaction_reference or repayment.repayment_number
 
-        message = (
-            f"Dear {first_name}, payment of KES {amt_paid_str} for loan {loan.loan_number} "
-            f"received on {repayment.payment_date}. Ref: {txn_ref}. "
-            f"Outstanding balance: KES {rem_bal_str}. Royal SACCO."
-        )
+        is_mpesa = getattr(repayment, "payment_method", "").lower() == "mpesa"
+        if is_mpesa:
+            message = (
+                f"Dear {first_name}, M-Pesa payment of KES {amt_paid_str} (Ref: {txn_ref}) for loan {loan.loan_number} "
+                f"received on {repayment.payment_date}. Outstanding balance: KES {rem_bal_str}. Royal SACCO."
+            )
+            event_type = SMSEventType.MPESA_PAYMENT_RECEIVED
+        else:
+            message = (
+                f"Dear {first_name}, payment of KES {amt_paid_str} for loan {loan.loan_number} "
+                f"received on {repayment.payment_date}. Ref: {txn_ref}. "
+                f"Outstanding balance: KES {rem_bal_str}. Royal SACCO."
+            )
+            event_type = SMSEventType.REPAYMENT_CONFIRMATION
 
         return cls._dispatch_and_log(
             phone_number=member.phone_number,
             message=message,
-            event_type=SMSEventType.REPAYMENT_CONFIRMATION,
+            event_type=event_type,
             member=member,
             recipient_name=f"{member.first_name} {member.other_names}".strip(),
+        )
+
+    # -------------------------------------------------------------------------
+    # 4b. M-Pesa Unallocated Payment Received Notification
+    # -------------------------------------------------------------------------
+    @classmethod
+    def notify_mpesa_unallocated(cls, mpesa_tx, member=None) -> Dict[str, Any]:
+        """
+        Triggered when an M-Pesa C2B Paybill payment is received for a registered member
+        but cannot yet be automatically allocated to a specific active loan facility.
+        Dispatches notification directly to the registered member's mobile number.
+        """
+        target_member = member or mpesa_tx.member
+        if not target_member:
+            logger.warning(f"Cannot dispatch unallocated M-Pesa notification: no member attached to tx {mpesa_tx.trans_id}")
+            return {"success": False, "error": "No member attached to M-Pesa transaction"}
+
+        first_name = (target_member.first_name or "Member").title()
+        amt_str = _format_curr(mpesa_tx.trans_amount)
+        ref_str = mpesa_tx.trans_id
+        bill_ref = mpesa_tx.bill_ref_number
+
+        message = (
+            f"Dear {first_name}, your M-Pesa payment of KES {amt_str} (Ref: {ref_str}) "
+            f"has been received by Royal SACCO. Account Ref: {bill_ref}. "
+            f"Our team is allocating your payment. Thank you."
+        )
+
+        return cls._dispatch_and_log(
+            phone_number=target_member.phone_number,
+            message=message,
+            event_type=SMSEventType.MPESA_PAYMENT_RECEIVED,
+            member=target_member,
+            recipient_name=f"{target_member.first_name} {target_member.other_names}".strip(),
         )
 
     # -------------------------------------------------------------------------

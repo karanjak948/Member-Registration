@@ -12,6 +12,7 @@ from apps.loans.views.mpesa_views import (
     MpesaC2BConfirmationView,
     MpesaC2BValidationView,
     MpesaTransactionViewSet,
+    MpesaReceivedPaymentViewSet,
 )
 
 __all__ = [
@@ -23,4 +24,5 @@ __all__ = [
     "MpesaC2BConfirmationView",
     "MpesaC2BValidationView",
     "MpesaTransactionViewSet",
+    "MpesaReceivedPaymentViewSet",
 ]

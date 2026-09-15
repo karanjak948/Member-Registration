@@ -321,6 +321,20 @@ export function getMenuItems(
     title: "Reports",
     icon: IconReportAnalytics,
     href: "/reports",
+    children: [
+      {
+        id: "reports-overview",
+        title: "Portfolio & Analytics",
+        icon: IconReportAnalytics,
+        href: "/reports",
+      },
+      {
+        id: "reports-mpesa",
+        title: "M-Pesa Transaction Logs",
+        icon: IconReceipt,
+        href: "/reports/mpesa",
+      },
+    ],
   });
 
   // ============================================================

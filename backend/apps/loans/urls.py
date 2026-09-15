@@ -9,6 +9,7 @@ from apps.loans.views import (
     MpesaC2BConfirmationView,
     MpesaC2BValidationView,
     MpesaTransactionViewSet,
+    MpesaReceivedPaymentViewSet,
 )
 
 router = DefaultRouter()
@@ -18,6 +19,7 @@ router.register(r"repayments", RepaymentViewSet, basename="repayment")
 router.register(r"ledger-accounts", LedgerAccountViewSet, basename="ledger-account")
 router.register(r"ledger-transactions", LedgerTransactionViewSet, basename="ledger-transaction")
 router.register(r"mpesa/transactions", MpesaTransactionViewSet, basename="mpesa-transaction")
+router.register(r"mpesa/raw-webhooks", MpesaReceivedPaymentViewSet, basename="mpesa-raw-webhook")
 
 urlpatterns = [
     # Safaricom Daraja C2B Paybill Callbacks

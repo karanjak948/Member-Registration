@@ -28,6 +28,11 @@ logger = logging.getLogger(__name__)
 
 class MpesaTransactionSerializer(serializers.ModelSerializer):
     member_name = serializers.SerializerMethodField()
+    member_phone = serializers.SerializerMethodField()
+    member_number = serializers.SerializerMethodField()
+    member_national_id = serializers.SerializerMethodField()
+    is_payer_registered_phone = serializers.SerializerMethodField()
+    sms_status = serializers.SerializerMethodField()
     loan_number = serializers.CharField(source="loan.loan_number", read_only=True, default=None)
     repayment_number = serializers.CharField(source="repayment.repayment_number", read_only=True, default=None)
 
@@ -49,6 +54,11 @@ class MpesaTransactionSerializer(serializers.ModelSerializer):
             "status",
             "member",
             "member_name",
+            "member_phone",
+            "member_number",
+            "member_national_id",
+            "is_payer_registered_phone",
+            "sms_status",
             "loan",
             "loan_number",
             "repayment",
@@ -67,6 +77,38 @@ class MpesaTransactionSerializer(serializers.ModelSerializer):
         if obj.member:
             return f"{obj.member.first_name} {obj.member.other_names}".strip()
         return obj.first_name or "—"
+
+    def get_member_phone(self, obj):
+        return obj.member.phone_number if obj.member else None
+
+    def get_member_number(self, obj):
+        return obj.member.membership_number if obj.member else None
+
+    def get_member_national_id(self, obj):
+        return obj.member.national_id if obj.member else None
+
+    def get_is_payer_registered_phone(self, obj):
+        if not obj.member or not obj.member.phone_number:
+            return None
+        from apps.common.sms_service import BulkSMSService
+        clean_msisdn = BulkSMSService.format_phone_number(obj.msisdn)
+        clean_member_phone = BulkSMSService.format_phone_number(obj.member.phone_number)
+        return clean_msisdn == clean_member_phone
+
+    def get_sms_status(self, obj):
+        try:
+            from apps.members.models.sms_log import SMSLog
+            log = SMSLog.objects.filter(message__icontains=obj.trans_id).order_by("-created_at").first()
+            if log:
+                return {
+                    "sent": log.status == "sent",
+                    "status": log.status,
+                    "phone": log.phone_number,
+                    "dispatched_at": log.created_at,
+                }
+        except Exception:
+            pass
+        return None
 
 
 class MpesaC2BConfirmationView(APIView):
@@ -358,9 +400,47 @@ class MpesaTransactionViewSet(viewsets.ReadOnlyModelViewSet):
     def get_queryset(self):
         qs = super().get_queryset()
         status_filter = self.request.query_params.get("status")
-        if status_filter:
+        if status_filter and status_filter.upper() != "ALL":
             qs = qs.filter(status__iexact=status_filter)
+        date_from = self.request.query_params.get("date_from")
+        if date_from:
+            qs = qs.filter(trans_time__date__gte=date_from)
+        date_to = self.request.query_params.get("date_to")
+        if date_to:
+            qs = qs.filter(trans_time__date__lte=date_to)
         return qs
+
+    @action(detail=False, methods=["get"], url_path="stats")
+    def stats(self, request):
+        """
+        Aggregate summary metrics for M-Pesa reporting.
+        """
+        from django.db.models import Sum
+        from decimal import Decimal
+
+        qs = self.get_queryset()
+        total_count = qs.count()
+        total_amount = qs.aggregate(s=Sum("trans_amount"))["s"] or Decimal("0.00")
+
+        completed_qs = qs.filter(status=MpesaTransactionStatus.COMPLETED)
+        completed_count = completed_qs.count()
+        completed_amount = completed_qs.aggregate(s=Sum("trans_amount"))["s"] or Decimal("0.00")
+
+        unallocated_qs = qs.filter(status=MpesaTransactionStatus.UNALLOCATED)
+        unallocated_count = unallocated_qs.count()
+        unallocated_amount = unallocated_qs.aggregate(s=Sum("trans_amount"))["s"] or Decimal("0.00")
+
+        failed_count = qs.filter(status__in=[MpesaTransactionStatus.FAILED, MpesaTransactionStatus.VERIFICATION_FAILED]).count()
+
+        return Response({
+            "total_count": total_count,
+            "total_amount": float(total_amount),
+            "completed_count": completed_count,
+            "completed_amount": float(completed_amount),
+            "unallocated_count": unallocated_count,
+            "unallocated_amount": float(unallocated_amount),
+            "failed_count": failed_count,
+        })
 
     @action(detail=True, methods=["post"], url_path="allocate")
     def allocate(self, request, pk=None):
@@ -410,3 +490,47 @@ class MpesaTransactionViewSet(viewsets.ReadOnlyModelViewSet):
         tx.save(update_fields=["loan", "member", "repayment", "status", "error_message"])
 
         return Response(MpesaTransactionSerializer(tx).data)
+
+
+class MpesaReceivedPaymentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = MpesaReceivedPayment
+        fields = [
+            "id",
+            "unique_serial",
+            "mpesa_payload",
+            "transID",
+            "verify_url",
+            "status",
+            "message",
+            "verification_response",
+            "createdon",
+            "ipaddress",
+        ]
+        read_only_fields = fields
+
+
+class MpesaReceivedPaymentViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    Administrative API to audit raw incoming M-Pesa webhooks (Daraja & Relay).
+    """
+    queryset = MpesaReceivedPayment.objects.all().order_by("-createdon")
+    serializer_class = MpesaReceivedPaymentSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    search_fields = ["transID", "ipaddress", "message", "status"]
+    ordering_fields = ["createdon", "status"]
+    ordering = ["-createdon"]
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        status_filter = self.request.query_params.get("status")
+        if status_filter and status_filter.upper() != "ALL":
+            qs = qs.filter(status__iexact=status_filter)
+        date_from = self.request.query_params.get("date_from")
+        if date_from:
+            qs = qs.filter(createdon__date__gte=date_from)
+        date_to = self.request.query_params.get("date_to")
+        if date_to:
+            qs = qs.filter(createdon__date__lte=date_to)
+        return qs
