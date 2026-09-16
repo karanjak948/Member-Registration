@@ -161,6 +161,7 @@ export interface Loan {
   interest_balance?: string;
   penalty_balance?: string;
   fees_balance?: string;
+  reference_weekly_installment?: string | number | null;
   total_principal_paid?: string;
   total_interest_paid?: string;
   total_fees_paid?: string;

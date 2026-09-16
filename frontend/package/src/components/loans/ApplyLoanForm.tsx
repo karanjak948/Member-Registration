@@ -129,6 +129,7 @@ export default function ApplyLoanForm() {
     installment: number;
     totalInterest: number;
     totalPayable: number;
+    referenceWeeklyInstallment?: number | null;
     fees: Array<{ fee_name: string; amount: string }>;
   } | null>(null);
 
@@ -208,6 +209,7 @@ export default function ApplyLoanForm() {
               installment: Number(res.regular_installment),
               totalInterest: Number(res.total_interest),
               totalPayable: Number(res.total_payable),
+              referenceWeeklyInstallment: res.reference_weekly_installment ? Number(res.reference_weekly_installment) : null,
               fees: (res.fees && res.fees.length > 0) ? res.fees : productFees,
             });
           }
@@ -1049,6 +1051,13 @@ export default function ApplyLoanForm() {
                         label={`${selectedProduct?.interest_rate}% ${selectedProduct?.interest_period || "p.a."}`}
                         sx={{ fontWeight: 800, bgcolor: "#ecfdf5", color: "#047857", fontSize: "0.72rem" }}
                       />
+                      {previewData.referenceWeeklyInstallment != null && (
+                        <Chip
+                          size="small"
+                          label={`Ref. Weekly Target: KES ${previewData.referenceWeeklyInstallment.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} / wk`}
+                          sx={{ fontWeight: 800, bgcolor: "#e0e7ff", color: "#3730a3", fontSize: "0.72rem", border: "1px solid #c7d2fe" }}
+                        />
+                      )}
                     </Stack>
 
                     <Grid container spacing={2}>

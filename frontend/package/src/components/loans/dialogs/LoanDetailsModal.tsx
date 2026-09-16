@@ -408,7 +408,7 @@ export default function LoanDetailsModal({
                         {loan.interest_rate}% ({loan.interest_method?.replace("_", " ") || "reducing"})
                       </Typography>
                     </Grid>
-                    <Grid size={{ xs: 12, sm: 3 }}>
+                    <Grid size={{ xs: 12, sm: loan.reference_weekly_installment ? 2.4 : 3 }}>
                       <Typography variant="caption" sx={{ color: "#166534", fontWeight: 700, textTransform: "uppercase" }}>
                         Tenor &amp; Frequency
                       </Typography>
@@ -416,6 +416,16 @@ export default function LoanDetailsModal({
                         {loan.num_periods || 0} {loan.repayment_frequency || "Periods"}
                       </Typography>
                     </Grid>
+                    {loan.reference_weekly_installment && (
+                      <Grid size={{ xs: 12, sm: 2.4 }}>
+                        <Typography variant="caption" sx={{ color: "#166534", fontWeight: 700, textTransform: "uppercase" }}>
+                          Ref. Weekly Target
+                        </Typography>
+                        <Typography variant="h6" fontWeight={900} sx={{ color: "#0d9488", mt: 0.5, fontFamily: "monospace" }}>
+                          {formatCurrency(loan.reference_weekly_installment)}
+                        </Typography>
+                      </Grid>
+                    )}
                   </Grid>
                 </Box>
 
@@ -739,12 +749,20 @@ export default function LoanDetailsModal({
                         {loan.repayment_frequency || "Monthly"}
                       </Typography>
                     </Grid>
-                    <Grid size={{ xs: 6, sm: 3 }}>
+                    <Grid size={{ xs: 6, sm: loan.reference_weekly_installment ? 2.4 : 3 }}>
                       <Typography variant="caption" sx={{ color: "#94a3b8" }}>TENOR</Typography>
                       <Typography variant="body1" fontWeight={800} sx={{ color: "#ffffff" }}>
                         {loan.num_periods || 0} installments
                       </Typography>
                     </Grid>
+                    {loan.reference_weekly_installment && (
+                      <Grid size={{ xs: 6, sm: 2.4 }}>
+                        <Typography variant="caption" sx={{ color: "#94a3b8" }}>REF. WEEKLY</Typography>
+                        <Typography variant="body1" fontWeight={800} sx={{ color: "#a78bfa" }}>
+                          {formatCurrency(loan.reference_weekly_installment)}
+                        </Typography>
+                      </Grid>
+                    )}
                   </Grid>
                 </Paper>
 

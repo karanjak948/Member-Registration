@@ -29,6 +29,7 @@ from apps.loans.services.engine.schedule import generate_schedule, add_periods
 from apps.loans.services.engine.fees import calculate_fee
 from apps.loans.services.engine.aging import classify_loan_aging
 from apps.loans.services.engine.interest import round2
+from apps.loans.services.engine.microfinance import find_weekly_reference_payment
 from apps.loans.services.accounting import record_disbursement_journal
 
 
@@ -203,6 +204,14 @@ class LoanViewSet(viewsets.ModelViewSet):
         total_payable = sum(item.expected_amount for item in schedule)
         installment = round2(total_payable / Decimal(str(num_periods))) if num_periods > 0 else (schedule[0].expected_amount if schedule else Decimal("0.00"))
 
+        reference_weekly = None
+        if method == "reducing_balance" and num_periods > 0:
+            try:
+                r_dec = rate / Decimal("100")
+                reference_weekly = str(find_weekly_reference_payment(principal, r_dec, start_date, num_periods))
+            except Exception:
+                reference_weekly = None
+
         return Response({
             "principal": str(principal),
             "interest_rate": str(rate),
@@ -213,6 +222,7 @@ class LoanViewSet(viewsets.ModelViewSet):
             "total_interest": str(round2(total_interest)),
             "total_payable": str(round2(total_payable)),
             "regular_installment": str(installment),
+            "reference_weekly_installment": reference_weekly,
             "fees": fees_list,
             "schedule": [
                 {
@@ -431,6 +441,16 @@ class LoanViewSet(viewsets.ModelViewSet):
         loan.principal_balance = principal
         loan.interest_balance = total_interest
         loan.outstanding_balance = principal + total_interest
+
+        ref_weekly = None
+        if loan.interest_method == "reducing_balance" and num_periods > 0:
+            try:
+                r_dec = loan.interest_rate / Decimal("100")
+                ref_weekly = find_weekly_reference_payment(principal, r_dec, disb_date, num_periods)
+            except Exception:
+                ref_weekly = None
+        loan.reference_weekly_installment = ref_weekly
+
         loan.save()
 
         # Post Double-Entry Journal Transaction with itemized fee lines
@@ -472,26 +492,40 @@ class LoanViewSet(viewsets.ModelViewSet):
         today = timezone.now().date()
         unpaid_entries = list(loan.schedule_entries.filter(is_paid=False).order_by("period_number"))
 
-        overdue_entries = [e for e in unpaid_entries if e.due_date <= today]
-        overdue_interest = sum(
-            max(Decimal("0.00"), e.expected_interest - e.paid_interest)
-            for e in overdue_entries
-        )
-        total_future_interest = sum(
-            max(Decimal("0.00"), e.expected_interest - e.paid_interest)
-            for e in unpaid_entries if e.due_date > today
-        )
-
         outstanding_principal = loan.principal_balance
         outstanding_penalty = loan.penalty_balance
         outstanding_fees = loan.fees_balance
-        net_payoff = outstanding_principal + overdue_interest + outstanding_penalty + outstanding_fees
+
+        if loan.interest_method == "reducing_balance" and unpaid_entries:
+            # Under Peter Irungu's specification:
+            # Current 30-day cycle interest is charged (e.g. Month 1 6k on 30k = 36k total payoff)
+            # Future unaccrued cycles beyond the active cycle are waived
+            active_entry = unpaid_entries[0]
+            current_cycle_interest = max(Decimal("0.00"), active_entry.expected_interest - active_entry.paid_interest)
+            total_future_interest = sum(
+                max(Decimal("0.00"), e.expected_interest - e.paid_interest)
+                for e in unpaid_entries[1:]
+            )
+            net_payoff = outstanding_principal + current_cycle_interest + outstanding_penalty + outstanding_fees
+            accrued_interest = current_cycle_interest
+        else:
+            overdue_entries = [e for e in unpaid_entries if e.due_date <= today]
+            overdue_interest = sum(
+                max(Decimal("0.00"), e.expected_interest - e.paid_interest)
+                for e in overdue_entries
+            )
+            total_future_interest = sum(
+                max(Decimal("0.00"), e.expected_interest - e.paid_interest)
+                for e in unpaid_entries if e.due_date > today
+            )
+            net_payoff = outstanding_principal + overdue_interest + outstanding_penalty + outstanding_fees
+            accrued_interest = overdue_interest
 
         return Response({
             "loan_id": loan.id,
             "loan_number": loan.loan_number,
             "principal_balance": float(outstanding_principal),
-            "accrued_interest": float(overdue_interest),
+            "accrued_interest": float(accrued_interest),
             "penalty_balance": float(outstanding_penalty),
             "fees_balance": float(outstanding_fees),
             "waived_future_interest": float(total_future_interest),

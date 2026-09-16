@@ -29,6 +29,7 @@ export interface LoanCalculatorPreviewResponse {
   total_interest: string;
   total_payable: string;
   regular_installment: string;
+  reference_weekly_installment?: string | null;
   fees: Array<{ fee_name: string; amount: string; affects_principal: boolean }>;
   schedule: Array<{
     period_number: number;

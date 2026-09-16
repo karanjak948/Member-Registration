@@ -65,6 +65,13 @@ class Loan(AuditModel):
     interest_balance = models.DecimalField(max_digits=15, decimal_places=2, default=0)
     penalty_balance = models.DecimalField(max_digits=15, decimal_places=2, default=0)
     fees_balance = models.DecimalField(max_digits=15, decimal_places=2, default=0)
+    reference_weekly_installment = models.DecimalField(
+        max_digits=15,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text="Algorithmically simulated reference weekly installment",
+    )
 
     # Total amounts tracked
     total_principal_paid = models.DecimalField(max_digits=15, decimal_places=2, default=0)

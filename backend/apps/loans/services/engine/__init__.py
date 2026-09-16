@@ -27,6 +27,17 @@ from apps.loans.services.engine.aging import (
     AgingClassification,
 )
 
+from apps.loans.services.engine.microfinance import (
+    simulate_microfinance_loan,
+    find_weekly_reference_payment,
+    find_weekly_payment_day_based,
+    generate_full_reference_schedule,
+    get_loan_cycle_info,
+    add_calendar_months,
+    generate_weekly_dates,
+    generate_interest_dates,
+)
+
 __all__ = [
     "calculate_flat_interest",
     "calculate_reducing_balance_schedule",
@@ -42,4 +53,13 @@ __all__ = [
     "RepaymentAllocation",
     "classify_loan_aging",
     "AgingClassification",
+    "simulate_microfinance_loan",
+    "find_weekly_reference_payment",
+    "find_weekly_payment_day_based",
+    "generate_full_reference_schedule",
+    "get_loan_cycle_info",
+    "add_calendar_months",
+    "generate_weekly_dates",
+    "generate_interest_dates",
 ]
+

@@ -1388,6 +1388,17 @@ export default function LoanDetailPage() {
                 {formatCurrency(loan.outstanding_balance)}
               </Typography>
             </Grid>
+
+            {loan.reference_weekly_installment && (
+              <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+                <Typography variant="caption" sx={{ color: "#64748b", fontWeight: 700, textTransform: "uppercase" }}>
+                  Reference Weekly Target
+                </Typography>
+                <Typography sx={{ fontWeight: 900, color: "#0d9488", fontFamily: "monospace", fontSize: "1.05rem", mt: 0.3 }}>
+                  {formatCurrency(loan.reference_weekly_installment)}
+                </Typography>
+              </Grid>
+            )}
           </Grid>
         </Paper>
 
@@ -2365,8 +2376,13 @@ export default function LoanDetailPage() {
                 <Button
                   size="small"
                   variant="contained"
-                  onClick={() => {
-                    setPaymentAmount(String(loan.principal_balance));
+                  onClick={async () => {
+                    try {
+                      const quote = await loanService.getSettlementQuote(loan.id);
+                      setPaymentAmount(String(quote.net_payoff_amount));
+                    } catch {
+                      setPaymentAmount(String(loan.principal_balance));
+                    }
                     setIsEarlySettlement(true);
                   }}
                   sx={{
@@ -2378,7 +2394,7 @@ export default function LoanDetailPage() {
                     fontSize: "0.8rem",
                   }}
                 >
-                  Clear Principal Balance (KES {Number(loan.principal_balance).toLocaleString()})
+                  Clear Facility Payoff (KES {Number(loan.principal_balance).toLocaleString()})
                 </Button>
               </Paper>
             )}
