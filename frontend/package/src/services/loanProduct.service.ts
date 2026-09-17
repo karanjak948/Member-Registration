@@ -12,7 +12,7 @@ class LoanProductService {
   async getAll(activeOnly: boolean = false): Promise<LoanProduct[]> {
     try {
       const response = await api.get("/loan-products/", {
-        params: activeOnly ? { active_only: "true" } : {},
+        params: activeOnly ? { active_only: "true" } : { include_archived: "true" },
       });
       const data = response.data;
       return Array.isArray(data) ? data : (data?.results || []);
@@ -27,7 +27,9 @@ class LoanProductService {
    */
   async getById(productId: number | string): Promise<LoanProduct> {
     try {
-      const response = await api.get(`/loan-products/${productId}/`);
+      const response = await api.get(`/loan-products/${productId}/`, {
+        params: { include_archived: "true" },
+      });
       return response.data;
     } catch (error: any) {
       console.error(`Failed to fetch loan product ${productId}:`, error);
@@ -53,7 +55,9 @@ class LoanProductService {
    */
   async update(productId: number | string, data: LoanProductUpdate): Promise<LoanProduct> {
     try {
-      const response = await api.put(`/loan-products/${productId}/`, data);
+      const response = await api.put(`/loan-products/${productId}/`, data, {
+        params: { include_archived: "true" },
+      });
       return response.data;
     } catch (error: any) {
       console.error(`Failed to update loan product ${productId}:`, error);
@@ -69,6 +73,24 @@ class LoanProductService {
       await api.delete(`/loan-products/${productId}/`);
     } catch (error: any) {
       console.error(`Failed to delete loan product ${productId}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * POST /api/loan-products/{id}/toggle-status/
+   * Enable or hide/archive a loan product.
+   */
+  async toggleStatus(productId: number | string, isActive?: boolean): Promise<{ success: boolean; is_active: boolean; message: string; product: LoanProduct }> {
+    try {
+      const response = await api.post(
+        `/loan-products/${productId}/toggle-status/`,
+        isActive !== undefined ? { is_active: isActive } : {},
+        { params: { include_archived: "true" } }
+      );
+      return response.data;
+    } catch (error: any) {
+      console.error(`Failed to toggle loan product ${productId} status:`, error);
       throw error;
     }
   }

@@ -140,19 +140,19 @@ const statusConfig: Record<
 export default function LoanDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const { can, isSuperuser, isStaff, role } = usePermissions();
+  const { can, isSuperuser, isStaff, role, isAdmin } = usePermissions();
 
   const identifier = params.id as string;
   const isNumericId = /^\d+$/.test(identifier);
 
   const roleName = role?.name?.toUpperCase();
-  const isSystemAdmin = isSuperuser || roleName === "SUPERADMIN" || roleName === "OWNER";
+  const isSystemAdmin = isAdmin || isSuperuser || roleName === "SUPERADMIN" || roleName === "OWNER";
 
   // Strict Permission Gates
   const canApproveLoans = isSystemAdmin || can(PERMISSIONS.APPROVE_LOANS);
   const canDisburseLoans = isSystemAdmin || can(PERMISSIONS.DISBURSE_LOANS);
   const canRejectLoans = isSystemAdmin || can(PERMISSIONS.REJECT_LOANS) || can(PERMISSIONS.APPROVE_LOANS);
-  const canDeleteLoans = isSystemAdmin || can(PERMISSIONS.DELETE_LOANS);
+  const canDeleteLoans = isAdmin;
   const hasAnyGovernanceAction = canApproveLoans || canDisburseLoans || canRejectLoans || canDeleteLoans;
 
   const [loan, setLoan] = useState<Loan | null>(null);

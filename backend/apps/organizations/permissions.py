@@ -146,14 +146,16 @@ class IsOrganizationMember(BasePermission):
 
 def is_admin_or_owner_user(user) -> bool:
     """
-    Check whether a user is an Organization Owner, Superuser, Staff,
-    or holds an administrative role (e.g. Owner, Administrator, Admin).
+    Strictly check whether a user is an Organization Owner, System Superuser,
+    or holds an executive administrative role (e.g. Owner, Administrator, Admin).
+    Normal operational staff (e.g. Member Officer, Loan Officer, Cashier)
+    do NOT pass this check unless granted explicit permissions.
     """
     if not (user and user.is_authenticated):
         return False
 
-    # 1. Django superuser or staff
-    if getattr(user, "is_superuser", False) or getattr(user, "is_staff", False):
+    # 1. Django superuser
+    if getattr(user, "is_superuser", False):
         return True
 
     # 2. Direct organization owner
@@ -168,7 +170,7 @@ def is_admin_or_owner_user(user) -> bool:
     if Organization.objects.filter(owner=user).exists():
         return True
 
-    # 3. Active role assignment
+    # 3. Active role assignment: strictly check for executive administrative roles
     membership = (
         OrganizationUser.objects
         .select_related("role")
@@ -176,11 +178,9 @@ def is_admin_or_owner_user(user) -> bool:
         .first()
     )
     if membership and membership.role:
-        role_name = (membership.role.name or "").lower()
-        if (
-            getattr(membership.role, "is_system_role", False)
-            or any(adm in role_name for adm in ["admin", "owner", "super", "system administrator", "director", "manager"])
-        ):
+        role_name = (membership.role.name or "").strip().lower()
+        admin_keywords = ["admin", "owner", "administrator", "super admin", "system administrator", "executive"]
+        if any(role_name == kw or role_name.startswith("admin") or role_name.endswith("admin") for kw in admin_keywords):
             return True
 
     return False

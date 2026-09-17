@@ -695,7 +695,9 @@ export default function ApplyLoanForm() {
                       }}
                     >
                       <MenuItem value={0}>-- Select Loan Product --</MenuItem>
-                      {products.map((product) => (
+                      {products
+                        .filter((p) => p.is_active === undefined || p.is_active === true || p.is_active === 1 || (p as any).is_active === "1")
+                        .map((product) => (
                         <MenuItem key={product.id} value={product.id}>
                           <Stack direction="row" spacing={1} alignItems="center">
                             <span style={{ fontWeight: 800 }}>{product.product_name}</span>

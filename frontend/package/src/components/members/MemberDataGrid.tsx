@@ -61,7 +61,7 @@ export default function MemberDataGrid({
   onCompleteRegistration,
   onDelete,
 }: MemberDataGridProps) {
-  const { can } = usePermissions();
+  const { can, isAdmin } = usePermissions();
 
   const columns = useMemo<GridColDef<Member>[]>(
     () => [
@@ -477,7 +477,7 @@ export default function MemberDataGrid({
               );
             }
 
-            if (can(PERMISSIONS.DELETE_MEMBERS)) {
+            if (isAdmin && can(PERMISSIONS.DELETE_MEMBERS)) {
               actions.push(
                 <GridActionsCellItem
                   key="delete_pending"
@@ -534,7 +534,7 @@ export default function MemberDataGrid({
           }
 
           // 6. Delete Member (Admin / Authorized roles only)
-          if (can(PERMISSIONS.DELETE_MEMBERS)) {
+          if (isAdmin && can(PERMISSIONS.DELETE_MEMBERS)) {
             actions.push(
               <GridActionsCellItem
                 key="delete"
@@ -552,6 +552,7 @@ export default function MemberDataGrid({
     ],
     [
       can,
+      isAdmin,
       onView,
       onEdit,
       onDelete,

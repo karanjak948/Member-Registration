@@ -52,7 +52,10 @@ import {
   IconReceipt2,
   IconDownload,
   IconShieldCheck,
+  IconShieldLock,
 } from "@tabler/icons-react";
+import { usePermissions } from "@/hooks/usePermissions";
+import { PERMISSIONS } from "@/constants/permissions";
 
 function amountToWords(num: number): string {
   if (!num || isNaN(num) || num <= 0) return "Zero Kenya Shillings Only";
@@ -82,6 +85,8 @@ function amountToWords(num: number): string {
 }
 
 export default function SavingsPaymentsPage() {
+  const { isAdmin, can, loading: authLoading } = usePermissions();
+  const canViewSavings = isAdmin || can(PERMISSIONS.VIEW_SAVINGS);
   const [payments, setPayments] = useState<SavingsPayment[]>([]);
   const [summary, setSummary] = useState<SavingsSummary | null>(null);
   const [loading, setLoading] = useState(true);
@@ -319,6 +324,64 @@ export default function SavingsPaymentsPage() {
       setDeleting(false);
     }
   };
+
+  if (!authLoading && !canViewSavings) {
+    return (
+      <PageContainer title="Savings Access Denied" description="Access Restricted">
+        <Box sx={{ p: 4, display: "flex", justifyContent: "center", alignItems: "center", minHeight: "50vh" }}>
+          <Paper
+            elevation={0}
+            sx={{
+              p: 5,
+              maxWidth: 520,
+              textAlign: "center",
+              borderRadius: 3.5,
+              border: "1px solid #fee2e2",
+              bgcolor: "#fff5f5",
+            }}
+          >
+            <Box
+              sx={{
+                width: 64,
+                height: 64,
+                borderRadius: "50%",
+                bgcolor: "#fef2f2",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                mx: "auto",
+                mb: 2.5,
+                color: "#dc2626",
+              }}
+            >
+              <IconShieldLock size={32} />
+            </Box>
+            <Typography variant="h5" fontWeight={800} color="#991b1b" gutterBottom>
+              Administrative Access Required
+            </Typography>
+            <Typography variant="body2" color="#7f1d1d" sx={{ mb: 3.5, lineHeight: 1.6 }}>
+              You do not have permission to view or manage SACCO Member Savings Accounts (MPA). Please contact your organization administrator.
+            </Typography>
+            <Button
+              component={Link}
+              href="/dashboard"
+              variant="contained"
+              sx={{
+                bgcolor: "#064e3b",
+                "&:hover": { bgcolor: "#047857" },
+                fontWeight: 700,
+                textTransform: "none",
+                borderRadius: 2,
+                px: 3,
+              }}
+            >
+              Return to Dashboard
+            </Button>
+          </Paper>
+        </Box>
+      </PageContainer>
+    );
+  }
 
   return (
     <PageContainer title="Savings payments - Royal SACCO" description="Manage and track member savings contributions">
@@ -757,22 +820,24 @@ export default function SavingsPaymentsPage() {
                                 <IconEye size={15} />
                               </IconButton>
                             </Tooltip>
-                            <Tooltip title="Delete">
-                              <IconButton
-                                size="small"
-                                onClick={() => setDeleteTarget(item)}
-                                sx={{
-                                  bgcolor: "#ef4444",
-                                  color: "#ffffff",
-                                  "&:hover": { bgcolor: "#dc2626" },
-                                  borderRadius: 1,
-                                  width: 26,
-                                  height: 26,
-                                }}
-                              >
-                                <IconTrash size={15} />
-                              </IconButton>
-                            </Tooltip>
+                            {isAdmin && (
+                              <Tooltip title="Delete">
+                                <IconButton
+                                  size="small"
+                                  onClick={() => setDeleteTarget(item)}
+                                  sx={{
+                                    bgcolor: "#ef4444",
+                                    color: "#ffffff",
+                                    "&:hover": { bgcolor: "#dc2626" },
+                                    borderRadius: 1,
+                                    width: 26,
+                                    height: 26,
+                                  }}
+                                >
+                                  <IconTrash size={15} />
+                                </IconButton>
+                              </Tooltip>
+                            )}
                           </Stack>
                         </TableCell>
                       </TableRow>
@@ -1193,29 +1258,31 @@ export default function SavingsPaymentsPage() {
         </Dialog>
 
         {/* Delete Confirmation Dialog */}
-        <Dialog open={!!deleteTarget} onClose={() => !deleting && setDeleteTarget(null)} maxWidth="xs" fullWidth>
-          <DialogTitle sx={{ fontWeight: 800, color: "#dc2626" }}>Delete Savings Payment?</DialogTitle>
-          <DialogContent>
-            <Typography variant="body2">
-              Are you sure you want to delete payment record #{deleteTarget?.document_no} for{" "}
-              <strong>{deleteTarget?.member_name}</strong>? This action cannot be undone.
-            </Typography>
-          </DialogContent>
-          <DialogActions sx={{ p: 2 }}>
-            <Button onClick={() => setDeleteTarget(null)} disabled={deleting} sx={{ textTransform: "none" }}>
-              Cancel
-            </Button>
-            <Button
-              variant="contained"
-              color="error"
-              onClick={handleDelete}
-              disabled={deleting}
-              sx={{ textTransform: "none", fontWeight: 700 }}
-            >
-              {deleting ? "Deleting..." : "Confirm Delete"}
-            </Button>
-          </DialogActions>
-        </Dialog>
+        {isAdmin && (
+          <Dialog open={!!deleteTarget} onClose={() => !deleting && setDeleteTarget(null)} maxWidth="xs" fullWidth>
+            <DialogTitle sx={{ fontWeight: 800, color: "#dc2626" }}>Delete Savings Payment?</DialogTitle>
+            <DialogContent>
+              <Typography variant="body2">
+                Are you sure you want to delete payment record #{deleteTarget?.document_no} for{" "}
+                <strong>{deleteTarget?.member_name}</strong>? This action cannot be undone.
+              </Typography>
+            </DialogContent>
+            <DialogActions sx={{ p: 2 }}>
+              <Button onClick={() => setDeleteTarget(null)} disabled={deleting} sx={{ textTransform: "none" }}>
+                Cancel
+              </Button>
+              <Button
+                variant="contained"
+                color="error"
+                onClick={handleDelete}
+                disabled={deleting}
+                sx={{ textTransform: "none", fontWeight: 700 }}
+              >
+                {deleting ? "Deleting..." : "Confirm Delete"}
+              </Button>
+            </DialogActions>
+          </Dialog>
+        )}
 
         {/* ======================================================== */}
         {/* EXECUTIVE BULK SAVINGS PAYMENTS UPLOAD MODAL              */}

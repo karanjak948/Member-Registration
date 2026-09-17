@@ -18,21 +18,34 @@ async function refreshAccessToken(token: any) {
 
     const refreshed = response.data;
 
+    let permissions = token.permissions;
+    let role = token.role;
+    try {
+      const meRes = await axios.get(`${API_BASE_URL}/auth/me/`, {
+        headers: { Authorization: `Bearer ${refreshed.access_token}` },
+      });
+      if (meRes.data?.permissions) {
+        permissions = meRes.data.permissions;
+      }
+      if (meRes.data?.role) {
+        role = meRes.data.role;
+      }
+    } catch (e) {
+      // keep existing permissions if me call fails
+    }
+
     return {
       ...token,
-
+      permissions,
+      role,
       accessToken: refreshed.access_token,
-
       refreshToken:
         refreshed.refresh_token ??
         token.refreshToken,
-
       expiresIn: refreshed.expires_in,
-
       accessTokenExpires:
         Date.now() +
         refreshed.expires_in * 1000,
-
       error: undefined,
     };
   } catch (error) {

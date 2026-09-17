@@ -39,10 +39,15 @@ import {
   IconSearch,
   IconFileSpreadsheet,
   IconPlus,
+  IconShieldLock,
 } from "@tabler/icons-react";
 import loanService from "@/services/loan.service";
+import { usePermissions } from "@/hooks/usePermissions";
+import { PERMISSIONS } from "@/constants/permissions";
 
 export default function CollectionsOverviewPage() {
+  const { isAdmin, can, loading: authLoading } = usePermissions();
+  const canViewCollections = isAdmin || can(PERMISSIONS.VIEW_COLLECTIONS);
   const [loans, setLoans] = useState<any[]>([]);
   const [repayments, setRepayments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -246,6 +251,64 @@ export default function CollectionsOverviewPage() {
       color: "#7c3aed",
     },
   ];
+
+  if (!authLoading && !canViewCollections) {
+    return (
+      <PageContainer title="Collections Access Denied" description="Access Restricted">
+        <Box sx={{ p: 4, display: "flex", justifyContent: "center", alignItems: "center", minHeight: "50vh" }}>
+          <Paper
+            elevation={0}
+            sx={{
+              p: 5,
+              maxWidth: 520,
+              textAlign: "center",
+              borderRadius: 3.5,
+              border: "1px solid #fee2e2",
+              bgcolor: "#fff5f5",
+            }}
+          >
+            <Box
+              sx={{
+                width: 64,
+                height: 64,
+                borderRadius: "50%",
+                bgcolor: "#fef2f2",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                mx: "auto",
+                mb: 2.5,
+                color: "#dc2626",
+              }}
+            >
+              <IconShieldLock size={32} />
+            </Box>
+            <Typography variant="h5" fontWeight={800} color="#991b1b" gutterBottom>
+              Administrative Access Required
+            </Typography>
+            <Typography variant="body2" color="#7f1d1d" sx={{ mb: 3.5, lineHeight: 1.6 }}>
+              You do not have permission to view or manage SACCO Member Collections or Repayments. Please contact your organization administrator.
+            </Typography>
+            <Button
+              component={Link}
+              href="/dashboard"
+              variant="contained"
+              sx={{
+                bgcolor: "#064e3b",
+                "&:hover": { bgcolor: "#047857" },
+                fontWeight: 700,
+                textTransform: "none",
+                borderRadius: 2,
+                px: 3,
+              }}
+            >
+              Return to Dashboard
+            </Button>
+          </Paper>
+        </Box>
+      </PageContainer>
+    );
+  }
 
   return (
     <PageContainer title="Collections Central - Royal SACCO" description="Member Collections & Repayment Management">

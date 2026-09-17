@@ -118,12 +118,25 @@ class MemberViewSet(OrganizationScopedViewSet):
             user=self.request.user,
         )
 
+    def destroy(self, request, *args, **kwargs):
+        """
+        Strictly enforce that only organization owners, superusers,
+        or administrators can delete members from the system.
+        """
+        from apps.organizations.permissions import is_admin_or_owner_user
+        if not is_admin_or_owner_user(request.user):
+            return Response(
+                {"error": "Permission denied. Only administrators or organization owners can delete members."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        return super().destroy(request, *args, **kwargs)
+
     def perform_destroy(self, instance):
         """
         Delete an organization-scoped member.
 
         Authorization has already been enforced by
-        HasMemberPermission and get_queryset().
+        destroy(), HasMemberPermission, and get_queryset().
         """
 
         MemberService.delete_member(

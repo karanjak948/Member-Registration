@@ -35,10 +35,12 @@ import {
   Snackbar,
 } from "@mui/material";
 import { useSearchParams } from "next/navigation";
+import Link from "next/link";
 import PageContainer from "@/app/(DashboardLayout)/components/container/PageContainer";
 import api from "@/services/api";
 import loanService from "@/services/loan.service";
 import { usePermissions } from "@/hooks/usePermissions";
+import { PERMISSIONS } from "@/constants/permissions";
 import AddLedgerAccountDialog from "@/components/finance/AddLedgerAccountDialog";
 import ExportButton from "@/components/common/ExportButton";
 import { ExportColumn } from "@/utils/exportGrid";
@@ -63,6 +65,7 @@ import {
   IconFilter,
   IconReportMoney,
   IconCalendar,
+  IconShieldLock,
 } from "@tabler/icons-react";
 
 interface LedgerEntry {
@@ -99,7 +102,8 @@ interface LedgerAccount {
 }
 
 export default function FinancePage() {
-  const { isAdmin } = usePermissions();
+  const { isAdmin, can, loading: authLoading } = usePermissions();
+  const canViewFinance = isAdmin || can(PERMISSIONS.VIEW_FINANCE);
   const [transactions, setTransactions] = useState<LedgerTransaction[]>([]);
   const [accounts, setAccounts] = useState<LedgerAccount[]>([]);
   const [loading, setLoading] = useState(true);
@@ -503,6 +507,67 @@ export default function FinancePage() {
         )
     );
   }, [transactions, searchQuery, selectedAccountCode]);
+
+  if (!authLoading && !canViewFinance) {
+    return (
+      <PageContainer
+        title="Access Denied - Finance"
+        description="Administrative permission required"
+      >
+        <Box sx={{ p: 4, display: "flex", justifyContent: "center", alignItems: "center", minHeight: "50vh" }}>
+          <Paper
+            elevation={0}
+            sx={{
+              p: 5,
+              maxWidth: 520,
+              textAlign: "center",
+              borderRadius: 3.5,
+              border: "1px solid #fee2e2",
+              bgcolor: "#fff5f5",
+            }}
+          >
+            <Box
+              sx={{
+                width: 64,
+                height: 64,
+                borderRadius: "50%",
+                bgcolor: "#fef2f2",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                mx: "auto",
+                mb: 2.5,
+                color: "#dc2626",
+              }}
+            >
+              <IconShieldLock size={32} />
+            </Box>
+            <Typography variant="h5" fontWeight={800} color="#991b1b" gutterBottom>
+              Administrative Access Required
+            </Typography>
+            <Typography variant="body2" color="#7f1d1d" sx={{ mb: 3.5, lineHeight: 1.6 }}>
+              You do not have administrative permission to view or manage Financial Ledgers, Journals, or Chart of Accounts. Please contact your organization administrator.
+            </Typography>
+            <Button
+              component={Link}
+              href="/dashboard"
+              variant="contained"
+              sx={{
+                bgcolor: "#064e3b",
+                "&:hover": { bgcolor: "#047857" },
+                fontWeight: 700,
+                textTransform: "none",
+                borderRadius: 2,
+                px: 3,
+              }}
+            >
+              Return to Dashboard
+            </Button>
+          </Paper>
+        </Box>
+      </PageContainer>
+    );
+  }
 
   return (
     <PageContainer

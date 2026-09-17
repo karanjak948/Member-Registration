@@ -17,6 +17,8 @@ import {
   TextField,
   Tooltip,
   Typography,
+  Alert,
+  CircularProgress,
 } from "@mui/material";
 import {
   IconPlus,
@@ -29,20 +31,33 @@ import {
   IconShieldCheck,
   IconCoins,
   IconArrowRight,
+  IconEyeOff,
+  IconCheck,
 } from "@tabler/icons-react";
 import { DataGrid, GridColDef } from "@mui/x-data-grid";
 import { LoanProduct } from "@/interfaces/loanProduct";
 import ExportButton from "@/components/common/ExportButton";
+import loanProductService from "@/services/loanProduct.service";
+import { usePermissions } from "@/hooks/usePermissions";
+import { PERMISSIONS } from "@/constants/permissions";
 
 interface Props {
   products: LoanProduct[];
   loading?: boolean;
+  onRefresh?: () => void;
 }
 
-export default function LoanProductTable({ products, loading = false }: Props) {
+export default function LoanProductTable({ products, loading = false, onRefresh }: Props) {
   const router = useRouter();
+  const { isAdmin, can } = usePermissions();
+  // Strictly Admin or Owner has the right to hide and unhide loan products tiers
+  const canToggleProducts = isAdmin;
+  const canManageProducts = isAdmin || can(PERMISSIONS.CREATE_LOAN_PRODUCTS) || can(PERMISSIONS.EDIT_LOAN_PRODUCTS);
+
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"ALL" | "ACTIVE" | "INACTIVE">("ACTIVE");
+  const [statusFilter, setStatusFilter] = useState<"ALL" | "ACTIVE" | "INACTIVE">("ALL");
+  const [togglingId, setTogglingId] = useState<number | null>(null);
+  const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
 
   const isProductActive = (product: LoanProduct) =>
     product.is_active === true ||
@@ -52,10 +67,37 @@ export default function LoanProductTable({ products, loading = false }: Props) {
     (product as any).status === "1" ||
     (product as any).status === "active";
 
+  const handleToggleProduct = async (product: LoanProduct) => {
+    try {
+      setTogglingId(product.id);
+      const res = await loanProductService.toggleStatus(product.id);
+      setFeedback({
+        type: "success",
+        message: res.message || `Loan product '${product.product_name}' status updated.`,
+      });
+      if (onRefresh) {
+        onRefresh();
+      }
+    } catch (err: any) {
+      setFeedback({
+        type: "error",
+        message: err?.response?.data?.error || "Failed to update loan product status.",
+      });
+    } finally {
+      setTogglingId(null);
+    }
+  };
+
+  // For non-admin users, hidden/archived products are completely filtered out (they disappear)
+  const visibleProducts = useMemo(() => {
+    if (isAdmin) return products;
+    return products.filter(isProductActive);
+  }, [products, isAdmin]);
+
   const filteredProducts = useMemo(() => {
     const term = search.trim().toLowerCase();
 
-    return products.filter((product) => {
+    return visibleProducts.filter((product) => {
       const matchesSearch =
         !term ||
         [
@@ -69,6 +111,12 @@ export default function LoanProductTable({ products, loading = false }: Props) {
           .includes(term);
 
       const active = isProductActive(product);
+
+      // Non-admin normal users NEVER see inactive/hidden products under any circumstance
+      if (!isAdmin) {
+        return matchesSearch && active;
+      }
+
       const matchesStatus =
         statusFilter === "ALL" ||
         (statusFilter === "ACTIVE" && active) ||
@@ -76,26 +124,31 @@ export default function LoanProductTable({ products, loading = false }: Props) {
 
       return matchesSearch && matchesStatus;
     });
-  }, [products, search, statusFilter]);
+  }, [visibleProducts, search, statusFilter, isAdmin]);
 
   // Compute KPI metrics
   const metrics = useMemo(() => {
-    const totalCount = products.length;
-    const activeCount = products.filter(isProductActive).length;
-    const rates = products.map((p) => Number(p.interest_rate) || 0).filter((r) => r > 0);
+    const activeProducts = products.filter(isProductActive);
+    const totalCount = isAdmin ? products.length : activeProducts.length;
+    const activeCount = activeProducts.length;
+    const hiddenCount = Math.max(0, products.length - activeCount);
+    const sourceList = isAdmin ? products : activeProducts;
+
+    const rates = sourceList.map((p) => Number(p.interest_rate) || 0).filter((r) => r > 0);
     const minRate = rates.length ? Math.min(...rates) : 0;
     const maxRate = rates.length ? Math.max(...rates) : 0;
-    const maxTenor = Math.max(...products.map((p) => p.max_repayment_period || 0), 0);
-    const requireGuarantors = products.filter((p) => p.requires_guarantor).length;
+    const maxTenor = Math.max(...sourceList.map((p) => p.max_repayment_period || 0), 0);
+    const requireGuarantors = sourceList.filter((p) => p.requires_guarantor).length;
 
     return {
       totalCount,
       activeCount,
+      hiddenCount,
       rateRange: rates.length ? `${minRate}% - ${maxRate}% p.a.` : "—",
       maxTenor: maxTenor ? `${maxTenor} Months` : "—",
       requireGuarantors,
     };
-  }, [products]);
+  }, [products, isAdmin]);
 
   const exportColumns = useMemo(
     () => [
@@ -251,18 +304,19 @@ export default function LoanProductTable({ products, loading = false }: Props) {
       field: "is_active",
       headerName: "Status",
       flex: 1,
-      minWidth: 120,
+      minWidth: 160,
       renderCell: ({ row, value }) => {
         const isActive = isProductActive(row) || value === true || value === 1 || value === "1";
         return (
           <Chip
-            label={isActive ? "Active Tier" : "Archived"}
+            icon={isActive ? <IconCheck size={14} style={{ color: "#047857" }} /> : <IconEyeOff size={14} style={{ color: "#b45309" }} />}
+            label={isActive ? "Enabled (Visible)" : "Hidden (Archived)"}
             size="small"
             sx={{
               fontWeight: 800,
-              bgcolor: isActive ? "#ecfdf5" : "#f1f5f9",
-              color: isActive ? "#047857" : "#64748b",
-              border: `1px solid ${isActive ? "#a7f3d0" : "#cbd5e1"}`,
+              bgcolor: isActive ? "#ecfdf5" : "#fffbeb",
+              color: isActive ? "#047857" : "#b45309",
+              border: `1px solid ${isActive ? "#a7f3d0" : "#fde68a"}`,
               borderRadius: 2,
             }}
           />
@@ -274,40 +328,70 @@ export default function LoanProductTable({ products, loading = false }: Props) {
       headerName: "Actions",
       sortable: false,
       filterable: false,
-      width: 140,
-      renderCell: ({ row }) => (
-        <Stack direction="row" spacing={1} alignItems="center" sx={{ height: "100%" }}>
-          <Tooltip title="View Specification Dossier">
-            <IconButton
-              size="small"
-              onClick={() => router.push(`/loan-products/${row.id}`)}
-              sx={{
-                color: "#059669",
-                bgcolor: "#ecfdf5",
-                border: "1px solid #a7f3d0",
-                "&:hover": { bgcolor: "#d1fae5" },
-              }}
-            >
-              <IconEye size={18} />
-            </IconButton>
-          </Tooltip>
+      width: canManageProducts || canToggleProducts ? 180 : 90,
+      renderCell: ({ row }) => {
+        const isActive = isProductActive(row);
+        const isToggling = togglingId === row.id;
+        return (
+          <Stack direction="row" spacing={1} alignItems="center" sx={{ height: "100%" }}>
+            <Tooltip title="View Specification Dossier">
+              <IconButton
+                size="small"
+                onClick={() => router.push(`/loan-products/${row.id}`)}
+                sx={{
+                  color: "#059669",
+                  bgcolor: "#ecfdf5",
+                  border: "1px solid #a7f3d0",
+                  "&:hover": { bgcolor: "#d1fae5" },
+                }}
+              >
+                <IconEye size={18} />
+              </IconButton>
+            </Tooltip>
 
-          <Tooltip title="Edit / Update Tier">
-            <IconButton
-              size="small"
-              onClick={() => router.push(`/loan-products/${row.id}/edit`)}
-              sx={{
-                color: "#2563eb",
-                bgcolor: "#eff6ff",
-                border: "1px solid #bfdbfe",
-                "&:hover": { bgcolor: "#dbeafe" },
-              }}
-            >
-              <IconEdit size={18} />
-            </IconButton>
-          </Tooltip>
-        </Stack>
-      ),
+            {canManageProducts && (
+              <Tooltip title="Edit / Update Tier">
+                <IconButton
+                  size="small"
+                  onClick={() => router.push(`/loan-products/${row.id}/edit`)}
+                  sx={{
+                    color: "#2563eb",
+                    bgcolor: "#eff6ff",
+                    border: "1px solid #bfdbfe",
+                    "&:hover": { bgcolor: "#dbeafe" },
+                  }}
+                >
+                  <IconEdit size={18} />
+                </IconButton>
+              </Tooltip>
+            )}
+
+            {canToggleProducts && (
+              <Tooltip title={isActive ? "Hide Product (Archived from loan applications)" : "Enable Product (Visible for loan applications)"}>
+                <IconButton
+                  size="small"
+                  disabled={isToggling}
+                  onClick={() => handleToggleProduct(row)}
+                  sx={{
+                    color: isActive ? "#d97706" : "#059669",
+                    bgcolor: isActive ? "#fffbeb" : "#f0fdf4",
+                    border: `1px solid ${isActive ? "#fde68a" : "#a7f3d0"}`,
+                    "&:hover": { bgcolor: isActive ? "#fef3c7" : "#dcfce7" },
+                  }}
+                >
+                  {isToggling ? (
+                    <CircularProgress size={16} color="inherit" />
+                  ) : isActive ? (
+                    <IconEyeOff size={18} />
+                  ) : (
+                    <IconCheck size={18} />
+                  )}
+                </IconButton>
+              </Tooltip>
+            )}
+          </Stack>
+        );
+      },
     },
   ];
 
@@ -377,23 +461,25 @@ export default function LoanProductTable({ products, loading = false }: Props) {
                 Loan Portfolio
               </Button>
 
-              <Button
-                variant="contained"
-                startIcon={<IconPlus size={18} />}
-                onClick={() => router.push("/loan-products/new")}
-                sx={{
-                  bgcolor: "#ffffff",
-                  color: "#065f46",
-                  fontWeight: 900,
-                  borderRadius: 2.5,
-                  px: 3,
-                  py: 1.1,
-                  boxShadow: "0 4px 14px rgba(0,0,0,0.18)",
-                  "&:hover": { bgcolor: "#f0fdf4" },
-                }}
-              >
-                Create Loan Product
-              </Button>
+              {canManageProducts && (
+                <Button
+                  variant="contained"
+                  startIcon={<IconPlus size={18} />}
+                  onClick={() => router.push("/loan-products/new")}
+                  sx={{
+                    bgcolor: "#ffffff",
+                    color: "#065f46",
+                    fontWeight: 900,
+                    borderRadius: 2.5,
+                    px: 3,
+                    py: 1.1,
+                    boxShadow: "0 4px 14px rgba(0,0,0,0.18)",
+                    "&:hover": { bgcolor: "#f0fdf4" },
+                  }}
+                >
+                  Create Loan Product
+                </Button>
+              )}
             </Stack>
           </Stack>
         </Paper>
@@ -415,10 +501,18 @@ export default function LoanProductTable({ products, loading = false }: Props) {
                 <Stack direction="row" justifyContent="space-between" alignItems="center">
                   <Box>
                     <Typography variant="caption" sx={{ color: "#64748b", fontWeight: 700, textTransform: "uppercase" }}>
-                      Active Product Tiers
+                      {isAdmin ? "Active Product Tiers" : "Available Product Tiers"}
                     </Typography>
                     <Typography variant="h5" fontWeight={900} sx={{ color: "#065f46", mt: 0.5 }}>
-                      {metrics.activeCount} <span style={{ fontSize: "0.85rem", color: "#64748b", fontWeight: 600 }}>/ {metrics.totalCount} Total</span>
+                      {isAdmin ? (
+                        <>
+                          {metrics.activeCount} <span style={{ fontSize: "0.85rem", color: "#64748b", fontWeight: 600 }}>/ {metrics.totalCount} Total</span>
+                        </>
+                      ) : (
+                        <>
+                          {metrics.activeCount} <span style={{ fontSize: "0.85rem", color: "#64748b", fontWeight: 600 }}>Total Tiers</span>
+                        </>
+                      )}
                     </Typography>
                   </Box>
                   <Box sx={{ p: 1.2, borderRadius: 2, bgcolor: "#ecfdf5", color: "#059669" }}>
@@ -559,27 +653,52 @@ export default function LoanProductTable({ products, loading = false }: Props) {
             />
 
             <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
-              {(["ALL", "ACTIVE", "INACTIVE"] as const).map((key) => {
-                const isActive = statusFilter === key;
-                return (
-                  <Chip
-                    key={key}
-                    label={key === "ALL" ? "All Products" : key === "ACTIVE" ? "Active" : "Archived"}
-                    onClick={() => setStatusFilter(key)}
-                    sx={{
-                      fontWeight: 800,
-                      cursor: "pointer",
-                      px: 0.5,
-                      bgcolor: isActive ? "#064e3b" : "#f1f5f9",
-                      color: isActive ? "#ffffff" : "#475569",
-                      border: `1px solid ${isActive ? "#064e3b" : "#cbd5e1"}`,
-                      "&:hover": {
-                        bgcolor: isActive ? "#047857" : "#e2e8f0",
-                      },
-                    }}
-                  />
-                );
-              })}
+              {isAdmin ? (
+                (["ALL", "ACTIVE", "INACTIVE"] as const).map((key) => {
+                  const isActive = statusFilter === key;
+                  const count =
+                    key === "ALL"
+                      ? metrics.totalCount
+                      : key === "ACTIVE"
+                      ? metrics.activeCount
+                      : metrics.hiddenCount;
+                  return (
+                    <Chip
+                      key={key}
+                      label={
+                        key === "ALL"
+                          ? `All Products (${count})`
+                          : key === "ACTIVE"
+                          ? `Active / Visible (${count})`
+                          : `Hidden / Archived (${count})`
+                      }
+                      onClick={() => setStatusFilter(key)}
+                      sx={{
+                        fontWeight: 800,
+                        cursor: "pointer",
+                        px: 0.5,
+                        bgcolor: isActive ? "#064e3b" : "#f1f5f9",
+                        color: isActive ? "#ffffff" : "#475569",
+                        border: `1px solid ${isActive ? "#064e3b" : "#cbd5e1"}`,
+                        "&:hover": {
+                          bgcolor: isActive ? "#047857" : "#e2e8f0",
+                        },
+                      }}
+                    />
+                  );
+                })
+              ) : (
+                <Chip
+                  label={`All Available Tiers (${metrics.activeCount})`}
+                  sx={{
+                    fontWeight: 800,
+                    px: 0.5,
+                    bgcolor: "#064e3b",
+                    color: "#ffffff",
+                    border: "1px solid #064e3b",
+                  }}
+                />
+              )}
 
               <ExportButton
                 data={filteredProducts}
@@ -590,6 +709,16 @@ export default function LoanProductTable({ products, loading = false }: Props) {
             </Stack>
           </Stack>
         </Paper>
+
+        {feedback && (
+          <Alert
+            severity={feedback.type}
+            sx={{ borderRadius: 2.5, fontWeight: 700 }}
+            onClose={() => setFeedback(null)}
+          >
+            {feedback.message}
+          </Alert>
+        )}
 
         {/* DataGrid Table */}
         <Paper

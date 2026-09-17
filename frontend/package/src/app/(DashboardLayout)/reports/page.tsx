@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   Box,
   Button,
@@ -39,32 +40,44 @@ import {
   IconShieldCheck,
   IconReceipt,
   IconDatabase,
+  IconCoin,
+  IconPigMoney,
+  IconShieldLock,
 } from "@tabler/icons-react";
+import { usePermissions } from "@/hooks/usePermissions";
+import { PERMISSIONS } from "@/constants/permissions";
 import { useMembers } from "@/hooks/useMembers";
 import MpesaReportsView from "@/components/reports/MpesaReportsView";
 import MpesaWebhooksView from "@/components/reports/MpesaWebhooksView";
+import IncomeReportView from "@/components/reports/IncomeReportView";
+import LoanBalancesReportView from "@/components/reports/LoanBalancesReportView";
+import SavingsBalancesReportView from "@/components/reports/SavingsBalancesReportView";
 
 const Chart = dynamic(() => import("react-apexcharts"), { ssr: false });
 
 export default function ReportsPage() {
+  const { isAdmin, can, loading: authLoading } = usePermissions();
+  const canViewReports = isAdmin || can(PERMISSIONS.VIEW_REPORTS);
   const searchParams = useSearchParams();
   const router = useRouter();
   const tabParam = searchParams.get("tab");
 
-  const [activeTab, setActiveTab] = useState(
-    tabParam === "mpesa" ? 1 : tabParam === "webhooks" ? 2 : 0
-  );
+  const TAB_NAMES = ["performance", "income", "loans", "savings", "mpesa", "webhooks"];
+
+  const [activeTab, setActiveTab] = useState<number>(() => {
+    const idx = TAB_NAMES.indexOf(tabParam || "performance");
+    return idx !== -1 ? idx : 0;
+  });
 
   useEffect(() => {
     const tab = searchParams.get("tab");
-    if (tab === "mpesa") setActiveTab(1);
-    else if (tab === "webhooks") setActiveTab(2);
-    else if (tab === "performance") setActiveTab(0);
+    const idx = TAB_NAMES.indexOf(tab || "performance");
+    if (idx !== -1) setActiveTab(idx);
   }, [searchParams]);
 
   const handleTabChange = (_: React.SyntheticEvent, newValue: number) => {
     setActiveTab(newValue);
-    const tabName = newValue === 1 ? "mpesa" : newValue === 2 ? "webhooks" : "performance";
+    const tabName = TAB_NAMES[newValue] || "performance";
     router.push(`/reports?tab=${tabName}`, { scroll: false });
   };
 
@@ -221,6 +234,64 @@ export default function ReportsPage() {
 
   const loading = membersLoading || loansLoading;
 
+  if (!authLoading && !canViewReports) {
+    return (
+      <PageContainer title="Reports Access Denied" description="Access Restricted">
+        <Box sx={{ p: 4, display: "flex", justifyContent: "center", alignItems: "center", minHeight: "50vh" }}>
+          <Paper
+            elevation={0}
+            sx={{
+              p: 5,
+              maxWidth: 520,
+              textAlign: "center",
+              borderRadius: 3.5,
+              border: "1px solid #fee2e2",
+              bgcolor: "#fff5f5",
+            }}
+          >
+            <Box
+              sx={{
+                width: 64,
+                height: 64,
+                borderRadius: "50%",
+                bgcolor: "#fef2f2",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                mx: "auto",
+                mb: 2.5,
+                color: "#dc2626",
+              }}
+            >
+              <IconShieldLock size={32} />
+            </Box>
+            <Typography variant="h5" fontWeight={800} color="#991b1b" gutterBottom>
+              Administrative Access Required
+            </Typography>
+            <Typography variant="body2" color="#7f1d1d" sx={{ mb: 3.5, lineHeight: 1.6 }}>
+              You do not have administrative permission to view SACCO Financial, Performance, or Analytical Reports. Please contact your organization administrator.
+            </Typography>
+            <Button
+              component={Link}
+              href="/dashboard"
+              variant="contained"
+              sx={{
+                bgcolor: "#064e3b",
+                "&:hover": { bgcolor: "#047857" },
+                fontWeight: 700,
+                textTransform: "none",
+                borderRadius: 2,
+                px: 3,
+              }}
+            >
+              Return to Dashboard
+            </Button>
+          </Paper>
+        </Box>
+      </PageContainer>
+    );
+  }
+
   return (
     <PageContainer title="Reports & Analytics - Royal SACCO" description="SACCO performance reports, portfolio analytics, and audit metrics">
       {/* 1. SCREEN DASHBOARD (HIDDEN IN PRINT) */}
@@ -317,6 +388,24 @@ export default function ReportsPage() {
               iconPosition="start"
               label="SACCO Portfolio & Performance"
               id="reports-tab-performance"
+            />
+            <Tab
+              icon={<IconCoin size={19} />}
+              iconPosition="start"
+              label="Fee & Income Report"
+              id="reports-tab-income"
+            />
+            <Tab
+              icon={<IconCash size={19} />}
+              iconPosition="start"
+              label="Loan Balances Report"
+              id="reports-tab-loans"
+            />
+            <Tab
+              icon={<IconPigMoney size={19} />}
+              iconPosition="start"
+              label="Savings Balances Report"
+              id="reports-tab-savings"
             />
             <Tab
               icon={<IconReceipt size={19} />}
@@ -565,9 +654,15 @@ export default function ReportsPage() {
           </>
         ))}
 
-        {activeTab === 1 && <MpesaReportsView />}
+        {activeTab === 1 && <IncomeReportView />}
 
-        {activeTab === 2 && <MpesaWebhooksView />}
+        {activeTab === 2 && <LoanBalancesReportView loans={loans} loading={loansLoading} />}
+
+        {activeTab === 3 && <SavingsBalancesReportView />}
+
+        {activeTab === 4 && <MpesaReportsView />}
+
+        {activeTab === 5 && <MpesaWebhooksView />}
       </Box>
 
       {/* ========================================================================= */}

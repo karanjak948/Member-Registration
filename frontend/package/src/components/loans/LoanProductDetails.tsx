@@ -37,14 +37,18 @@ import {
   IconFileText,
   IconCheck,
   IconX,
+  IconEyeOff,
 } from "@tabler/icons-react";
 import { LoanProduct } from "@/interfaces/loanProduct";
+import loanProductService from "@/services/loanProduct.service";
+import { usePermissions } from "@/hooks/usePermissions";
+import { PERMISSIONS } from "@/constants/permissions";
 
 interface Props {
   product: LoanProduct;
 }
 
-function formatLabel(str: string | null | undefined): string {
+function formatLabel(str?: string | null) {
   if (!str) return "—";
   return str
     .replace(/_/g, " ")
@@ -53,6 +57,28 @@ function formatLabel(str: string | null | undefined): string {
 
 export default function LoanProductDetails({ product }: Props) {
   const router = useRouter();
+  const { isAdmin, can } = usePermissions();
+  // Strictly Admin or Owner has the right to hide and unhide loan products tiers
+  const canToggleProducts = isAdmin;
+  const canManageProducts = isAdmin || can(PERMISSIONS.CREATE_LOAN_PRODUCTS) || can(PERMISSIONS.EDIT_LOAN_PRODUCTS);
+
+  const [currentActive, setCurrentActive] = React.useState<boolean>(
+    Boolean(product.is_active === true || product.is_active === 1 || (product as any).status === 1)
+  );
+  const [toggling, setToggling] = React.useState(false);
+
+  const handleToggle = async () => {
+    try {
+      setToggling(true);
+      const res = await loanProductService.toggleStatus(product.id);
+      setCurrentActive(res.is_active);
+      product.is_active = res.is_active;
+    } catch (err) {
+      console.error("Failed to toggle product status:", err);
+    } finally {
+      setToggling(false);
+    }
+  };
 
   const formattedRate = `${Number(product.interest_rate || 0)}%`;
   const rateMethod = formatLabel(product.interest_method);
@@ -128,27 +154,55 @@ export default function LoanProductDetails({ product }: Props) {
           </Button>
 
           <Stack direction="row" spacing={1.5}>
-            <Button
-              variant="contained"
-              startIcon={<IconEdit size={18} />}
-              onClick={() => router.push(`/loan-products/${product.id}/edit`)}
-              sx={{
-                bgcolor: "#ffffff",
-                color: "#064e3b",
-                fontWeight: 700,
-                textTransform: "none",
-                borderRadius: 2,
-                px: 2.5,
-                py: 0.85,
-                boxShadow: "0 4px 14px rgba(0,0,0,0.15)",
-                "&:hover": {
-                  bgcolor: "#f0fdf4",
-                  color: "#047857",
-                },
-              }}
-            >
-              Edit Product Tier
-            </Button>
+            {canToggleProducts && (
+              <Button
+                variant="outlined"
+                disabled={toggling}
+                startIcon={currentActive ? <IconEyeOff size={18} /> : <IconCheck size={18} />}
+                onClick={handleToggle}
+                sx={{
+                  color: "#ffffff",
+                  borderColor: "rgba(255,255,255,0.4)",
+                  bgcolor: "rgba(255,255,255,0.12)",
+                  fontWeight: 700,
+                  textTransform: "none",
+                  borderRadius: 2,
+                  px: 2.2,
+                  py: 0.85,
+                  backdropFilter: "blur(6px)",
+                  "&:hover": {
+                    bgcolor: "rgba(255,255,255,0.22)",
+                    borderColor: "rgba(255,255,255,0.6)",
+                  },
+                }}
+              >
+                {toggling ? "Updating..." : currentActive ? "Hide Product (Archive)" : "Enable Product"}
+              </Button>
+            )}
+
+            {canManageProducts && (
+              <Button
+                variant="contained"
+                startIcon={<IconEdit size={18} />}
+                onClick={() => router.push(`/loan-products/${product.id}/edit`)}
+                sx={{
+                  bgcolor: "#ffffff",
+                  color: "#064e3b",
+                  fontWeight: 700,
+                  textTransform: "none",
+                  borderRadius: 2,
+                  px: 2.5,
+                  py: 0.85,
+                  boxShadow: "0 4px 14px rgba(0,0,0,0.15)",
+                  "&:hover": {
+                    bgcolor: "#f0fdf4",
+                    color: "#047857",
+                  },
+                }}
+              >
+                Edit Product Tier
+              </Button>
+            )}
           </Stack>
         </Stack>
 
@@ -174,9 +228,9 @@ export default function LoanProductDetails({ product }: Props) {
                 }}
               />
               <Chip
-                label={product.is_active ? "Active Tier" : "Inactive Tier"}
+                label={currentActive ? "Active Tier" : "Hidden / Archived"}
                 sx={{
-                  bgcolor: product.is_active ? "#10b981" : "rgba(255,255,255,0.25)",
+                  bgcolor: currentActive ? "#10b981" : "#f59e0b",
                   color: "#ffffff",
                   fontWeight: 700,
                   fontSize: "0.75rem",

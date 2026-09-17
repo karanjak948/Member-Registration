@@ -18,6 +18,8 @@ class LedgerEntrySerializer(serializers.ModelSerializer):
             "entry_type",
             "amount",
             "narration",
+            "document_no",
+            "jv_no",
         ]
 
 
@@ -44,6 +46,7 @@ class LedgerTransactionSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "transaction_number",
+            "jv_no",
             "transaction_date",
             "description",
             "reference_type",

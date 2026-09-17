@@ -51,6 +51,15 @@ urlpatterns = [
         include("apps.savings.urls"),
     ),
 
+    path(
+        "api/",
+        include("apps.shares.urls"),
+    ),
+    path(
+        "api/v1/",
+        include("apps.shares.urls"),
+    ),
+
     # Always serve media uploads directly (logos, passport photos, documents)
     re_path(
         r"^media/(?P<path>.*)$",

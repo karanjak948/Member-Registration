@@ -24,7 +24,7 @@ import { usePermissions } from "@/hooks/usePermissions";
 export default function SidebarItems() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const { loading, permissions, isSuperuser } = usePermissions();
+  const { loading, permissions, isSuperuser, isAdmin } = usePermissions();
 
   // Keep track of open accordion sections
   const [openSections, setOpenSections] = useState<{ [key: string]: boolean }>({
@@ -32,7 +32,9 @@ export default function SidebarItems() {
     "jinue-loans": true,
     "collections": false,
     "mpa": true,
+    "shares": true,
     "finance": true,
+    "reports": false,
     "administration": false,
   });
 
@@ -47,8 +49,12 @@ export default function SidebarItems() {
         setOpenSections((prev) => ({ ...prev, "collections": true }));
       } else if (pathname.startsWith("/savings") || pathname.startsWith("/mpa")) {
         setOpenSections((prev) => ({ ...prev, "mpa": true }));
+      } else if (pathname.startsWith("/shares")) {
+        setOpenSections((prev) => ({ ...prev, "shares": true }));
       } else if (pathname.startsWith("/finance")) {
         setOpenSections((prev) => ({ ...prev, "finance": true }));
+      } else if (pathname.startsWith("/reports")) {
+        setOpenSections((prev) => ({ ...prev, "reports": true }));
       } else if (pathname.startsWith("/administration") || pathname.startsWith("/settings")) {
         setOpenSections((prev) => ({ ...prev, "administration": true }));
       }
@@ -66,7 +72,7 @@ export default function SidebarItems() {
     return null;
   }
 
-  const menuItems = getMenuItems(permissions, isSuperuser);
+  const menuItems = getMenuItems(permissions, isSuperuser || isAdmin);
 
   return (
     <Box

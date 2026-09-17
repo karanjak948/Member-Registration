@@ -291,14 +291,26 @@ class OrganizationAccessService:
             owner_role.permissions.set(all_permissions)
 
         # 3. Create default Member Officer role if not exists
-        Role.objects.get_or_create(
+        officer_role, _ = Role.objects.get_or_create(
             organization=organization,
             name="Member Officer",
             defaults={
-                "description": "Standard operational role for member management.",
+                "description": "Standard operational staff role for member management, loans, collections, savings, shares, and finance operations.",
                 "is_system_role": False,
             },
         )
+        officer_perms = Permission.objects.filter(
+            code__in=[
+                "view_members", "create_members", "edit_members", "complete_registration_members",
+                "view_loan_products", "view_loans", "apply_loans",
+                "view_collections", "receive_payments", "manage_reconciliation", "allocate_collections",
+                "view_savings", "create_savings", "edit_savings",
+                "view_shares", "create_shares", "edit_shares",
+                "view_finance", "view_ledger", "post_journal_entry",
+            ]
+        )
+        if officer_perms.exists():
+            officer_role.permissions.set(officer_perms)
 
         # 4. Create OrganizationUser membership for owner
         if owner_user:

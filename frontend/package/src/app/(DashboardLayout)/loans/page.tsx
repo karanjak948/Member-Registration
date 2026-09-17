@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
 import {
   Box,
   Card,
@@ -49,6 +50,7 @@ import {
   IconAlertTriangle,
   IconUser,
   IconSend,
+  IconShieldLock,
 } from "@tabler/icons-react";
 import ExportButton from "@/components/common/ExportButton";
 import { useLoans } from "@/hooks/useLoans";
@@ -133,7 +135,7 @@ function LoansContent() {
   const statusParam = searchParams.get("status");
 
   const { loans, loading, error, refresh } = useLoans();
-  const { can, isSuperuser, isStaff, role } = usePermissions();
+  const { can, isSuperuser, isStaff, role, isAdmin, loading: authLoading } = usePermissions();
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
@@ -213,10 +215,10 @@ function LoansContent() {
     }
   }, [statusParam]);
 
-  const roleName = role?.name?.toUpperCase();
-  const isSystemAdmin = isSuperuser || roleName === "SUPERADMIN" || roleName === "OWNER";
+  const isSystemAdmin = isAdmin;
 
   // Strict Permission Gates
+  const canViewLoans = isAdmin || can(PERMISSIONS.VIEW_LOANS);
   const canApproveLoans = isSystemAdmin || can(PERMISSIONS.APPROVE_LOANS);
   const canDisburseLoans = isSystemAdmin || can(PERMISSIONS.DISBURSE_LOANS);
 
@@ -452,6 +454,64 @@ function LoansContent() {
       <Container maxWidth={false}>
         <Box display="flex" justifyContent="center" alignItems="center" py={12}>
           <CircularProgress color="success" size={44} />
+        </Box>
+      </Container>
+    );
+  }
+
+  if (!authLoading && !canViewLoans) {
+    return (
+      <Container maxWidth={false} sx={{ py: 8 }}>
+        <Box display="flex" justifyContent="center" alignItems="center">
+          <Paper
+            elevation={0}
+            sx={{
+              p: 5,
+              maxWidth: 520,
+              textAlign: "center",
+              borderRadius: 3.5,
+              border: "1px solid #fee2e2",
+              bgcolor: "#fff5f5",
+            }}
+          >
+            <Box
+              sx={{
+                width: 64,
+                height: 64,
+                borderRadius: "50%",
+                bgcolor: "#fef2f2",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                mx: "auto",
+                mb: 2.5,
+                color: "#dc2626",
+              }}
+            >
+              <IconShieldLock size={32} />
+            </Box>
+            <Typography variant="h5" fontWeight={800} color="#991b1b" gutterBottom>
+              Administrative Access Required
+            </Typography>
+            <Typography variant="body2" color="#7f1d1d" sx={{ mb: 3.5, lineHeight: 1.6 }}>
+              You do not have permission to view or manage SACCO Loan Portfolios. Please contact your organization administrator.
+            </Typography>
+            <Button
+              component={Link}
+              href="/dashboard"
+              variant="contained"
+              sx={{
+                bgcolor: "#064e3b",
+                "&:hover": { bgcolor: "#047857" },
+                fontWeight: 700,
+                textTransform: "none",
+                borderRadius: 2,
+                px: 3,
+              }}
+            >
+              Return to Dashboard
+            </Button>
+          </Paper>
         </Box>
       </Container>
     );

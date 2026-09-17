@@ -22,6 +22,8 @@ import { FormProvider, useForm } from "react-hook-form";
 
 import loanProductService from "@/services/loanProduct.service";
 import { LoanProductCreate } from "@/interfaces/loanProduct";
+import { usePermissions } from "@/hooks/usePermissions";
+import { PERMISSIONS } from "@/constants/permissions";
 
 import BasicInformation from "./sections/BasicInformation";
 import InterestConfiguration from "./sections/InterestConfiguration";
@@ -111,6 +113,9 @@ export default function LoanProductForm({
   });
 
   const router = useRouter();
+  const { isAdmin, can, loading: authLoading } = usePermissions();
+  const canManage = isAdmin || can(PERMISSIONS.CREATE_LOAN_PRODUCTS) || can(PERMISSIONS.EDIT_LOAN_PRODUCTS);
+
   const [loading, setLoading] = useState(false);
   const [snackbar, setSnackbar] = useState<{
     open: boolean;
@@ -121,6 +126,44 @@ export default function LoanProductForm({
     message: "",
     severity: "success",
   });
+
+  if (!authLoading && !canManage) {
+    return (
+      <Container maxWidth="md" sx={{ py: 8 }}>
+        <Paper
+          elevation={0}
+          sx={{
+            p: 5,
+            borderRadius: 3.5,
+            border: "1px solid #fecdd3",
+            bgcolor: "#fff1f2",
+            textAlign: "center",
+          }}
+        >
+          <Typography variant="h5" fontWeight={900} color="#9f1239" gutterBottom>
+            Administrative Privileges Required
+          </Typography>
+          <Typography variant="body1" color="#475569" sx={{ mb: 3.5, maxWidth: 500, mx: "auto" }}>
+            Only SACCO administrators or organization owners have permission to create or modify loan products and credit tiers.
+          </Typography>
+          <Button
+            variant="contained"
+            onClick={() => router.push("/loan-products")}
+            sx={{
+              bgcolor: "#059669",
+              "&:hover": { bgcolor: "#047857" },
+              borderRadius: 2.5,
+              fontWeight: 800,
+              px: 3,
+              py: 1,
+            }}
+          >
+            Return to Loan Products Catalog
+          </Button>
+        </Paper>
+      </Container>
+    );
+  }
 
   async function onSubmit(data: LoanProductCreate) {
     try {

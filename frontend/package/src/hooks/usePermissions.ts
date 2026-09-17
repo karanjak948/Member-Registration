@@ -29,30 +29,34 @@ export function usePermissions() {
   const isOwner =
     session?.user.isOwner ?? false;
 
-  const roleName = (role?.name || "").toLowerCase();
+  const roleName = (role?.name || "").trim().toLowerCase();
+
+  /**
+   * Strictly verify if current user is an executive Administrator or Organization Owner.
+   * Standard operational staff (e.g. Member Officer, Loan Officer, Cashier) do NOT pass this check.
+   */
   const isAdmin =
-    isSuperuser ||
-    isStaff ||
-    isOwner ||
-    session?.user.isAdmin === true ||
-    roleName.includes("admin") ||
-    roleName.includes("owner") ||
-    roleName.includes("super") ||
-    !!role?.isSystemRole;
+    Boolean(isSuperuser) ||
+    Boolean(isOwner) ||
+    roleName === "owner" ||
+    roleName === "admin" ||
+    roleName === "administrator" ||
+    roleName === "super admin" ||
+    roleName === "system administrator" ||
+    roleName.includes("administrator") ||
+    roleName.includes("super admin");
 
   const loading =
     status === "loading";
 
   /**
-   * Returns true if the current user
-   * has the specified permission.
-   *
-   * Superusers automatically pass.
+   * Returns true if the current user has the specified permission.
+   * Executive Admins & Owners automatically pass all checks.
    */
   const can = (
     permission: Permission
   ): boolean => {
-    if (isSuperuser) {
+    if (isSuperuser || isOwner || isAdmin) {
       return true;
     }
 
@@ -71,14 +75,12 @@ export function usePermissions() {
   };
 
   /**
-   * Returns true if the user has
-   * at least one of the supplied
-   * permissions.
+   * Returns true if the user has at least one of the supplied permissions.
    */
   const hasAny = (
     required: Permission[]
   ): boolean => {
-    if (isSuperuser) {
+    if (isSuperuser || isOwner || isAdmin) {
       return true;
     }
 
@@ -89,13 +91,12 @@ export function usePermissions() {
   };
 
   /**
-   * Returns true if the user has
-   * every supplied permission.
+   * Returns true if the user has every supplied permission.
    */
   const hasAll = (
     required: Permission[]
   ): boolean => {
-    if (isSuperuser) {
+    if (isSuperuser || isOwner || isAdmin) {
       return true;
     }
 

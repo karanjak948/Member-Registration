@@ -34,7 +34,7 @@ export default function WorkflowToolbar({
   onCompleteRegistration,
   onDelete,
 }: Props) {
-  const { can } = usePermissions();
+  const { can, isAdmin } = usePermissions();
 
   const isDataCapture = member.registration_stage === "DATA_CAPTURE_PENDING";
   const isApproved = member.registration_stage === "APPROVED";
@@ -206,7 +206,7 @@ export default function WorkflowToolbar({
                 </Button>
               )}
 
-              {can(PERMISSIONS.DELETE_MEMBERS) && onDelete && (
+              {isAdmin && can(PERMISSIONS.DELETE_MEMBERS) && onDelete && (
                 <Button
                   variant="outlined"
                   startIcon={<IconTrash size={18} />}
@@ -303,7 +303,7 @@ export default function WorkflowToolbar({
                 </Button>
               )}
 
-              {can(PERMISSIONS.DELETE_MEMBERS) && onDelete && (
+              {isAdmin && can(PERMISSIONS.DELETE_MEMBERS) && onDelete && (
                 <Button
                   variant="outlined"
                   startIcon={<IconTrash size={18} />}
@@ -380,7 +380,7 @@ export default function WorkflowToolbar({
           )}
 
           {/* 4. REJECTED -> Delete */}
-          {isRejected && can(PERMISSIONS.DELETE_MEMBERS) && onDelete && (
+          {isRejected && isAdmin && can(PERMISSIONS.DELETE_MEMBERS) && onDelete && (
             <Button
               variant="outlined"
               startIcon={<IconTrash size={18} />}

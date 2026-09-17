@@ -41,11 +41,12 @@ class LedgerTransaction(AuditModel):
     Double-entry accounting transaction header (Journal Entry).
     """
     transaction_number = models.CharField(max_length=50, unique=True, db_index=True)
+    jv_no = models.CharField(max_length=50, blank=True, null=True, db_index=True)
     transaction_date = models.DateField(db_index=True)
     description = models.TextField()
     reference_type = models.CharField(
         max_length=50,
-        help_text="DISBURSEMENT | REPAYMENT | FEE | PENALTY | WRITE_OFF | RESCHEDULE",
+        help_text="DISBURSEMENT | REPAYMENT | FEE | PENALTY | WRITE_OFF | RESCHEDULE | GENERAL_JOURNAL | BROUGHT_FORWARD",
         db_index=True,
     )
     reference_id = models.CharField(max_length=100, blank=True, null=True)
@@ -83,6 +84,8 @@ class LedgerEntry(models.Model):
     entry_type = models.CharField(max_length=10, choices=EntryType.choices)
     amount = models.DecimalField(max_digits=15, decimal_places=2)
     narration = models.CharField(max_length=255, blank=True, null=True)
+    document_no = models.CharField(max_length=100, blank=True, null=True, db_index=True)
+    jv_no = models.CharField(max_length=50, blank=True, null=True, db_index=True)
 
     class Meta:
         db_table = "tbl_ledger_entries"
