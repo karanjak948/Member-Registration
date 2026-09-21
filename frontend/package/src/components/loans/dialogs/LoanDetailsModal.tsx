@@ -99,6 +99,12 @@ const statusConfig: Record<
     color: "#dc2626",
     border: "#fecaca",
   },
+  defaulted: {
+    label: "Defaulted",
+    bg: "#450a0a",
+    color: "#fef2f2",
+    border: "#991b1b",
+  },
   closed: {
     label: "Fully Repaid & Closed",
     bg: "#f1f5f9",

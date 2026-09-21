@@ -36,6 +36,10 @@ from apps.loans.services.engine.microfinance import (
     add_calendar_months,
     generate_weekly_dates,
     generate_interest_dates,
+    calculate_jiinue_special_preschedule,
+    JiinueSpecialPreScheduleResult,
+    JiinueSpecialScheduleEntry,
+    check_loan_default_status,
 )
 
 __all__ = [
@@ -61,5 +65,9 @@ __all__ = [
     "add_calendar_months",
     "generate_weekly_dates",
     "generate_interest_dates",
+    "calculate_jiinue_special_preschedule",
+    "JiinueSpecialPreScheduleResult",
+    "JiinueSpecialScheduleEntry",
+    "check_loan_default_status",
 ]
 

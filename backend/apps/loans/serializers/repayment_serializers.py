@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from decimal import Decimal
+from datetime import timedelta
 from apps.loans.models import Repayment, Loan, LoanStatus
 from apps.loans.services.engine.repayment import allocate_repayment_waterfall
 from apps.loans.services.accounting import record_repayment_journal
@@ -299,47 +300,91 @@ class RepaymentSerializer(serializers.ModelSerializer):
         # dynamically recalculate future cycles' interest strictly against the reduced principal balance (Peter Irungu's specification)
         has_future_entries = loan.schedule_entries.filter(period_number__gt=1).exists()
         if is_reducing and not is_early_settlement and alloc.allocated_principal > Decimal("0.00") and has_future_entries and loan.principal_balance > Decimal("0.01"):
-            rate_pct = loan.interest_rate / Decimal("100")
-            if loan.loan_product and loan.loan_product.interest_period == "yearly":
-                r_per = rate_pct / Decimal("12")
-            else:
-                r_per = rate_pct
 
             remaining_unpaid_entries = list(loan.schedule_entries.filter(is_paid=False).order_by("period_number"))
             num_rem = len(remaining_unpaid_entries)
+
             if num_rem > 1:
-                rem_prn_per_period = round2(loan.principal_balance / Decimal(str(num_rem)))
-                sim_bal = loan.principal_balance
-                new_future_interest_total = Decimal("0.00")
+                # Jiinue Loan Special: weekly repayment with monthly interest period
+                # Recalculate using the exact pre-schedule engine (Peter Irungu's model)
+                is_weekly_monthly = (
+                    loan.repayment_frequency == "weekly"
+                    and loan.loan_product
+                    and loan.loan_product.interest_period == "monthly"
+                )
 
-                for idx, r_entry in enumerate(remaining_unpaid_entries):
-                    r_entry.opening_balance = round2(sim_bal)
-                    int_charge = round2(sim_bal * r_per)
-                    r_entry.expected_interest = int_charge
-
-                    if idx == num_rem - 1:
-                        prn_comp = sim_bal
-                        r_entry.closing_balance = Decimal("0.00")
-                    else:
-                        prn_comp = rem_prn_per_period
-                        r_entry.closing_balance = round2(sim_bal - prn_comp)
-
-                    r_entry.expected_principal = prn_comp
-                    r_entry.expected_amount = round2(
-                        prn_comp + int_charge + r_entry.expected_fees + r_entry.expected_penalty
+                if is_weekly_monthly:
+                    from apps.loans.services.engine.microfinance import calculate_jiinue_special_preschedule
+                    # Recalculate the remaining pre-schedule based on current principal balance
+                    # and how many weekly periods remain
+                    first_remaining_due = remaining_unpaid_entries[0].due_date
+                    presched = calculate_jiinue_special_preschedule(
+                        principal=loan.principal_balance,
+                        interest_rate_pct=loan.interest_rate,
+                        num_periods=num_rem,
+                        disbursement_date=first_remaining_due - timedelta(days=7),
                     )
-                    r_entry.save(update_fields=[
-                        "opening_balance",
-                        "expected_interest",
-                        "expected_principal",
-                        "closing_balance",
-                        "expected_amount",
-                    ])
-                    sim_bal = r_entry.closing_balance
-                    rem_int_entry = max(Decimal("0.00"), int_charge - r_entry.paid_interest)
-                    new_future_interest_total += rem_int_entry
+                    new_future_interest_total = Decimal("0.00")
+                    for idx, (r_entry, s_row) in enumerate(zip(remaining_unpaid_entries, presched.schedule)):
+                        r_entry.opening_balance = s_row.opening_balance
+                        r_entry.expected_interest = s_row.expected_interest
+                        r_entry.expected_principal = s_row.expected_principal
+                        r_entry.closing_balance = s_row.closing_balance
+                        r_entry.expected_amount = round2(
+                            s_row.expected_principal + s_row.expected_interest
+                            + r_entry.expected_fees + r_entry.expected_penalty
+                        )
+                        r_entry.save(update_fields=[
+                            "opening_balance",
+                            "expected_interest",
+                            "expected_principal",
+                            "closing_balance",
+                            "expected_amount",
+                        ])
+                        rem_int_entry = max(Decimal("0.00"), s_row.expected_interest - r_entry.paid_interest)
+                        new_future_interest_total += rem_int_entry
 
-                loan.interest_balance = round2(new_future_interest_total)
+                    loan.interest_balance = round2(new_future_interest_total)
+
+                else:
+                    rate_pct = loan.interest_rate / Decimal("100")
+                    if loan.loan_product and loan.loan_product.interest_period == "yearly":
+                        r_per = rate_pct / Decimal("12")
+                    else:
+                        r_per = rate_pct
+
+                    rem_prn_per_period = round2(loan.principal_balance / Decimal(str(num_rem)))
+                    sim_bal = loan.principal_balance
+                    new_future_interest_total = Decimal("0.00")
+
+                    for idx, r_entry in enumerate(remaining_unpaid_entries):
+                        r_entry.opening_balance = round2(sim_bal)
+                        int_charge = round2(sim_bal * r_per)
+                        r_entry.expected_interest = int_charge
+
+                        if idx == num_rem - 1:
+                            prn_comp = sim_bal
+                            r_entry.closing_balance = Decimal("0.00")
+                        else:
+                            prn_comp = rem_prn_per_period
+                            r_entry.closing_balance = round2(sim_bal - prn_comp)
+
+                        r_entry.expected_principal = prn_comp
+                        r_entry.expected_amount = round2(
+                            prn_comp + int_charge + r_entry.expected_fees + r_entry.expected_penalty
+                        )
+                        r_entry.save(update_fields=[
+                            "opening_balance",
+                            "expected_interest",
+                            "expected_principal",
+                            "closing_balance",
+                            "expected_amount",
+                        ])
+                        sim_bal = r_entry.closing_balance
+                        rem_int_entry = max(Decimal("0.00"), int_charge - r_entry.paid_interest)
+                        new_future_interest_total += rem_int_entry
+
+                    loan.interest_balance = round2(new_future_interest_total)
 
         loan.outstanding_balance = (
             loan.principal_balance

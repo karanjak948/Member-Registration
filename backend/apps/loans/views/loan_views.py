@@ -206,11 +206,14 @@ class LoanViewSet(viewsets.ModelViewSet):
 
         reference_weekly = None
         if method == "reducing_balance" and num_periods > 0:
-            try:
-                r_dec = rate / Decimal("100")
-                reference_weekly = str(find_weekly_reference_payment(principal, r_dec, start_date, num_periods))
-            except Exception:
-                reference_weekly = None
+            if freq == "weekly" and period == "monthly":
+                reference_weekly = str(installment)
+            else:
+                try:
+                    r_dec = rate / Decimal("100")
+                    reference_weekly = str(find_weekly_reference_payment(principal, r_dec, start_date, num_periods))
+                except Exception:
+                    reference_weekly = None
 
         return Response({
             "principal": str(principal),
@@ -444,11 +447,14 @@ class LoanViewSet(viewsets.ModelViewSet):
 
         ref_weekly = None
         if loan.interest_method == "reducing_balance" and num_periods > 0:
-            try:
-                r_dec = loan.interest_rate / Decimal("100")
-                ref_weekly = find_weekly_reference_payment(principal, r_dec, disb_date, num_periods)
-            except Exception:
-                ref_weekly = None
+            if loan.repayment_frequency == "weekly" and product.interest_period == "monthly" and schedule:
+                ref_weekly = schedule[0].expected_amount
+            else:
+                try:
+                    r_dec = loan.interest_rate / Decimal("100")
+                    ref_weekly = find_weekly_reference_payment(principal, r_dec, disb_date, num_periods)
+                except Exception:
+                    ref_weekly = None
         loan.reference_weekly_installment = ref_weekly
 
         loan.save()
@@ -544,6 +550,7 @@ class LoanViewSet(viewsets.ModelViewSet):
                 LoanStatus.WATCHFUL,
                 LoanStatus.NON_PERFORMING,
                 LoanStatus.DOUBTFUL,
+                LoanStatus.DEFAULTED,
             ]
         ).select_related("member", "loan_product")
 
@@ -553,6 +560,7 @@ class LoanViewSet(viewsets.ModelViewSet):
             "watchful": {"count": 0, "principal": Decimal("0.00"), "provision": Decimal("0.00")},
             "non_performing": {"count": 0, "principal": Decimal("0.00"), "provision": Decimal("0.00")},
             "doubtful": {"count": 0, "principal": Decimal("0.00"), "provision": Decimal("0.00")},
+            "defaulted": {"count": 0, "principal": Decimal("0.00"), "provision": Decimal("0.00")},
             "loss": {"count": 0, "principal": Decimal("0.00"), "provision": Decimal("0.00")},
         }
 
@@ -570,23 +578,35 @@ class LoanViewSet(viewsets.ModelViewSet):
                 outstanding_balance=loan.outstanding_balance,
             )
 
+            # Peter Irungu's Rule: If maturity date has passed and balance > 0, status is DEFAULTED
+            if loan.maturity_date and today > loan.maturity_date and loan.outstanding_balance > Decimal("0.01"):
+                if loan.status != LoanStatus.DEFAULTED:
+                    loan.status = LoanStatus.DEFAULTED
+                    loan.days_overdue = days_overdue
+                    loan.save(update_fields=["status", "days_overdue"])
+                cat_key = "defaulted"
             # Update status if delinquent
-            if aging.category == "watchful" and loan.status != LoanStatus.WATCHFUL:
+            elif aging.category == "watchful" and loan.status != LoanStatus.WATCHFUL:
                 loan.status = LoanStatus.WATCHFUL
                 loan.days_overdue = days_overdue
                 loan.save(update_fields=["status", "days_overdue"])
+                cat_key = aging.category
             elif aging.category == "non_performing" and loan.status != LoanStatus.NON_PERFORMING:
                 loan.status = LoanStatus.NON_PERFORMING
                 loan.days_overdue = days_overdue
                 loan.save(update_fields=["status", "days_overdue"])
+                cat_key = aging.category
             elif aging.category == "doubtful" and loan.status != LoanStatus.DOUBTFUL:
                 loan.status = LoanStatus.DOUBTFUL
                 loan.days_overdue = days_overdue
                 loan.save(update_fields=["status", "days_overdue"])
+                cat_key = aging.category
+            else:
+                cat_key = "defaulted" if loan.status == LoanStatus.DEFAULTED else aging.category
 
-            summary[aging.category]["count"] += 1
-            summary[aging.category]["principal"] += loan.outstanding_balance
-            summary[aging.category]["provision"] += aging.provision_amount
+            summary[cat_key]["count"] += 1
+            summary[cat_key]["principal"] += loan.outstanding_balance
+            summary[cat_key]["provision"] += aging.provision_amount
 
             loans_data.append({
                 "id": loan.id,

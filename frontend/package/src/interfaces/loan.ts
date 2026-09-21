@@ -17,6 +17,7 @@ export type LoanStatus =
   | "watchful"
   | "non_performing"
   | "doubtful"
+  | "defaulted"
   | "closed"
   | "written_off"
   | "rejected";

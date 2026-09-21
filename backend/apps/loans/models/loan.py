@@ -12,6 +12,7 @@ class LoanStatus(models.TextChoices):
     WATCHFUL = "watchful", "Watchful (1-30d Overdue)"
     NON_PERFORMING = "non_performing", "Non-Performing (31-90d Overdue)"
     DOUBTFUL = "doubtful", "Doubtful (91-180d Overdue)"
+    DEFAULTED = "defaulted", "Defaulted"
     CLOSED = "closed", "Closed / Fully Paid"
     WRITTEN_OFF = "written_off", "Written Off"
     REJECTED = "rejected", "Rejected"

@@ -295,3 +295,181 @@ def get_loan_cycle_info(
         "cycle_end": cycle_end,
         "days_elapsed": days_elapsed,
     }
+
+
+@dataclass
+class JiinueSpecialScheduleEntry:
+    period_number: int
+    due_date: date
+    expected_amount: Decimal
+    expected_principal: Decimal
+    expected_interest: Decimal
+    opening_balance: Decimal
+    closing_balance: Decimal
+
+
+@dataclass
+class JiinueSpecialPreScheduleResult:
+    principal: Decimal
+    monthly_interest_rate_pct: Decimal
+    term_months: int
+    num_weeks: int
+    total_interest: Decimal
+    total_payable: Decimal
+    weekly_installment: Decimal
+    weekly_principal: Decimal
+    weekly_interest: Decimal
+    monthly_interest_breakdown: List[Dict[str, Any]]
+    schedule: List[JiinueSpecialScheduleEntry]
+
+
+def calculate_jiinue_special_preschedule(
+    principal: Decimal | float | int,
+    interest_rate_pct: Decimal | float | int,
+    num_periods: int,
+    disbursement_date: date | None = None,
+    term_months: int | None = None,
+) -> JiinueSpecialPreScheduleResult:
+    """
+    Calculates the exact Loan Pre-Schedule (Loan Calculator) for Peter Irungu's
+    'Jiinue Loan Special' Reducing Balance product (Image 1).
+
+    Logic:
+    - Given Principal P (e.g. KES 30,000) over M months (e.g. 3 months = 12 weeks) at monthly rate r (e.g. 20%):
+      1. Equal monthly principal deduction expected in pre-schedule: P / M (e.g. 10,000 / month).
+      2. Month-by-month expected interest:
+         - Month 1: 30,000 * 20% = 6,000
+         - Month 2: 20,000 * 20% = 4,000
+         - Month 3: 10,000 * 20% = 2,000
+         Total Interest = 12,000.
+      3. Total Loan Plus Interest (Gross Liability) = P + Total Interest = 42,000.
+      4. Weekly Installments = Total Liability / (M * 4) = 42,000 / 12 = 3,500 / week.
+         - Principal component: 30,000 / 12 = 2,500
+         - Shared interest component: 12,000 / 12 = 1,000
+         - Total Installment = 2,500 + 1,000 = 3,500.
+      5. Pre-Schedule Table shows 12 weekly entries reducing opening balance from 42,000 to 0.
+    """
+    P = _to_d(principal)
+    r_pct = _to_d(interest_rate_pct)
+    r = r_pct / _to_d(100)
+
+    if disbursement_date is None:
+        disbursement_date = date.today()
+
+    n = int(num_periods)
+    if n <= 0:
+        raise ValueError("num_periods must be positive.")
+
+    # Determine tenor months and total weekly installments
+    if term_months is not None and term_months > 0:
+        M = int(term_months)
+        W = M * 4 if n < 4 else n
+    elif n < 4:
+        # Caller passed months (e.g. 3) instead of weeks
+        M = n
+        W = M * 4
+    else:
+        # Caller passed number of weekly installments (e.g. 12)
+        W = n
+        M = max(1, int(round(Decimal(str(W)) / Decimal("4"))))
+
+    # Calculate monthly expected reducing balance interest
+    P_mo = round2(P / _to_d(M))
+    monthly_breakdown: List[Dict[str, Any]] = []
+    total_interest = Decimal("0.00")
+    sim_balance = P
+
+    for m in range(1, M + 1):
+        int_m = round2(sim_balance * r)
+        monthly_breakdown.append({
+            "month": m,
+            "starting_principal": sim_balance,
+            "interest": int_m,
+        })
+        total_interest += int_m
+        sim_balance = max(Decimal("0.00"), sim_balance - P_mo)
+
+    total_payable = round2(P + total_interest)
+    weekly_inst = round2(total_payable / _to_d(W))
+    weekly_prn = round2(P / _to_d(W))
+    weekly_int = round2(total_interest / _to_d(W))
+
+    schedule: List[JiinueSpecialScheduleEntry] = []
+    curr_bal = total_payable
+    accum_prn = Decimal("0.00")
+    accum_int = Decimal("0.00")
+
+    for w in range(1, W + 1):
+        due = disbursement_date + timedelta(days=7 * w)
+
+        if w == W:
+            # Final period takes up any fractional cent discrepancies
+            exp_prn = round2(P - accum_prn)
+            exp_int = round2(total_interest - accum_int)
+            exp_amt = round2(curr_bal)
+            closing = Decimal("0.00")
+        else:
+            exp_prn = weekly_prn
+            exp_int = weekly_int
+            exp_amt = weekly_inst
+            closing = round2(curr_bal - exp_amt)
+            if closing < Decimal("0.00"):
+                closing = Decimal("0.00")
+
+        schedule.append(
+            JiinueSpecialScheduleEntry(
+                period_number=w,
+                due_date=due,
+                expected_amount=exp_amt,
+                expected_principal=exp_prn,
+                expected_interest=exp_int,
+                opening_balance=round2(curr_bal),
+                closing_balance=closing,
+            )
+        )
+        accum_prn += exp_prn
+        accum_int += exp_int
+        curr_bal = closing
+
+    return JiinueSpecialPreScheduleResult(
+        principal=round2(P),
+        monthly_interest_rate_pct=r_pct,
+        term_months=M,
+        num_weeks=W,
+        total_interest=round2(total_interest),
+        total_payable=total_payable,
+        weekly_installment=weekly_inst,
+        weekly_principal=weekly_prn,
+        weekly_interest=weekly_int,
+        monthly_interest_breakdown=monthly_breakdown,
+        schedule=schedule,
+    )
+
+
+def check_loan_default_status(loan, as_of_date: date | None = None) -> bool:
+    """
+    Evaluates whether a loan should transition to defaulted status.
+    Under Peter Irungu's specification:
+    'If balance is greater than 0, the loan goes to defaulted status'
+    at maturity / after the term expires.
+    """
+    from apps.loans.models import LoanStatus
+
+    if as_of_date is None:
+        from django.utils import timezone
+        as_of_date = timezone.now().date()
+
+    if loan.status in [LoanStatus.CLOSED, LoanStatus.WRITTEN_OFF, LoanStatus.REJECTED]:
+        return False
+
+    maturity = loan.maturity_date
+    if not maturity and loan.schedule_entries.exists():
+        maturity = loan.schedule_entries.order_by("due_date").last().due_date
+
+    if maturity and as_of_date > maturity and loan.outstanding_balance > Decimal("0.01"):
+        if loan.status != LoanStatus.DEFAULTED:
+            loan.status = LoanStatus.DEFAULTED
+            loan.save(update_fields=["status"])
+            return True
+    return False
+

@@ -144,28 +144,54 @@ export default function ApplyLoanForm() {
     const rate = Number(selectedProduct.interest_rate || 0);
     const method = selectedProduct.interest_method || "reducing_balance";
     const isYearly = selectedProduct.interest_period === "yearly";
+    const isMonthlyRate = selectedProduct.interest_period === "monthly";
     const freq = selectedProduct.repayment_frequency || "monthly";
-
-    // Immediate calculation for zero-latency feedback
-    let periodicRate = rate / 100;
-    if (isYearly) {
-      periodicRate = freq === "weekly" ? (rate / 100) / 52 : (rate / 100) / 12;
-    } else {
-      periodicRate = freq === "weekly" ? ((rate / 100) * 12) / 52 : rate / 100;
-    }
+    const isWeeklyMonthly = freq === "weekly" && isMonthlyRate;
 
     let installment = 0;
     let totalInterest = 0;
     let totalPayable = 0;
 
-    if (method === "reducing_balance" && periodicRate > 0) {
-      // SACCO Straight-Line Reducing Balance (Equal Principal Payments)
-      // Total Interest = Principal * periodicRate * (periods + 1) / 2
+    if (method === "reducing_balance" && isWeeklyMonthly) {
+      // ====================================================================
+      // Peter Irungu's Jiinue Loan Special Pre-Schedule Formula:
+      // - num_periods = total weekly installments (e.g. 12 = 3 months)
+      // - M = num_periods / 4 = number of months
+      // - Monthly interest per month m: balance_m * (rate/100)
+      //   where balance_m = P - (m-1) * (P/M)
+      // - Total Interest = P * (rate/100) * (M+1) / 2
+      // - Total Payable = P + Total Interest
+      // - Weekly Installment = Total Payable / num_periods
+      // ====================================================================
+      const M = Math.max(1, Math.round(periods / 4));
+      const r = rate / 100;
+      // Total interest: sum of month-by-month interest on reducing principal
+      // = P*r + (P - P/M)*r + (P - 2P/M)*r + ...
+      // = P*r * (M + (M-1) + ... + 1) / M
+      // = P*r * M*(M+1)/2 / M
+      // = P*r * (M+1)/2
+      totalInterest = principal * r * (M + 1) / 2;
+      totalPayable = principal + totalInterest;
+      installment = totalPayable / periods;
+    } else if (method === "reducing_balance") {
+      // Standard SACCO Straight-Line Reducing Balance (Equal Principal Payments)
+      let periodicRate = rate / 100;
+      if (isYearly) {
+        periodicRate = freq === "weekly" ? (rate / 100) / 52 : (rate / 100) / 12;
+      } else {
+        periodicRate = freq === "weekly" ? ((rate / 100) * 12) / 52 : rate / 100;
+      }
       totalInterest = (principal * periodicRate * (periods + 1)) / 2;
       totalPayable = principal + totalInterest;
       installment = totalPayable / periods;
     } else {
       // Flat rate formula
+      let periodicRate = rate / 100;
+      if (isYearly) {
+        periodicRate = freq === "weekly" ? (rate / 100) / 52 : (rate / 100) / 12;
+      } else {
+        periodicRate = freq === "weekly" ? ((rate / 100) * 12) / 52 : rate / 100;
+      }
       totalInterest = principal * periodicRate * periods;
       totalPayable = principal + totalInterest;
       installment = totalPayable / periods;
@@ -1045,7 +1071,11 @@ export default function ApplyLoanForm() {
                       </Typography>
                       <Chip
                         size="small"
-                        label={selectedProduct?.interest_method === "reducing_balance" ? "Reducing Balance" : "Flat Rate"}
+                        label={
+                          selectedProduct?.repayment_frequency === "weekly" && selectedProduct?.interest_period === "monthly"
+                            ? "Pre-Schedule (Reducing Balance)"
+                            : selectedProduct?.interest_method === "reducing_balance" ? "Reducing Balance" : "Flat Rate"
+                        }
                         sx={{ fontWeight: 800, bgcolor: "#bbf7d0", color: "#14532d", fontSize: "0.72rem" }}
                       />
                       <Chip
@@ -1053,7 +1083,16 @@ export default function ApplyLoanForm() {
                         label={`${selectedProduct?.interest_rate}% ${selectedProduct?.interest_period || "p.a."}`}
                         sx={{ fontWeight: 800, bgcolor: "#ecfdf5", color: "#047857", fontSize: "0.72rem" }}
                       />
-                      {previewData.referenceWeeklyInstallment != null && (
+                      {selectedProduct?.repayment_frequency === "weekly" && selectedProduct?.interest_period === "monthly" && (
+                        <Chip
+                          size="small"
+                          label="Peter's Pre-Schedule Model"
+                          sx={{ fontWeight: 800, bgcolor: "#fef3c7", color: "#92400e", fontSize: "0.72rem", border: "1px solid #fde68a" }}
+                        />
+                      )}
+                      {previewData.referenceWeeklyInstallment != null && !(
+                          selectedProduct?.repayment_frequency === "weekly" && selectedProduct?.interest_period === "monthly"
+                        ) && (
                         <Chip
                           size="small"
                           label={`Ref. Weekly Target: KES ${previewData.referenceWeeklyInstallment.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} / wk`}
@@ -1066,13 +1105,17 @@ export default function ApplyLoanForm() {
                       <Grid size={{ xs: 12, sm: 6, md: 3 }}>
                         <Paper elevation={0} sx={{ p: 1.8, borderRadius: 2, bgcolor: "#ffffff", border: "1px solid #bbf7d0" }}>
                           <Typography variant="caption" sx={{ color: "#059669", fontWeight: 800, textTransform: "uppercase" }}>
-                            {selectedProduct?.interest_method === "reducing_balance" ? "Installment (Avg)" : "Monthly Installment (EMI)"}
+                            {selectedProduct?.repayment_frequency === "weekly" && selectedProduct?.interest_period === "monthly"
+                              ? "Weekly Installment"
+                              : selectedProduct?.interest_method === "reducing_balance" ? "Installment (Avg)" : "Monthly Installment (EMI)"}
                           </Typography>
                           <Typography variant="h5" fontWeight={900} sx={{ color: "#064e3b", fontFamily: "monospace", mt: 0.5 }}>
                             KES {previewData.installment.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                           </Typography>
                           <Typography variant="caption" sx={{ color: "#6b7280" }}>
-                            Principal + Interest per period
+                            {selectedProduct?.repayment_frequency === "weekly" && selectedProduct?.interest_period === "monthly"
+                              ? "Principal + Shared Interest per week"
+                              : "Principal + Interest per period"}
                           </Typography>
                         </Paper>
                       </Grid>
@@ -1086,7 +1129,9 @@ export default function ApplyLoanForm() {
                             KES {previewData.totalInterest.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                           </Typography>
                           <Typography variant="caption" sx={{ color: "#6b7280" }}>
-                            Accrued over {(watchedPeriods || selectedProduct?.max_repayment_period || 12)} months
+                            {selectedProduct?.repayment_frequency === "weekly" && selectedProduct?.interest_period === "monthly"
+                              ? `Accrued over ${Math.round((Number(watchedPeriods) || Number(selectedProduct?.max_repayment_period) || 12) / 4)} months (reducing balance)`
+                              : `Accrued over ${(watchedPeriods || selectedProduct?.max_repayment_period || 12)} months`}
                           </Typography>
                         </Paper>
                       </Grid>

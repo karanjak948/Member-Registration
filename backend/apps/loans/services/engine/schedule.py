@@ -18,6 +18,7 @@ from apps.loans.services.engine.interest import (
     round2,
     _to_d,
 )
+from apps.loans.services.engine.microfinance import calculate_jiinue_special_preschedule
 
 
 @dataclass
@@ -114,22 +115,42 @@ def generate_schedule(
             balance = closing
 
     elif interest_method == "reducing_balance":
-        schedule = calculate_reducing_balance_schedule(
-            P, r_pct, n, interest_period, repayment_frequency
-        )
-        for i, row in enumerate(schedule, 1):
-            due = add_periods(disbursement_date, repayment_frequency, i)
-            entries.append(
-                ScheduleEntry(
-                    period_number=i,
-                    due_date=due,
-                    expected_amount=row.installment,
-                    expected_principal=row.principal_component,
-                    expected_interest=row.interest_charge,
-                    opening_balance=row.opening_balance,
-                    closing_balance=row.closing_balance,
-                )
+        if repayment_frequency == "weekly" and interest_period == "monthly":
+            presched = calculate_jiinue_special_preschedule(
+                principal=P,
+                interest_rate_pct=r_pct,
+                num_periods=n,
+                disbursement_date=disbursement_date,
             )
+            for s in presched.schedule:
+                entries.append(
+                    ScheduleEntry(
+                        period_number=s.period_number,
+                        due_date=s.due_date,
+                        expected_amount=s.expected_amount,
+                        expected_principal=s.expected_principal,
+                        expected_interest=s.expected_interest,
+                        opening_balance=s.opening_balance,
+                        closing_balance=s.closing_balance,
+                    )
+                )
+        else:
+            schedule = calculate_reducing_balance_schedule(
+                P, r_pct, n, interest_period, repayment_frequency
+            )
+            for i, row in enumerate(schedule, 1):
+                due = add_periods(disbursement_date, repayment_frequency, i)
+                entries.append(
+                    ScheduleEntry(
+                        period_number=i,
+                        due_date=due,
+                        expected_amount=row.installment,
+                        expected_principal=row.principal_component,
+                        expected_interest=row.interest_charge,
+                        opening_balance=row.opening_balance,
+                        closing_balance=row.closing_balance,
+                    )
+                )
 
     elif interest_method == "compound":
         schedule = calculate_compound_interest(
