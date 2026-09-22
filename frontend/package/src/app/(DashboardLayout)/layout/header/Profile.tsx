@@ -35,6 +35,8 @@ import {
 } from "@tabler/icons-react";
 
 import api from "@/services/api";
+import { usePermissions } from "@/hooks/usePermissions";
+import { PERMISSIONS } from "@/constants/permissions";
 
 interface CurrentUser {
   id: number;
@@ -81,6 +83,13 @@ export default function Profile() {
     data: session,
     status,
   } = useSession();
+
+  const { can, isAdmin } = usePermissions();
+
+  const canAccessSettings =
+    isAdmin ||
+    can(PERMISSIONS.VIEW_SETTINGS) ||
+    can(PERMISSIONS.MANAGE_SETTINGS);
 
   const [anchorEl, setAnchorEl] =
     useState<HTMLElement | null>(null);
@@ -388,27 +397,29 @@ export default function Profile() {
           />
         </MenuItem>
 
-        {/* Account Settings */}
-        <MenuItem
-          component={Link}
-          href="/settings"
-          onClick={handleClose}
-          sx={{
-            py: 1.25,
-          }}
-        >
-          <ListItemIcon>
-            <IconSettings
-              width={20}
-              height={20}
-            />
-          </ListItemIcon>
+        {/* System Settings - restricted to Admins and Owners */}
+        {canAccessSettings && (
+          <MenuItem
+            component={Link}
+            href="/settings"
+            onClick={handleClose}
+            sx={{
+              py: 1.25,
+            }}
+          >
+            <ListItemIcon>
+              <IconSettings
+                width={20}
+                height={20}
+              />
+            </ListItemIcon>
 
-          <ListItemText
-            primary="Account Settings"
-            secondary="Manage preferences"
-          />
-        </MenuItem>
+            <ListItemText
+              primary="System Settings"
+              secondary="Manage preferences"
+            />
+          </MenuItem>
+        )}
 
         <Divider />
 

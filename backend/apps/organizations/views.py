@@ -25,6 +25,7 @@ from .models import (
 
 from .permissions import (
     HasRBACPermission,
+    IsAdminOrOwner,
     IsOrganizationMember,
 )
 
@@ -64,6 +65,11 @@ class OrganizationAPIView(APIView):
     permission_classes = [
         IsAuthenticated,
     ]
+
+    def get_permissions(self):
+        if self.request.method in ("PUT", "PATCH", "POST", "DELETE"):
+            return [IsAdminOrOwner()]
+        return [IsAuthenticated()]
 
     parser_classes = [
         MultiPartParser,
@@ -232,7 +238,7 @@ class OrganizationLogoUploadView(APIView):
     """
 
     permission_classes = [
-        IsAuthenticated,
+        IsAdminOrOwner,
     ]
 
     parser_classes = [

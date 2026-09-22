@@ -174,11 +174,8 @@ class IsAdminOrReadOnly(BasePermission):
     Permission for shared system/reference data.
 
     Authenticated users may read shared configuration.
-    Only staff users may modify it.
-
-    This is retained for existing reference/configuration
-    endpoints. Organization-scoped business endpoints
-    should use RBAC-specific permissions instead.
+    Only organization owners and administrators may modify it.
+    Operational staff (e.g. Member Officers, Loan Officers) have read-only access.
     """
 
     def has_permission(self, request, view):
@@ -191,4 +188,5 @@ class IsAdminOrReadOnly(BasePermission):
         if request.method in SAFE_METHODS:
             return True
 
-        return request.user.is_staff
+        from apps.organizations.permissions import is_admin_or_owner_user
+        return is_admin_or_owner_user(request.user)

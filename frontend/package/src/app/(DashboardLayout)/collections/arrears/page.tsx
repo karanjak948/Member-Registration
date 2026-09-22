@@ -22,11 +22,13 @@ import {
   Typography,
 } from "@mui/material";
 import PageContainer from "@/app/(DashboardLayout)/components/container/PageContainer";
+import { useRouter } from "next/navigation";
 import { IconAlertTriangle, IconRefresh, IconSearch, IconPhoneCall, IconChartPie, IconActivity } from "@tabler/icons-react";
 
 export default function ArrearsManagementPage() {
   const [loans, setLoans] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const router = useRouter();
   const [search, setSearch] = useState("");
 
   useEffect(() => {
@@ -223,6 +225,7 @@ export default function ArrearsManagementPage() {
                             color="primary"
                             startIcon={<IconPhoneCall size={14} />}
                             sx={{ textTransform: "none", fontSize: "0.72rem", fontWeight: 700 }}
+                            onClick={() => router.push(`/collections/arrears/follow-up/${l.id}`)}
                           >
                             Follow Up
                           </Button>
