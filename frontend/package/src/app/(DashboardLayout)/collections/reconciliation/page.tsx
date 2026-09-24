@@ -29,6 +29,8 @@ import {
 } from "@mui/material";
 import PageContainer from "@/app/(DashboardLayout)/components/container/PageContainer";
 import { IconRefresh, IconPlus, IconCheck, IconX, IconDatabase } from "@tabler/icons-react";
+import ExportButton from "@/components/common/ExportButton";
+import { ExportColumn } from "@/utils/exportGrid";
 
 interface LedgerItem {
   id: number;
@@ -123,9 +125,19 @@ export default function ReconciliationPage() {
   }
 
   const filtered = ledger.filter((item) =>
-    item.account_name.toLowerCase().includes(accountFilter.toLowerCase()) ||
-    item.description.toLowerCase().includes(accountFilter.toLowerCase())
+    (item.account_name || "").toLowerCase().includes(accountFilter.toLowerCase()) ||
+    (item.description || "").toLowerCase().includes(accountFilter.toLowerCase())
   );
+
+  const exportColumns: ExportColumn<LedgerItem>[] = [
+    { header: "Txn Date", accessor: (row) => row.transaction_date || "N/A" },
+    { header: "Account Name", accessor: (row) => row.account_name || "N/A" },
+    { header: "Description", accessor: (row) => row.description || "N/A" },
+    { header: "Money In (KES)", accessor: (row) => Number(row.money_in || 0).toLocaleString() },
+    { header: "Money Out (KES)", accessor: (row) => Number(row.money_out || 0).toLocaleString() },
+    { header: "Loan Ref", accessor: (row) => (row.related_loan_id ? `LN #${row.related_loan_id}` : "N/A") },
+    { header: "Status", accessor: (row) => (row.is_reversed ? "Reversed" : "Reconciled") },
+  ];
 
   const totalIn = ledger.reduce((acc, cur) => acc + Number(cur.money_in || 0), 0);
   const totalOut = ledger.reduce((acc, cur) => acc + Number(cur.money_out || 0), 0);
@@ -210,13 +222,22 @@ export default function ReconciliationPage() {
                   General Ledger Transactions ({ledger.length})
                 </Typography>
               </Stack>
-              <TextField
-                size="small"
-                placeholder="Filter by account or notes..."
-                value={accountFilter}
-                onChange={(e) => setAccountFilter(e.target.value)}
-                sx={{ width: 260 }}
-              />
+              <Stack direction="row" spacing={1.5} alignItems="center">
+                <TextField
+                  size="small"
+                  placeholder="Filter by account or notes..."
+                  value={accountFilter}
+                  onChange={(e) => setAccountFilter(e.target.value)}
+                  sx={{ width: 240 }}
+                />
+                <ExportButton
+                  data={filtered}
+                  columns={exportColumns}
+                  filename="mpesa_bank_reconciliation"
+                  title="Royal SACCO - M-Pesa & Bank Reconciliation Ledger"
+                  size="small"
+                />
+              </Stack>
             </Stack>
 
             <Divider sx={{ mb: 2 }} />

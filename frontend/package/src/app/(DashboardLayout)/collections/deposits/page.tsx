@@ -27,6 +27,8 @@ import { IconBuildingBank, IconLock, IconRefresh, IconSearch, IconShieldCheck, I
 import memberService from "@/services/member.service";
 import { Member } from "@/interfaces/member";
 import { getMediaUrl } from "@/utils/media";
+import ExportButton from "@/components/common/ExportButton";
+import { ExportColumn } from "@/utils/exportGrid";
 
 export default function SecurityDepositsPage() {
   const [members, setMembers] = useState<Member[]>([]);
@@ -54,6 +56,15 @@ export default function SecurityDepositsPage() {
     m.membership_number?.toLowerCase().includes(search.toLowerCase()) ||
     m.national_id?.toLowerCase().includes(search.toLowerCase())
   );
+
+  const exportColumns: ExportColumn<Member>[] = [
+    { header: "Membership #", accessor: (row) => row.membership_number || `RC-${row.id}` },
+    { header: "Member Name", accessor: (row) => `${row.first_name} ${row.other_names}`.trim() },
+    { header: "National ID", accessor: (row) => row.national_id || "N/A" },
+    { header: "Phone Number", accessor: (row) => row.phone_number || "N/A" },
+    { header: "Category", accessor: (row) => row.category_name || "General" },
+    { header: "Deposit Status", accessor: () => "Active Held" },
+  ];
 
   return (
     <PageContainer title="Security Deposits - Royal SACCO" description="Manage member security deposits & collateral savings">
@@ -175,18 +186,27 @@ export default function SecurityDepositsPage() {
                   </Typography>
                 </Box>
               </Stack>
-              <TextField
-                size="small"
-                placeholder="Search member name / number..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                slotProps={{
-                  input: {
-                    startAdornment: <IconSearch size={16} style={{ marginRight: 8, color: "#94a3b8" }} />,
-                  },
-                }}
-                sx={{ width: { xs: "100%", sm: 280 } }}
-              />
+              <Stack direction="row" spacing={1.5} alignItems="center" sx={{ width: { xs: "100%", sm: "auto" } }}>
+                <TextField
+                  size="small"
+                  placeholder="Search member name / number..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  slotProps={{
+                    input: {
+                      startAdornment: <IconSearch size={16} style={{ marginRight: 8, color: "#94a3b8" }} />,
+                    },
+                  }}
+                  sx={{ width: { xs: "100%", sm: 260 } }}
+                />
+                <ExportButton
+                  data={filtered}
+                  columns={exportColumns}
+                  filename="member_security_deposits"
+                  title="Royal SACCO - Member Security Deposits Registry"
+                  size="small"
+                />
+              </Stack>
             </Stack>
 
             <Divider sx={{ mb: 2 }} />

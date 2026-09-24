@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import {
   Box,
   Card,
@@ -22,6 +22,8 @@ import {
   LinearProgress,
   Button,
   Avatar,
+  Tabs,
+  Tab,
 } from "@mui/material";
 import PageContainer from "@/app/(DashboardLayout)/components/container/PageContainer";
 import {
@@ -33,11 +35,38 @@ import {
   IconCheck,
   IconPercentage,
   IconReceipt2,
+  IconSearch,
+  IconClick,
 } from "@tabler/icons-react";
+import ExportButton from "@/components/common/ExportButton";
+import { ExportColumn } from "@/utils/exportGrid";
+
+interface LoanAllocationItem {
+  id: number;
+  loan_number: string;
+  member_id: number;
+  member_name?: string;
+  membership_number?: string;
+  member_phone?: string;
+  product_name?: string;
+  principal_amount: number;
+  deposit_paid_amount?: number;
+  outstanding_balance: number;
+  principal_balance?: number;
+  interest_balance?: number;
+  penalty_balance?: number;
+  status: string;
+  days_overdue?: number;
+}
 
 export default function RepaymentAllocationPage() {
-  const [loans, setLoans] = useState<any[]>([]);
+  const [loans, setLoans] = useState<LoanAllocationItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [activeTab, setActiveTab] = useState<string>("active");
+  const [selectedLoanId, setSelectedLoanId] = useState<number | null>(null);
+
+  // Simulation balances
   const [simAmount, setSimAmount] = useState<number>(10000);
   const [penaltyDue, setPenaltyDue] = useState<number>(500);
   const [interestDue, setInterestDue] = useState<number>(2000);
@@ -46,10 +75,58 @@ export default function RepaymentAllocationPage() {
   useEffect(() => {
     fetch("/api/loans")
       .then((res) => res.json())
-      .then((data) => setLoans(Array.isArray(data) ? data : []))
+      .then((data) => {
+        const list = Array.isArray(data) ? data : data?.results || [];
+        setLoans(list);
+      })
       .catch((err) => console.error(err))
       .finally(() => setLoading(false));
   }, []);
+
+  // Filtered loans list
+  const filteredLoans = useMemo(() => {
+    let base = loans;
+    if (activeTab === "active") {
+      base = loans.filter((l) => ["active", "watchful", "non_performing", "doubtful"].includes(l.status?.toLowerCase()));
+    } else if (activeTab === "arrears") {
+      base = loans.filter((l) => (l.days_overdue || 0) > 0 || ["watchful", "non_performing", "doubtful", "defaulted"].includes(l.status?.toLowerCase()));
+    } else if (activeTab === "cleared") {
+      base = loans.filter((l) => l.status === "closed");
+    }
+
+    if (!search.trim()) return base;
+    const q = search.toLowerCase();
+    return base.filter(
+      (l) =>
+        l.loan_number?.toLowerCase().includes(q) ||
+        String(l.member_id).includes(q) ||
+        l.member_name?.toLowerCase().includes(q) ||
+        l.membership_number?.toLowerCase().includes(q)
+    );
+  }, [loans, activeTab, search]);
+
+  const exportColumns: ExportColumn<LoanAllocationItem>[] = [
+    { header: "Loan #", accessor: (row) => row.loan_number },
+    { header: "Member ID", accessor: (row) => row.membership_number || `Member #${row.member_id}` },
+    { header: "Member Name", accessor: (row) => row.member_name || "N/A" },
+    { header: "Principal (KES)", accessor: (row) => Number(row.principal_amount || 0).toLocaleString() },
+    { header: "Security Deposit (KES)", accessor: (row) => Number(row.deposit_paid_amount || 0).toLocaleString() },
+    { header: "Outstanding Balance (KES)", accessor: (row) => Number(row.outstanding_balance || 0).toLocaleString() },
+    { header: "Status", accessor: (row) => row.status },
+  ];
+
+  const handleSelectLoanForSim = (loan: LoanAllocationItem) => {
+    setSelectedLoanId(loan.id);
+    const pen = Number(loan.penalty_balance || (loan.days_overdue && loan.days_overdue > 7 ? 500 : 0));
+    const int = Number(loan.interest_balance || Math.round(Number(loan.outstanding_balance || 0) * 0.1));
+    const prn = Math.max(0, Number(loan.outstanding_balance || 0) - int - pen);
+    const targetSim = Math.min(Number(loan.outstanding_balance || 10000), Math.round(Number(loan.principal_amount || 10000) * 0.35));
+
+    setPenaltyDue(pen);
+    setInterestDue(int);
+    setPrincipalDue(prn > 0 ? prn : Number(loan.outstanding_balance || 5000));
+    setSimAmount(targetSim > 0 ? targetSim : 5000);
+  };
 
   // Waterfall allocation calculation
   const rem1 = Math.max(0, simAmount - penaltyDue);
@@ -70,25 +147,25 @@ export default function RepaymentAllocationPage() {
         {/* Header Banner */}
         <Box
           sx={{
-            mb: 4,
-            p: 3,
+            mb: 3.5,
+            p: 3.5,
             borderRadius: 3,
             background: "linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0d9488 100%)",
             color: "#ffffff",
-            boxShadow: "0 10px 25px -5px rgba(15, 23, 42, 0.25)",
+            boxShadow: "0 10px 25px -5px rgba(15, 23, 42, 0.3)",
           }}
         >
           <Stack direction={{ xs: "column", md: "row" }} justifyContent="space-between" alignItems={{ xs: "flex-start", md: "center" }} spacing={2}>
             <Box>
               <Stack direction="row" spacing={1.5} alignItems="center" mb={1}>
-                <Box sx={{ p: 1, bgcolor: "rgba(255,255,255,0.15)", borderRadius: 2, display: "flex" }}>
+                <Box sx={{ p: 1, bgcolor: "rgba(255,255,255,0.18)", borderRadius: 2, display: "flex" }}>
                   <IconCoin size={26} color="#38bdf8" />
                 </Box>
                 <Typography variant="h4" fontWeight={800} sx={{ color: "#ffffff", letterSpacing: "-0.5px" }}>
                   Repayment Allocation Engine
                 </Typography>
               </Stack>
-              <Typography variant="body1" sx={{ color: "#cbd5e1", maxWidth: 650 }}>
+              <Typography variant="body2" sx={{ color: "#cbd5e1", maxWidth: 680 }}>
                 Automated waterfall prioritization ensures statutory compliance, clearing overdue penalties and interest before principal amortisation.
               </Typography>
             </Box>
@@ -99,23 +176,22 @@ export default function RepaymentAllocationPage() {
               sx={{
                 bgcolor: "rgba(16, 185, 129, 0.15)",
                 color: "#6ee7b7",
-                fontWeight: 700,
                 border: "1px solid rgba(16, 185, 129, 0.3)",
-                px: 1,
-                py: 2.2,
-                borderRadius: 2,
+                fontWeight: 700,
+                fontSize: "0.85rem",
+                p: 1.5,
               }}
             />
           </Stack>
 
-          {/* Visual Waterfall Pipeline Step Banner */}
+          {/* Priority Workflow Visual */}
           <Box
             sx={{
               mt: 3,
               p: 2,
-              bgcolor: "rgba(255, 255, 255, 0.07)",
               borderRadius: 2,
-              border: "1px solid rgba(255, 255, 255, 0.12)",
+              bgcolor: "rgba(0,0,0,0.25)",
+              border: "1px solid rgba(255,255,255,0.1)",
             }}
           >
             <Typography variant="caption" sx={{ color: "#94a3b8", fontWeight: 700, letterSpacing: 1 }}>
@@ -193,7 +269,7 @@ export default function RepaymentAllocationPage() {
                       Interactive Waterfall Simulator
                     </Typography>
                     <Typography variant="caption" color="text.secondary">
-                      Test how incoming repayments split across balances
+                      {selectedLoanId ? `Simulating loan account #${selectedLoanId}` : "Test how incoming repayments split across balances"}
                     </Typography>
                   </Box>
                 </Stack>
@@ -220,52 +296,65 @@ export default function RepaymentAllocationPage() {
                       Simulated Split Result:
                     </Typography>
 
-                    {/* Step 1: Penalties */}
-                    <Box mb={2}>
+                    {/* Step 1: Penalty */}
+                    <Box sx={{ mb: 2 }}>
                       <Stack direction="row" justifyContent="space-between" mb={0.5}>
-                        <Typography variant="caption" fontWeight={700} color="error.main">1. Penalties &amp; Fees:</Typography>
-                        <Typography variant="caption" fontWeight={800}>KES {allocatedPenalty.toLocaleString()} / {penaltyDue.toLocaleString()}</Typography>
+                        <Typography variant="caption" fontWeight={700} color="error.main">
+                          1. Penalties &amp; Fees:
+                        </Typography>
+                        <Typography variant="caption" fontWeight={800}>
+                          KES {allocatedPenalty.toLocaleString()} / {penaltyDue.toLocaleString()}
+                        </Typography>
                       </Stack>
                       <LinearProgress
                         variant="determinate"
-                        value={penaltyDue > 0 ? Math.min(100, (allocatedPenalty / penaltyDue) * 100) : 100}
+                        value={penaltyDue > 0 ? (allocatedPenalty / penaltyDue) * 100 : 100}
                         color="error"
                         sx={{ height: 8, borderRadius: 4 }}
                       />
                     </Box>
 
                     {/* Step 2: Interest */}
-                    <Box mb={2}>
+                    <Box sx={{ mb: 2 }}>
                       <Stack direction="row" justifyContent="space-between" mb={0.5}>
-                        <Typography variant="caption" fontWeight={700} color="warning.main">2. Accrued Interest:</Typography>
-                        <Typography variant="caption" fontWeight={800}>KES {allocatedInterest.toLocaleString()} / {interestDue.toLocaleString()}</Typography>
+                        <Typography variant="caption" fontWeight={700} sx={{ color: "#d97706" }}>
+                          2. Accrued Interest:
+                        </Typography>
+                        <Typography variant="caption" fontWeight={800}>
+                          KES {allocatedInterest.toLocaleString()} / {interestDue.toLocaleString()}
+                        </Typography>
                       </Stack>
                       <LinearProgress
                         variant="determinate"
-                        value={interestDue > 0 ? Math.min(100, (allocatedInterest / interestDue) * 100) : 100}
+                        value={interestDue > 0 ? (allocatedInterest / interestDue) * 100 : 100}
                         color="warning"
                         sx={{ height: 8, borderRadius: 4 }}
                       />
                     </Box>
 
                     {/* Step 3: Principal */}
-                    <Box mb={1.5}>
+                    <Box sx={{ mb: 2 }}>
                       <Stack direction="row" justifyContent="space-between" mb={0.5}>
-                        <Typography variant="caption" fontWeight={700} color="success.main">3. Principal Reduction:</Typography>
-                        <Typography variant="caption" fontWeight={800}>KES {allocatedPrincipal.toLocaleString()} / {principalDue.toLocaleString()}</Typography>
+                        <Typography variant="caption" fontWeight={700} color="success.main">
+                          3. Principal Reduction:
+                        </Typography>
+                        <Typography variant="caption" fontWeight={800}>
+                          KES {allocatedPrincipal.toLocaleString()} / {principalDue.toLocaleString()}
+                        </Typography>
                       </Stack>
                       <LinearProgress
                         variant="determinate"
-                        value={principalDue > 0 ? Math.min(100, (allocatedPrincipal / principalDue) * 100) : 100}
+                        value={principalDue > 0 ? (allocatedPrincipal / principalDue) * 100 : 100}
                         color="success"
                         sx={{ height: 8, borderRadius: 4 }}
                       />
                     </Box>
 
+                    {/* Advance prepayment */}
                     {excessAdvance > 0 && (
-                      <Box sx={{ p: 1.2, bgcolor: "info.light", borderRadius: 1.5, mt: 1.5 }}>
+                      <Box sx={{ mt: 1, p: 1, bgcolor: "info.light", borderRadius: 1.5 }}>
                         <Typography variant="caption" color="info.dark" fontWeight={700}>
-                          ⚡ Excess Advance Credit: KES {excessAdvance.toLocaleString()} (Stored in Member Wallet)
+                          ★ Unallocated Advance (Future Installments): KES {excessAdvance.toLocaleString()}
                         </Typography>
                       </Box>
                     )}
@@ -288,18 +377,64 @@ export default function RepaymentAllocationPage() {
               }}
             >
               <CardContent sx={{ p: 3 }}>
-                <Stack direction="row" spacing={1.5} alignItems="center" mb={2}>
-                  <Box sx={{ p: 1, bgcolor: "success.light", color: "success.main", borderRadius: 2, display: "flex" }}>
-                    <IconReceipt2 size={22} />
-                  </Box>
-                  <Box>
-                    <Typography variant="h6" fontWeight={700}>
-                      Portfolio Allocation Balances ({loans.length})
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      Active loan balances synced directly with Jiinue Loan Engine
-                    </Typography>
-                  </Box>
+                <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" alignItems={{ xs: "flex-start", sm: "center" }} spacing={2} mb={2}>
+                  <Stack direction="row" spacing={1.5} alignItems="center">
+                    <Box sx={{ p: 1, bgcolor: "success.light", color: "success.main", borderRadius: 2, display: "flex" }}>
+                      <IconReceipt2 size={22} />
+                    </Box>
+                    <Box>
+                      <Typography variant="h6" fontWeight={700}>
+                        Portfolio Allocation Balances ({filteredLoans.length})
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        Click any loan to test allocation in the simulator
+                      </Typography>
+                    </Box>
+                  </Stack>
+
+                  <ExportButton
+                    data={filteredLoans}
+                    columns={exportColumns}
+                    filename={`repayment_allocation_${activeTab}`}
+                    title={`Royal SACCO - Portfolio Allocation Balances (${activeTab})`}
+                    size="small"
+                  />
+                </Stack>
+
+                <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" alignItems={{ xs: "flex-start", sm: "center" }} spacing={2} mb={2}>
+                  <Tabs
+                    value={activeTab}
+                    onChange={(_, val) => setActiveTab(val)}
+                    textColor="primary"
+                    indicatorColor="primary"
+                    variant="scrollable"
+                    scrollButtons="auto"
+                    sx={{
+                      "& .MuiTab-root": {
+                        fontWeight: 700,
+                        textTransform: "none",
+                        fontSize: "0.82rem",
+                        minHeight: 38,
+                      },
+                    }}
+                  >
+                    <Tab label="Active Servicing" value="active" />
+                    <Tab label="In Arrears" value="arrears" />
+                    <Tab label="All Portfolios" value="all" />
+                  </Tabs>
+
+                  <TextField
+                    size="small"
+                    placeholder="Search loan or member..."
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    slotProps={{
+                      input: {
+                        startAdornment: <IconSearch size={16} style={{ marginRight: 8, color: "#94a3b8" }} />,
+                      },
+                    }}
+                    sx={{ width: { xs: "100%", sm: 220 } }}
+                  />
                 </Stack>
 
                 <Divider sx={{ mb: 2 }} />
@@ -308,42 +443,70 @@ export default function RepaymentAllocationPage() {
                   <Box display="flex" justifyContent="center" py={8}>
                     <CircularProgress />
                   </Box>
-                ) : loans.length === 0 ? (
+                ) : filteredLoans.length === 0 ? (
                   <Box textAlign="center" py={6}>
                     <Typography variant="body2" color="text.secondary">
-                      No active loan records currently found.
+                      No loan records match your search criteria.
                     </Typography>
                   </Box>
                 ) : (
                   <TableContainer component={Paper} elevation={0} sx={{ border: "1px solid", borderColor: "divider", borderRadius: 2 }}>
                     <Table size="small">
-                      <TableHead sx={{ bgcolor: "grey.100" }}>
+                      <TableHead sx={{ bgcolor: "#f8fafc" }}>
                         <TableRow>
                           <TableCell sx={{ fontWeight: 700 }}>Loan #</TableCell>
                           <TableCell sx={{ fontWeight: 700 }}>Member</TableCell>
                           <TableCell sx={{ fontWeight: 700 }} align="right">Principal</TableCell>
-                          <TableCell sx={{ fontWeight: 700 }} align="right">Deposit</TableCell>
                           <TableCell sx={{ fontWeight: 700 }} align="right">Outstanding</TableCell>
-                          <TableCell sx={{ fontWeight: 700 }} align="center">Status</TableCell>
+                          <TableCell sx={{ fontWeight: 700 }} align="center">Action</TableCell>
                         </TableRow>
                       </TableHead>
                       <TableBody>
-                        {loans.map((l) => (
-                          <TableRow key={l.id} hover>
-                            <TableCell sx={{ fontWeight: 600 }}>{l.loan_number}</TableCell>
-                            <TableCell>Member #{l.member_id}</TableCell>
-                            <TableCell align="right">KES {Number(l.principal_amount || 0).toLocaleString()}</TableCell>
-                            <TableCell align="right">KES {Number(l.deposit_paid_amount || 0).toLocaleString()}</TableCell>
+                        {filteredLoans.map((l) => (
+                          <TableRow
+                            key={l.id}
+                            hover
+                            selected={selectedLoanId === l.id}
+                            onClick={() => handleSelectLoanForSim(l)}
+                            sx={{ cursor: "pointer", "&:hover": { bgcolor: "#f1f5f9" } }}
+                          >
+                            <TableCell sx={{ fontWeight: 700 }}>
+                              <Typography variant="body2" fontWeight={700} color="primary.main">
+                                {l.loan_number}
+                              </Typography>
+                              <Typography variant="caption" color="text.secondary">
+                                {l.product_name || "Loan"}
+                              </Typography>
+                            </TableCell>
+
+                            <TableCell>
+                              <Typography variant="body2" fontWeight={600}>
+                                {l.member_name || `Member #${l.member_id}`}
+                              </Typography>
+                            </TableCell>
+
+                            <TableCell align="right">
+                              KES {Number(l.principal_amount || 0).toLocaleString()}
+                            </TableCell>
+
                             <TableCell align="right" sx={{ color: "error.main", fontWeight: 700 }}>
                               KES {Number(l.outstanding_balance || 0).toLocaleString()}
                             </TableCell>
+
                             <TableCell align="center">
-                              <Chip
-                                label={l.status?.replace("_", " ") || "Active"}
+                              <Button
                                 size="small"
-                                color={l.status === "active" ? "success" : "default"}
-                                sx={{ textTransform: "capitalize", fontSize: "0.72rem", fontWeight: 600 }}
-                              />
+                                variant={selectedLoanId === l.id ? "contained" : "outlined"}
+                                color="primary"
+                                startIcon={<IconClick size={14} />}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleSelectLoanForSim(l);
+                                }}
+                                sx={{ textTransform: "none", fontSize: "0.72rem", fontWeight: 700, borderRadius: 1.5 }}
+                              >
+                                {selectedLoanId === l.id ? "Simulating" : "Simulate"}
+                              </Button>
                             </TableCell>
                           </TableRow>
                         ))}
