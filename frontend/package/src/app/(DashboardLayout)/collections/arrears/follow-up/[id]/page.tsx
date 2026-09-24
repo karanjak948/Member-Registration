@@ -34,6 +34,8 @@ import {
   LinearProgress,
 } from "@mui/material";
 import Grid from "@mui/material/Grid";
+import ExportButton from "@/components/common/ExportButton";
+import { ExportColumn } from "@/utils/exportGrid";
 import {
   IconPhoneCall,
   IconMessage,
@@ -135,6 +137,8 @@ export default function FollowUpPage() {
   const [smsTemplate, setSmsTemplate] = useState<string>("reminder");
   const [smsMessage, setSmsMessage] = useState<string>("");
   const [sendingSms, setSendingSms] = useState(false);
+  const [smsError, setSmsError] = useState<string | null>(null);
+  const [smsSuccess, setSmsSuccess] = useState<string | null>(null);
 
   // Toast notification
   const [toast, setToast] = useState<{ open: boolean; message: string; severity: "success" | "error" | "info" }>({
@@ -268,6 +272,8 @@ export default function FollowUpPage() {
     }
 
     setSendingSms(true);
+    setSmsError(null);
+    setSmsSuccess(null);
     try {
       const res = await fetch("/api/sms/send", {
         method: "POST",
@@ -279,6 +285,7 @@ export default function FollowUpPage() {
       });
       const data = await res.json();
       if (res.ok && data.success) {
+        setSmsSuccess("SMS dispatched successfully to borrower!");
         setToast({ open: true, message: "SMS dispatched successfully to borrower!", severity: "success" });
         saveActivityLog({
           id: `sms-${Date.now()}`,
@@ -288,16 +295,28 @@ export default function FollowUpPage() {
           outcome: `SMS Dispatched (${smsTemplate})`,
           notes: smsMessage.trim(),
         });
-        setSmsModalOpen(false);
+        setTimeout(() => setSmsModalOpen(false), 1500);
       } else {
+        const errorMsg = data.error || data.detail || "SMS Gateway delivery failed.";
+        setSmsError(errorMsg);
         setToast({
           open: true,
-          message: data.error || data.detail || "SMS Gateway delivery failed.",
+          message: errorMsg,
           severity: "error",
+        });
+        saveActivityLog({
+          id: `sms-fail-${Date.now()}`,
+          timestamp: new Date().toLocaleString("en-KE", { dateStyle: "medium", timeStyle: "short" }),
+          officer: session?.user?.name || "Credit Officer",
+          type: "sms",
+          outcome: "SMS Dispatch Failed",
+          notes: `Attempted SMS: "${smsMessage.slice(0, 80)}...". Gateway rejected: ${errorMsg}`,
         });
       }
     } catch (e: any) {
-      setToast({ open: true, message: e.message || "Network error while sending SMS.", severity: "error" });
+      const errMsg = e.message || "Network error while sending SMS.";
+      setSmsError(errMsg);
+      setToast({ open: true, message: errMsg, severity: "error" });
     } finally {
       setSendingSms(false);
     }
@@ -360,6 +379,26 @@ export default function FollowUpPage() {
     loan.principal_amount > 0
       ? Math.min(100, Math.round(((loan.principal_amount - loan.principal_balance) / loan.principal_amount) * 100))
       : 0;
+
+  const scheduleExportColumns: ExportColumn<ScheduleEntry>[] = [
+    { header: "Period", accessor: (row) => row.period_number },
+    { header: "Due Date", accessor: (row) => row.due_date },
+    { header: "Expected Amount (KES)", accessor: (row) => Number(row.expected_amount || 0).toLocaleString() },
+    { header: "Expected Principal (KES)", accessor: (row) => Number(row.expected_principal || 0).toLocaleString() },
+    { header: "Expected Interest (KES)", accessor: (row) => Number(row.expected_interest || 0).toLocaleString() },
+    { header: "Remaining Due (KES)", accessor: (row) => Number(row.total_due || 0).toLocaleString() },
+    { header: "Status", accessor: (row) => (row.is_paid ? "Paid" : "Unpaid") },
+  ];
+
+  const activityExportColumns: ExportColumn<FollowUpActivity>[] = [
+    { header: "Timestamp", accessor: (row) => row.timestamp },
+    { header: "Officer", accessor: (row) => row.officer },
+    { header: "Channel", accessor: (row) => row.type.toUpperCase() },
+    { header: "Outcome", accessor: (row) => row.outcome },
+    { header: "Promise Date", accessor: (row) => row.ptpDate || "-" },
+    { header: "Promise Amount (KES)", accessor: (row) => (row.ptpAmount ? row.ptpAmount.toLocaleString() : "-") },
+    { header: "Notes", accessor: (row) => row.notes },
+  ];
 
   return (
     <PageContainer
@@ -707,18 +746,27 @@ export default function FollowUpPage() {
               {/* Card 3: Unpaid Repayment Schedule */}
               <Card elevation={0} sx={{ border: "1px solid", borderColor: "divider", borderRadius: 2.5 }}>
                 <CardContent sx={{ p: 2.5 }}>
-                  <Stack direction="row" spacing={1.5} alignItems="center" mb={1.5}>
-                    <Box sx={{ p: 1, bgcolor: "#fef3c7", color: "#d97706", borderRadius: 1.5, display: "flex" }}>
-                      <IconCalendar size={20} />
-                    </Box>
-                    <Box>
-                      <Typography variant="h6" fontWeight={700}>
-                        Pending Installment Schedule
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        {unpaidEntries.length} installments pending payment
-                      </Typography>
-                    </Box>
+                  <Stack direction="row" justifyContent="space-between" alignItems="center" mb={1.5}>
+                    <Stack direction="row" spacing={1.5} alignItems="center">
+                      <Box sx={{ p: 1, bgcolor: "#fef3c7", color: "#d97706", borderRadius: 1.5, display: "flex" }}>
+                        <IconCalendar size={20} />
+                      </Box>
+                      <Box>
+                        <Typography variant="h6" fontWeight={700}>
+                          Pending Installment Schedule
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {unpaidEntries.length} installments pending payment
+                        </Typography>
+                      </Box>
+                    </Stack>
+                    <ExportButton
+                      data={unpaidEntries}
+                      columns={scheduleExportColumns}
+                      filename={`arrears_schedule_${loan.loan_number}`}
+                      title={`Royal SACCO - Arrears Schedule (${loan.loan_number} - ${loan.member_name})`}
+                      size="small"
+                    />
                   </Stack>
 
                   {unpaidEntries.length === 0 ? (
@@ -877,18 +925,27 @@ export default function FollowUpPage() {
               {/* Card 5: Follow-Up Activity & Communication Timeline */}
               <Card elevation={0} sx={{ border: "1px solid", borderColor: "divider", borderRadius: 2.5 }}>
                 <CardContent sx={{ p: 2.5 }}>
-                  <Stack direction="row" spacing={1.5} alignItems="center" mb={2}>
-                    <Box sx={{ p: 1, bgcolor: "#f1f5f9", color: "#475569", borderRadius: 1.5, display: "flex" }}>
-                      <IconHistory size={20} />
-                    </Box>
-                    <Box>
-                      <Typography variant="h6" fontWeight={700}>
-                        Activity &amp; Contact Log
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        {activities.length} interactions logged
-                      </Typography>
-                    </Box>
+                  <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2}>
+                    <Stack direction="row" spacing={1.5} alignItems="center">
+                      <Box sx={{ p: 1, bgcolor: "#f1f5f9", color: "#475569", borderRadius: 1.5, display: "flex" }}>
+                        <IconHistory size={20} />
+                      </Box>
+                      <Box>
+                        <Typography variant="h6" fontWeight={700}>
+                          Activity &amp; Contact Log
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {activities.length} interactions logged
+                        </Typography>
+                      </Box>
+                    </Stack>
+                    <ExportButton
+                      data={activities}
+                      columns={activityExportColumns}
+                      filename={`followup_log_${loan.loan_number}`}
+                      title={`Royal SACCO - Follow Up Log (${loan.loan_number})`}
+                      size="small"
+                    />
                   </Stack>
 
                   <Stack spacing={2}>
@@ -1004,16 +1061,48 @@ export default function FollowUpPage() {
         </Dialog>
 
         {/* DIALOG 2: Send SMS Notification Modal */}
-        <Dialog open={smsModalOpen} onClose={() => setSmsModalOpen(false)} maxWidth="sm" fullWidth>
+        <Dialog
+          open={smsModalOpen}
+          onClose={() => {
+            setSmsModalOpen(false);
+            setSmsError(null);
+            setSmsSuccess(null);
+          }}
+          maxWidth="sm"
+          fullWidth
+        >
           <DialogTitle sx={{ fontWeight: 800 }}>Dispatch SMS Notification</DialogTitle>
           <DialogContent>
             <Stack spacing={2} mt={1}>
+              {smsError && (
+                <Alert severity="error" sx={{ borderRadius: 2 }}>
+                  <Typography variant="subtitle2" fontWeight={700}>
+                    SMS Gateway Delivery Error:
+                  </Typography>
+                  <Typography variant="body2">{smsError}</Typography>
+                  {smsError.toLowerCase().includes("top up") && (
+                    <Typography variant="caption" display="block" mt={0.5} sx={{ color: "#991b1b", fontWeight: 600 }}>
+                      ℹ The Royal SACCO Bulk SMS account has run out of SMS units. Please purchase SMS credits from the Bulk SMS provider to dispatch live alerts.
+                    </Typography>
+                  )}
+                </Alert>
+              )}
+
+              {smsSuccess && (
+                <Alert severity="success" sx={{ borderRadius: 2 }}>
+                  {smsSuccess}
+                </Alert>
+              )}
+
               <TextField
                 select
                 size="small"
                 label="Select Notification Template"
                 value={smsTemplate}
-                onChange={(e) => setSmsTemplate(e.target.value)}
+                onChange={(e) => {
+                  setSmsTemplate(e.target.value);
+                  setSmsError(null);
+                }}
                 fullWidth
               >
                 <MenuItem value="reminder">Friendly Overdue Reminder</MenuItem>

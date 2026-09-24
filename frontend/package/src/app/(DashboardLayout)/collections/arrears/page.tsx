@@ -29,6 +29,8 @@ import {
 } from "@mui/material";
 import PageContainer from "@/app/(DashboardLayout)/components/container/PageContainer";
 import { useRouter } from "next/navigation";
+import ExportButton from "@/components/common/ExportButton";
+import { ExportColumn } from "@/utils/exportGrid";
 import {
   IconAlertTriangle,
   IconRefresh,
@@ -165,6 +167,18 @@ export default function ArrearsManagementPage() {
         l.member_phone?.toLowerCase().includes(q)
     );
   }, [activePortfolio, activeTab, stages, search]);
+
+  const exportColumns: ExportColumn<LoanRecord>[] = [
+    { header: "Loan #", accessor: (row) => row.loan_number },
+    { header: "Member ID", accessor: (row) => row.membership_number || `Member #${row.member_id}` },
+    { header: "Member Name", accessor: (row) => row.member_name || "N/A" },
+    { header: "Phone Number", accessor: (row) => row.member_phone || "N/A" },
+    { header: "Loan Product", accessor: (row) => row.product_name || "N/A" },
+    { header: "Principal (KES)", accessor: (row) => Number(row.principal_amount || 0).toLocaleString() },
+    { header: "Outstanding Balance (KES)", accessor: (row) => Number(row.outstanding_balance || 0).toLocaleString() },
+    { header: "Days Overdue", accessor: (row) => row.days_overdue || 0 },
+    { header: "Delinquency Status", accessor: (row) => row.status },
+  ];
 
   const handleCopyPhone = (phone: string, id: string) => {
     if (!phone) return;
@@ -494,18 +508,27 @@ export default function ArrearsManagementPage() {
                 <Tab label={`All Facilities (${activePortfolio.length})`} value="all" />
               </Tabs>
 
-              <TextField
-                size="small"
-                placeholder="Search loan, member, phone..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                slotProps={{
-                  input: {
-                    startAdornment: <IconSearch size={16} style={{ marginRight: 8, color: "#94a3b8" }} />,
-                  },
-                }}
-                sx={{ width: { xs: "100%", md: 280 } }}
-              />
+              <Stack direction="row" spacing={1.5} alignItems="center" sx={{ width: { xs: "100%", md: "auto" } }}>
+                <TextField
+                  size="small"
+                  placeholder="Search loan, member, phone..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  slotProps={{
+                    input: {
+                      startAdornment: <IconSearch size={16} style={{ marginRight: 8, color: "#94a3b8" }} />,
+                    },
+                  }}
+                  sx={{ width: { xs: "100%", md: 260 } }}
+                />
+                <ExportButton
+                  data={displayedLoans}
+                  columns={exportColumns}
+                  filename={`arrears_register_${activeTab}`}
+                  title={`Royal SACCO - Arrears & Delinquency Register (${activeTab})`}
+                  size="small"
+                />
+              </Stack>
             </Stack>
 
             <Divider sx={{ mb: 2 }} />
