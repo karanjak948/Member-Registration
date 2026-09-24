@@ -176,41 +176,88 @@ function ReceivePaymentContent() {
     }
   }
 
-  const filteredLoans = loans.filter((l) =>
-    l.loan_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    String(l.member_id).includes(searchTerm)
-  );
+  const [statusTab, setStatusTab] = useState<string>("active");
+
+  const filteredLoans = loans.filter((l) => {
+    const matchesSearch =
+      l.loan_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      String(l.member_id).includes(searchTerm);
+    if (!matchesSearch) return false;
+
+    if (statusTab === "active") return l.status === "active";
+    if (statusTab === "in_arrears") return l.status === "in_arrears" || l.status === "overdue";
+    if (statusTab === "closed") return l.status === "closed";
+    return true;
+  });
 
   return (
     <PageContainer title="Receive Payment - Collections" description="Record Loan Repayments & Collections">
       <Box sx={{ p: { xs: 1, sm: 2 } }}>
-        <Stack direction="row" justifyContent="space-between" alignItems="center" mb={3}>
-          <Box>
-            <Typography variant="h4" fontWeight={700} color="text.primary">
-              Receive Payment &amp; Collections
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Record loan repayments, M-Pesa collections, and direct deposits via Jiinue Loan Engine
-            </Typography>
-          </Box>
-          <Button
-            variant="outlined"
-            startIcon={<IconRefresh size={18} />}
-            onClick={fetchLoans}
-            disabled={loading}
-            sx={{ textTransform: "none" }}
+        {/* Executive Header Banner */}
+        <Box
+          sx={{
+            mb: 3.5,
+            p: 3.5,
+            borderRadius: 3,
+            background: "linear-gradient(135deg, #022c22 0%, #064e3b 60%, #0f172a 100%)",
+            color: "#ffffff",
+            boxShadow: "0 12px 28px -6px rgba(2, 44, 34, 0.35)",
+          }}
+        >
+          <Stack
+            direction={{ xs: "column", md: "row" }}
+            justifyContent="space-between"
+            alignItems={{ xs: "flex-start", md: "center" }}
+            spacing={2}
           >
-            Refresh
-          </Button>
-        </Stack>
+            <Box>
+              <Stack direction="row" spacing={1.5} alignItems="center" mb={1}>
+                <Box sx={{ p: 1, bgcolor: "rgba(255,255,255,0.18)", borderRadius: 2, display: "flex" }}>
+                  <IconCash size={26} color="#6ee7b7" />
+                </Box>
+                <Typography variant="h4" fontWeight={800} sx={{ color: "#ffffff", letterSpacing: "-0.5px" }}>
+                  Receive Payment &amp; Collections
+                </Typography>
+              </Stack>
+              <Typography variant="body2" sx={{ color: "#d1fae5", maxWidth: 680 }}>
+                Record loan repayments, settle M-Pesa collections, and execute principal early-payoff waivers via the Jiinue Loan Engine.
+              </Typography>
+            </Box>
+
+            <Button
+              variant="outlined"
+              startIcon={<IconRefresh size={18} />}
+              onClick={fetchLoans}
+              disabled={loading}
+              sx={{
+                borderColor: "rgba(255,255,255,0.4)",
+                color: "#ffffff",
+                fontWeight: 600,
+                textTransform: "none",
+                "&:hover": { borderColor: "#ffffff", bgcolor: "rgba(255,255,255,0.1)" },
+              }}
+            >
+              Refresh
+            </Button>
+          </Stack>
+        </Box>
 
         <Grid container spacing={3}>
           {/* Payment Form */}
           <Grid size={{ xs: 12, md: 5 }}>
-            <Card elevation={0} sx={{ border: "1px solid", borderColor: "divider", borderRadius: 2 }}>
+            <Card
+              elevation={0}
+              sx={{
+                bgcolor: "#ffffff",
+                border: "1px solid #e2e8f0",
+                borderTop: "3px solid #059669",
+                borderRadius: 2.5,
+                boxShadow: "0 4px 16px rgba(0,0,0,0.04)",
+              }}
+            >
               <CardContent sx={{ p: 3 }}>
                 <Stack direction="row" spacing={1.5} alignItems="center" mb={2}>
-                  <Box sx={{ p: 1, bgcolor: "primary.light", borderRadius: 1.5, color: "primary.main", display: "flex" }}>
+                  <Box sx={{ p: 1, bgcolor: "#ecfdf5", borderRadius: 1.5, color: "#059669", display: "flex" }}>
                     <IconCash size={22} />
                   </Box>
                   <Typography variant="h6" fontWeight={700}>
@@ -371,11 +418,18 @@ function ReceivePaymentContent() {
                     <Button
                       type="submit"
                       variant="contained"
-                      color="primary"
                       size="large"
                       disabled={submitting || loans.length === 0}
                       startIcon={submitting ? <CircularProgress size={18} color="inherit" /> : <IconCheck size={18} />}
-                      sx={{ textTransform: "none", fontWeight: 700, py: 1.3 }}
+                      sx={{
+                        textTransform: "none",
+                        fontWeight: 700,
+                        py: 1.4,
+                        bgcolor: "#059669",
+                        color: "#ffffff",
+                        boxShadow: "0 4px 14px rgba(5, 150, 105, 0.35)",
+                        "&:hover": { bgcolor: "#047857" },
+                      }}
                     >
                       {submitting ? "Processing Repayment..." : "Confirm & Record Payment"}
                     </Button>
@@ -387,19 +441,29 @@ function ReceivePaymentContent() {
 
           {/* Loans Overview & Search */}
           <Grid size={{ xs: 12, md: 7 }}>
-            <Card elevation={0} sx={{ border: "1px solid", borderColor: "divider", borderRadius: 2, height: "100%" }}>
+            <Card
+              elevation={0}
+              sx={{
+                bgcolor: "#ffffff",
+                border: "1px solid #e2e8f0",
+                borderTop: "3px solid #0284c7",
+                borderRadius: 2.5,
+                boxShadow: "0 4px 16px rgba(0,0,0,0.04)",
+                height: "100%",
+              }}
+            >
               <CardContent sx={{ p: 3 }}>
-                <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2}>
+                <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" alignItems={{ xs: "flex-start", sm: "center" }} spacing={1.5} mb={2}>
                   <Stack direction="row" spacing={1.5} alignItems="center">
-                    <Box sx={{ p: 1, bgcolor: "success.light", borderRadius: 1.5, color: "success.main", display: "flex" }}>
+                    <Box sx={{ p: 1, bgcolor: "#f0f9ff", borderRadius: 1.5, color: "#0284c7", display: "flex" }}>
                       <IconReceipt size={22} />
                     </Box>
                     <Typography variant="h6" fontWeight={700}>
-                      Active Loans in System ({loans.length})
+                      Loan Accounts ({filteredLoans.length})
                     </Typography>
                   </Stack>
 
-                  <Stack direction="row" spacing={1} alignItems="center">
+                  <Stack direction="row" spacing={1} alignItems="center" sx={{ width: { xs: "100%", sm: "auto" } }}>
                     <TextField
                       size="small"
                       placeholder="Search loan or member..."
@@ -410,7 +474,7 @@ function ReceivePaymentContent() {
                           startAdornment: <IconSearch size={16} style={{ marginRight: 6, color: "#94a3b8" }} />,
                         },
                       }}
-                      sx={{ width: 180 }}
+                      sx={{ width: { xs: "100%", sm: 180 } }}
                     />
                     <ExportButton
                       data={filteredLoans}
@@ -428,6 +492,33 @@ function ReceivePaymentContent() {
                   </Stack>
                 </Stack>
 
+                {/* Filter Tabs */}
+                <Stack direction="row" spacing={1} sx={{ mb: 2 }}>
+                  {[
+                    { label: "Active Servicing", value: "active" },
+                    { label: "In Arrears", value: "in_arrears" },
+                    { label: "All Accounts", value: "all" },
+                  ].map((tab) => (
+                    <Button
+                      key={tab.value}
+                      size="small"
+                      variant={statusTab === tab.value ? "contained" : "outlined"}
+                      onClick={() => setStatusTab(tab.value)}
+                      sx={{
+                        textTransform: "none",
+                        fontSize: "0.75rem",
+                        fontWeight: 700,
+                        borderRadius: 2,
+                        ...(statusTab === tab.value
+                          ? { bgcolor: "#059669", color: "#ffffff", "&:hover": { bgcolor: "#047857" } }
+                          : { borderColor: "#cbd5e1", color: "#64748b" }),
+                      }}
+                    >
+                      {tab.label}
+                    </Button>
+                  ))}
+                </Stack>
+
                 <Divider sx={{ mb: 2 }} />
 
                 {loading ? (
@@ -441,9 +532,9 @@ function ReceivePaymentContent() {
                     </Typography>
                   </Box>
                 ) : (
-                  <TableContainer component={Paper} elevation={0} sx={{ border: "1px solid", borderColor: "divider" }}>
+                  <TableContainer component={Paper} elevation={0} sx={{ border: "1px solid #e2e8f0", borderRadius: 2 }}>
                     <Table size="small">
-                      <TableHead sx={{ bgcolor: "grey.100" }}>
+                      <TableHead sx={{ bgcolor: "#f8fafc" }}>
                         <TableRow>
                           <TableCell sx={{ fontWeight: 700 }}>Loan #</TableCell>
                           <TableCell sx={{ fontWeight: 700 }}>Member ID</TableCell>
@@ -454,34 +545,55 @@ function ReceivePaymentContent() {
                         </TableRow>
                       </TableHead>
                       <TableBody>
-                        {filteredLoans.map((l) => (
-                          <TableRow key={l.id} hover selected={l.id === Number(selectedLoanId)}>
-                            <TableCell sx={{ fontWeight: 600 }}>{l.loan_number}</TableCell>
-                            <TableCell>Member #{l.member_id}</TableCell>
-                            <TableCell align="right">KES {Number(l.principal_amount || 0).toLocaleString()}</TableCell>
-                            <TableCell align="right" sx={{ color: "error.main", fontWeight: 700 }}>
-                              KES {Number(l.outstanding_balance || 0).toLocaleString()}
-                            </TableCell>
-                            <TableCell align="center">
-                              <Chip
-                                label={l.status?.replace("_", " ") || "ACTIVE"}
-                                size="small"
-                                color={l.status === "active" ? "success" : "warning"}
-                                sx={{ textTransform: "capitalize", fontSize: "0.7rem" }}
-                              />
-                            </TableCell>
-                            <TableCell align="center">
-                              <Button
-                                size="small"
-                                variant="text"
-                                onClick={() => setSelectedLoanId(l.id)}
-                                sx={{ textTransform: "none", fontSize: "0.75rem", fontWeight: 700 }}
-                              >
-                                Select
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        ))}
+                        {filteredLoans.map((l) => {
+                          const isAct = l.status === "active";
+                          const isPending = l.status?.includes("pending");
+                          const isClosed = l.status === "closed";
+
+                          return (
+                            <TableRow key={l.id} hover selected={l.id === Number(selectedLoanId)}>
+                              <TableCell sx={{ fontWeight: 700 }}>{l.loan_number}</TableCell>
+                              <TableCell sx={{ color: "text.secondary" }}>Member #{l.member_id}</TableCell>
+                              <TableCell align="right" sx={{ fontWeight: 600 }}>KES {Number(l.principal_amount || 0).toLocaleString()}</TableCell>
+                              <TableCell align="right" sx={{ color: Number(l.outstanding_balance || 0) > 0 ? "#dc2626" : "#059669", fontWeight: 800 }}>
+                                KES {Number(l.outstanding_balance || 0).toLocaleString()}
+                              </TableCell>
+                              <TableCell align="center">
+                                <Chip
+                                  label={l.status?.replace("_", " ") || "ACTIVE"}
+                                  size="small"
+                                  sx={{
+                                    textTransform: "capitalize",
+                                    fontSize: "0.72rem",
+                                    fontWeight: 700,
+                                    bgcolor: isAct ? "#ecfdf5" : isPending ? "#fffbeb" : isClosed ? "#f1f5f9" : "#fef2f2",
+                                    color: isAct ? "#065f46" : isPending ? "#92400e" : isClosed ? "#475569" : "#991b1b",
+                                    border: isAct ? "1px solid #a7f3d0" : isPending ? "1px solid #fde68a" : isClosed ? "1px solid #e2e8f0" : "1px solid #fecaca",
+                                  }}
+                                />
+                              </TableCell>
+                              <TableCell align="center">
+                                <Button
+                                  size="small"
+                                  variant={l.id === Number(selectedLoanId) ? "contained" : "outlined"}
+                                  onClick={() => setSelectedLoanId(l.id)}
+                                  sx={{
+                                    textTransform: "none",
+                                    fontSize: "0.75rem",
+                                    fontWeight: 700,
+                                    borderRadius: 1.5,
+                                    px: 1.5,
+                                    ...(l.id === Number(selectedLoanId)
+                                      ? { bgcolor: "#059669", color: "#ffffff", "&:hover": { bgcolor: "#047857" } }
+                                      : { borderColor: "#cbd5e1", color: "#059669", "&:hover": { borderColor: "#059669", bgcolor: "#ecfdf5" } }),
+                                  }}
+                                >
+                                  {l.id === Number(selectedLoanId) ? "Selected" : "Select"}
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
                       </TableBody>
                     </Table>
                   </TableContainer>

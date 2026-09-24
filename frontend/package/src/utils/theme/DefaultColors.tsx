@@ -12,37 +12,39 @@ const baselightTheme = createTheme({
   direction: "ltr",
   palette: {
     primary: {
-      main: "#5D87FF",
-      light: "#ECF2FF",
-      dark: "#4570EA",
+      main: "#059669", // Royal SACCO Emerald
+      light: "#ecfdf5",
+      dark: "#047857",
+      contrastText: "#ffffff",
     },
     secondary: {
-      main: "#49BEFF",
-      light: "#E8F7FF",
-      dark: "#23afdb",
+      main: "#0284c7", // Midnight Sapphire / Corporate Slate Blue
+      light: "#f0f9ff",
+      dark: "#0369a1",
+      contrastText: "#ffffff",
     },
     success: {
-      main: "#13DEB9",
-      light: "#E6FFFA",
-      dark: "#02b3a9",
+      main: "#10b981", // Crisp Emerald Green (replaces neon cyan)
+      light: "#ecfdf5",
+      dark: "#059669",
       contrastText: "#ffffff",
     },
     info: {
-      main: "#539BFF",
-      light: "#EBF3FE",
-      dark: "#1682d4",
+      main: "#0284c7",
+      light: "#f0f9ff",
+      dark: "#0369a1",
       contrastText: "#ffffff",
     },
     error: {
-      main: "#FA896B",
-      light: "#FDEDE8",
-      dark: "#f3704d",
+      main: "#dc2626", // Authoritative Crimson Red (replaces peach/salmon)
+      light: "#fef2f2",
+      dark: "#b91c1c",
       contrastText: "#ffffff",
     },
     warning: {
-      main: "#FFAE1F",
-      light: "#FEF5E5",
-      dark: "#ae8e59",
+      main: "#d97706", // Deep Warm Amber (replaces pastel yellow)
+      light: "#fffbeb",
+      dark: "#b45309",
       contrastText: "#ffffff",
     },
     grey: {
