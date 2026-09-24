@@ -395,26 +395,45 @@ def calculate_jiinue_special_preschedule(
     weekly_int = round2(total_interest / _to_d(W))
 
     schedule: List[JiinueSpecialScheduleEntry] = []
-    curr_bal = total_payable
+    weeks_per_month = max(1, W // M)
+    sim_bal = P
     accum_prn = Decimal("0.00")
-    accum_int = Decimal("0.00")
 
     for w in range(1, W + 1):
         due = disbursement_date + timedelta(days=7 * w)
+        m_idx = min(M, (w - 1) // weeks_per_month + 1)
+        is_first_in_month = ((w - 1) % weeks_per_month == 0)
 
-        if w == W:
-            # Final period takes up any fractional cent discrepancies
-            exp_prn = round2(P - accum_prn)
-            exp_int = round2(total_interest - accum_int)
-            exp_amt = round2(curr_bal)
-            closing = Decimal("0.00")
+        # In Peter Irungu's single-balance model:
+        # At start of month m, cycle interest = 20% of opening principal sim_bal
+        # First week in month satisfies the cycle interest
+        int_m = round2(sim_bal * r)
+
+        if is_first_in_month:
+            exp_int = int_m
+            exp_prn = Decimal("0.00")
+            exp_amt = exp_int
+            opening_b = round2(sim_bal + int_m)
+            closing_b = sim_bal
         else:
-            exp_prn = weekly_prn
-            exp_int = weekly_int
-            exp_amt = weekly_inst
-            closing = round2(curr_bal - exp_amt)
-            if closing < Decimal("0.00"):
-                closing = Decimal("0.00")
+            exp_int = Decimal("0.00")
+            rem_w = weeks_per_month - 1
+            if rem_w > 0:
+                if (w % weeks_per_month) == 0:
+                    exp_prn = round2(P_mo - (round2(P_mo / _to_d(rem_w)) * _to_d(rem_w - 1)))
+                else:
+                    exp_prn = round2(P_mo / _to_d(rem_w))
+            else:
+                exp_prn = P_mo
+
+            if w == W:
+                exp_prn = round2(P - accum_prn)
+
+            exp_amt = exp_prn
+            opening_b = sim_bal
+            closing_b = max(Decimal("0.00"), sim_bal - exp_prn)
+            sim_bal = closing_b
+            accum_prn += exp_prn
 
         schedule.append(
             JiinueSpecialScheduleEntry(
@@ -423,13 +442,10 @@ def calculate_jiinue_special_preschedule(
                 expected_amount=exp_amt,
                 expected_principal=exp_prn,
                 expected_interest=exp_int,
-                opening_balance=round2(curr_bal),
-                closing_balance=closing,
+                opening_balance=opening_b,
+                closing_balance=closing_b,
             )
         )
-        accum_prn += exp_prn
-        accum_int += exp_int
-        curr_bal = closing
 
     return JiinueSpecialPreScheduleResult(
         principal=round2(P),
@@ -472,4 +488,38 @@ def check_loan_default_status(loan, as_of_date: date | None = None) -> bool:
             loan.save(update_fields=["status"])
             return True
     return False
+
+
+def accrue_cycle_interest(loan, as_of_date: date | None = None) -> Decimal:
+    """
+    Evaluates whether a new 30-day compounding cycle has been reached for a reducing balance loan.
+    If so, adds the cycle interest (e.g. 20% on remaining principal balance) to the loan.
+    """
+    if loan.interest_method != "reducing_balance":
+        return Decimal("0.00")
+    if loan.principal_balance <= Decimal("0.01"):
+        return Decimal("0.00")
+    disb = loan.disbursement_date
+    if not disb:
+        return Decimal("0.00")
+
+    if as_of_date is None:
+        from django.utils import timezone
+        as_of_date = timezone.now().date()
+
+    days_elapsed = (as_of_date - disb).days
+    if days_elapsed < 30:
+        return Decimal("0.00")
+
+    cycle_idx = (days_elapsed // 30) + 1
+    # If loan currently has 0 unpaid interest and we are in cycle 2+, charge cycle interest
+    if loan.interest_balance <= Decimal("0.01"):
+        rate = loan.interest_rate / Decimal("100")
+        charge = round2(loan.principal_balance * rate)
+        loan.interest_balance += charge
+        loan.outstanding_balance += charge
+        loan.save(update_fields=["interest_balance", "outstanding_balance"])
+        return charge
+    return Decimal("0.00")
+
 

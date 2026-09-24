@@ -442,13 +442,26 @@ class LoanViewSet(viewsets.ModelViewSet):
         loan.status = LoanStatus.ACTIVE
         loan.disbursed_by = request.user if request.user and request.user.is_authenticated else None
         loan.principal_balance = principal
-        loan.interest_balance = total_interest
-        loan.outstanding_balance = principal + total_interest
+        if loan.interest_method == "reducing_balance":
+            # Under Peter Irungu's specification:
+            # Immediate 20% charge is added at disbursement (Cycle 1 interest)
+            # Opening outstanding balance = Principal + Cycle 1 Interest (e.g. 30k + 6k = 36k)
+            initial_cycle_interest = round2(principal * (loan.interest_rate / Decimal("100")))
+            loan.interest_balance = initial_cycle_interest
+            loan.outstanding_balance = principal + initial_cycle_interest
+        else:
+            loan.interest_balance = total_interest
+            loan.outstanding_balance = principal + total_interest
 
         ref_weekly = None
         if loan.interest_method == "reducing_balance" and num_periods > 0:
-            if loan.repayment_frequency == "weekly" and product.interest_period == "monthly" and schedule:
-                ref_weekly = schedule[0].expected_amount
+            if loan.repayment_frequency == "weekly" and product.interest_period == "monthly":
+                try:
+                    # Reference weekly target for borrower (e.g. KES 3,500 on 30k 12-week loan)
+                    total_proj_liability = principal + total_interest
+                    ref_weekly = round2(total_proj_liability / Decimal(str(num_periods)))
+                except Exception:
+                    ref_weekly = None
             else:
                 try:
                     r_dec = loan.interest_rate / Decimal("100")

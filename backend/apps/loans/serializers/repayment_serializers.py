@@ -5,6 +5,7 @@ from apps.loans.models import Repayment, Loan, LoanStatus
 from apps.loans.services.engine.repayment import allocate_repayment_waterfall
 from apps.loans.services.accounting import record_repayment_journal
 from apps.loans.services.engine.interest import round2
+from apps.loans.services.engine.microfinance import accrue_cycle_interest, add_calendar_months
 from django.db import transaction
 from django.utils import timezone
 
@@ -92,62 +93,71 @@ class RepaymentSerializer(serializers.ModelSerializer):
         #    - Clearing the loan in Month 1 charges only Month 1 interest (e.g. 6k on 30k = 36k total).
         #    - In subsequent months, interest is 20% on the remaining principal balance.
         is_reducing = loan.interest_method == "reducing_balance"
+        if is_reducing and loan.disbursement_date:
+            accrue_cycle_interest(loan, as_of_date=payment_date)
+
         total_full_payoff = loan.principal_balance + loan.interest_balance + due_penalty + due_fees
 
+        current_cycle_due = Decimal("0.00")
         if is_early_settlement:
             if is_reducing and unpaid_entries:
-                all_entries = list(loan.schedule_entries.all().order_by("period_number"))
-                curr_active = None
-                for entry in all_entries:
-                    if payment_date <= entry.due_date:
-                        curr_active = entry
-                        break
-                active_unpaid = (
-                    max(Decimal("0.00"), curr_active.expected_interest - curr_active.paid_interest)
-                    if curr_active and not curr_active.is_paid
-                    else Decimal("0.00")
-                )
+                disb = loan.disbursement_date or (loan.schedule_entries.first().due_date - timedelta(days=30))
+                cycle_idx = 1
+                while payment_date > add_calendar_months(disb, cycle_idx):
+                    cycle_idx += 1
+                cycle_start_date = add_calendar_months(disb, cycle_idx - 1)
+                cycle_end_date = add_calendar_months(disb, cycle_idx)
                 overdue_int = sum(
                     max(Decimal("0.00"), e.expected_interest - e.paid_interest)
-                    for e in unpaid_entries if e.due_date < payment_date
+                    for e in unpaid_entries if e.due_date < cycle_start_date
                 )
-                due_interest = overdue_int + active_unpaid
+                active_cycle_entries = [
+                    e for e in unpaid_entries if (cycle_start_date <= e.due_date <= cycle_end_date) or (e.period_number == cycle_idx)
+                ]
+                active_cycle_unpaid_interest = sum(
+                    max(Decimal("0.00"), e.expected_interest - e.paid_interest)
+                    for e in active_cycle_entries
+                )
+                due_interest = overdue_int + active_cycle_unpaid_interest
+                current_cycle_due = due_interest
             else:
                 due_interest = overdue_interest
         elif is_reducing and unpaid_entries:
             # Under Peter Irungu's specification:
-            # Interest is charged on 30-day boundaries (Cycle 1 at disbursement, Cycle 2 on day 30, etc.)
+            # Interest is charged on monthly cycles (Cycle 1 at disbursement, Cycle 2 on day 30 rollover, etc.)
+            # The repayment first satisfies the active cycle's unpaid interest (plus any overdue interest from previous cycles).
+            # Any excess payment reduces principal balance directly.
             disb = loan.disbursement_date or (loan.schedule_entries.first().due_date - timedelta(days=30))
-            all_entries = list(loan.schedule_entries.all().order_by("period_number"))
+            cycle_idx = 1
+            while payment_date > add_calendar_months(disb, cycle_idx):
+                cycle_idx += 1
 
-            current_active_entry = None
-            for entry in all_entries:
-                if payment_date <= entry.due_date:
-                    current_active_entry = entry
-                    break
-            if current_active_entry is None:
-                current_active_entry = all_entries[-1]
+            cycle_start_date = add_calendar_months(disb, cycle_idx - 1)
+            cycle_end_date = add_calendar_months(disb, cycle_idx)
 
-            # Overdue interest from previous completed cycles
+            # Overdue interest from prior cycles
             overdue_int = sum(
                 max(Decimal("0.00"), e.expected_interest - e.paid_interest)
-                for e in unpaid_entries if e.due_date < payment_date
+                for e in unpaid_entries if e.due_date < cycle_start_date
             )
 
-            # Unpaid interest for the cycle active on payment_date
-            if current_active_entry and not current_active_entry.is_paid:
-                active_cycle_unpaid_interest = max(
-                    Decimal("0.00"), current_active_entry.expected_interest - current_active_entry.paid_interest
-                )
-            else:
-                active_cycle_unpaid_interest = Decimal("0.00")
+            # Entries belonging to current active cycle (due within cycle window or period_number == cycle_idx)
+            active_cycle_entries = [
+                e for e in unpaid_entries if (cycle_start_date <= e.due_date <= cycle_end_date) or (e.period_number == cycle_idx)
+            ]
+
+            active_cycle_unpaid_interest = sum(
+                max(Decimal("0.00"), e.expected_interest - e.paid_interest)
+                for e in active_cycle_entries
+            )
+
+            # If the entry for this cycle was already prepaid/paid, but interest was accrued for this cycle (cycle 2+)
+            if not active_cycle_entries and cycle_idx >= 2 and loan.interest_balance > Decimal("0.00"):
+                active_cycle_unpaid_interest = loan.interest_balance
 
             current_cycle_due = overdue_int + active_cycle_unpaid_interest
-
-            # Check early payoff threshold
-            payoff_threshold = loan.principal_balance + current_cycle_due + due_penalty + due_fees
-            if amount >= payoff_threshold:
-                due_interest = current_cycle_due
+            if loan.interest_balance > Decimal("0.00"):
+                due_interest = min(loan.interest_balance, current_cycle_due)
             else:
                 due_interest = current_cycle_due
         elif amount >= total_full_payoff:
@@ -218,52 +228,84 @@ class RepaymentSerializer(serializers.ModelSerializer):
         rem_pen_alloc = alloc.allocated_penalty
 
         is_reducing = loan.interest_method == "reducing_balance"
-        active_entry = unpaid_entries[0] if unpaid_entries else None
+        if is_reducing and unpaid_entries:
+            target_entry = unpaid_entries[0]
+            target_entry.paid_penalty += alloc.allocated_penalty
+            target_entry.paid_fees += alloc.allocated_fees
+            target_entry.paid_interest += alloc.allocated_interest
+            target_entry.paid_principal += alloc.allocated_principal
 
-        for entry in unpaid_entries:
-            if rem_pen_alloc > Decimal("0"):
-                due_pen = max(Decimal("0"), entry.expected_penalty - entry.paid_penalty)
-                pay = min(rem_pen_alloc, due_pen)
-                entry.paid_penalty += pay
-                rem_pen_alloc -= pay
+            if target_entry.paid_interest > target_entry.expected_interest:
+                target_entry.expected_interest = target_entry.paid_interest
+            if target_entry.paid_principal > target_entry.expected_principal:
+                target_entry.expected_principal = target_entry.paid_principal
 
-            if rem_fee_alloc > Decimal("0"):
-                due_fee = max(Decimal("0"), entry.expected_fees - entry.paid_fees)
-                pay = min(rem_fee_alloc, due_fee)
-                entry.paid_fees += pay
-                rem_fee_alloc -= pay
+            target_entry.expected_amount = (
+                target_entry.expected_principal
+                + target_entry.expected_interest
+                + target_entry.expected_fees
+                + target_entry.expected_penalty
+            )
+            rem_prn = max(Decimal("0.00"), loan.principal_balance - alloc.allocated_principal)
+            rem_int = max(Decimal("0.00"), loan.interest_balance - alloc.allocated_interest)
+            target_entry.closing_balance = rem_prn + rem_int
+            if target_entry.remaining_principal <= Decimal("0.01") and target_entry.remaining_interest <= Decimal("0.01"):
+                target_entry.is_paid = True
+                target_entry.paid_date = payment_date
+            target_entry.save()
 
-            if rem_int_alloc > Decimal("0"):
-                due_int = max(Decimal("0"), entry.expected_interest - entry.paid_interest)
-                pay = min(rem_int_alloc, due_int)
-                entry.paid_interest += pay
-                rem_int_alloc -= pay
+            # Align subsequent schedule entries' opening and closing balances
+            curr_b = target_entry.closing_balance
+            for nxt in unpaid_entries[1:]:
+                nxt.opening_balance = curr_b
+                nxt.closing_balance = max(Decimal("0.00"), curr_b - nxt.expected_principal)
+                nxt.save(update_fields=["opening_balance", "closing_balance"])
+                curr_b = nxt.closing_balance
+        else:
+            for entry in unpaid_entries:
+                if rem_pen_alloc > Decimal("0"):
+                    due_pen = max(Decimal("0"), entry.expected_penalty - entry.paid_penalty)
+                    pay = min(rem_pen_alloc, due_pen)
+                    entry.paid_penalty += pay
+                    rem_pen_alloc -= pay
 
+                if rem_fee_alloc > Decimal("0"):
+                    due_fee = max(Decimal("0"), entry.expected_fees - entry.paid_fees)
+                    pay = min(rem_fee_alloc, due_fee)
+                    entry.paid_fees += pay
+                    rem_fee_alloc -= pay
+
+                if rem_int_alloc > Decimal("0"):
+                    due_int = max(Decimal("0"), entry.expected_interest - entry.paid_interest)
+                    pay = min(rem_int_alloc, due_int)
+                    entry.paid_interest += pay
+                    rem_int_alloc -= pay
+
+                if rem_prn_alloc > Decimal("0"):
+                    due_prn = max(Decimal("0"), entry.expected_principal - entry.paid_principal)
+                    pay = min(rem_prn_alloc, due_prn)
+                    entry.paid_principal += pay
+                    rem_prn_alloc -= pay
+
+                if entry.remaining_principal <= Decimal("0.01") and entry.remaining_interest <= Decimal("0.01"):
+                    entry.is_paid = True
+                    entry.paid_date = payment_date
+
+                if entry.paid_principal > Decimal("0.00"):
+                    entry.closing_balance = max(Decimal("0.00"), entry.opening_balance - entry.paid_principal)
+
+                entry.save()
+
+            # If any extra principal prepayment remains beyond all scheduled installments, apply to last unpaid entry
             if rem_prn_alloc > Decimal("0"):
-                due_prn = max(Decimal("0"), entry.expected_principal - entry.paid_principal)
-                pay = min(rem_prn_alloc, due_prn)
-                entry.paid_principal += pay
-                rem_prn_alloc -= pay
-
-            if entry.remaining_principal <= Decimal("0.01") and entry.remaining_interest <= Decimal("0.01"):
-                entry.is_paid = True
-                entry.paid_date = payment_date
-
-            if entry.paid_principal > Decimal("0.00"):
-                entry.closing_balance = max(Decimal("0.00"), entry.opening_balance - entry.paid_principal)
-
-            entry.save()
-
-        # If any extra principal prepayment remains beyond all scheduled installments, apply to last unpaid entry
-        if rem_prn_alloc > Decimal("0"):
-            last_entry = unpaid_entries[-1] if unpaid_entries else None
-            if last_entry:
-                last_entry.paid_principal += rem_prn_alloc
-                last_entry.closing_balance = max(Decimal("0.00"), last_entry.opening_balance - last_entry.paid_principal)
-                if last_entry.remaining_principal <= Decimal("0.01") and last_entry.remaining_interest <= Decimal("0.01"):
-                    last_entry.is_paid = True
-                    last_entry.paid_date = payment_date
-                last_entry.save()
+                last_entry = unpaid_entries[-1] if unpaid_entries else None
+                if last_entry:
+                    last_entry.paid_principal += rem_prn_alloc
+                    last_entry.closing_balance = max(Decimal("0.00"), last_entry.opening_balance - last_entry.paid_principal)
+                    if last_entry.remaining_principal <= Decimal("0.01") and last_entry.remaining_interest <= Decimal("0.01"):
+                        last_entry.is_paid = True
+                        last_entry.paid_date = payment_date
+                    last_entry.save()
 
         # Update Loan Header Balances
         loan.penalty_balance = max(Decimal("0"), loan.penalty_balance - alloc.allocated_penalty)
@@ -300,91 +342,47 @@ class RepaymentSerializer(serializers.ModelSerializer):
         # dynamically recalculate future cycles' interest strictly against the reduced principal balance (Peter Irungu's specification)
         has_future_entries = loan.schedule_entries.filter(period_number__gt=1).exists()
         if is_reducing and not is_early_settlement and alloc.allocated_principal > Decimal("0.00") and has_future_entries and loan.principal_balance > Decimal("0.01"):
+            rate_pct = loan.interest_rate / Decimal("100")
+            if loan.loan_product and loan.loan_product.interest_period == "yearly":
+                r_per = rate_pct / Decimal("12")
+            else:
+                r_per = rate_pct
 
             remaining_unpaid_entries = list(loan.schedule_entries.filter(is_paid=False).order_by("period_number"))
             num_rem = len(remaining_unpaid_entries)
+            if num_rem >= 1:
+                is_weekly = loan.repayment_frequency in ["weekly", "biweekly"]
+                sim_bal = loan.principal_balance
+                rem_prn_per_period = round2(sim_bal / Decimal(str(num_rem)))
 
-            if num_rem > 1:
-                # Jiinue Loan Special: weekly repayment with monthly interest period
-                # Recalculate using the exact pre-schedule engine (Peter Irungu's model)
-                is_weekly_monthly = (
-                    loan.repayment_frequency == "weekly"
-                    and loan.loan_product
-                    and loan.loan_product.interest_period == "monthly"
-                )
-
-                if is_weekly_monthly:
-                    from apps.loans.services.engine.microfinance import calculate_jiinue_special_preschedule
-                    # Recalculate the remaining pre-schedule based on current principal balance
-                    # and how many weekly periods remain
-                    first_remaining_due = remaining_unpaid_entries[0].due_date
-                    presched = calculate_jiinue_special_preschedule(
-                        principal=loan.principal_balance,
-                        interest_rate_pct=loan.interest_rate,
-                        num_periods=num_rem,
-                        disbursement_date=first_remaining_due - timedelta(days=7),
-                    )
-                    new_future_interest_total = Decimal("0.00")
-                    for idx, (r_entry, s_row) in enumerate(zip(remaining_unpaid_entries, presched.schedule)):
-                        r_entry.opening_balance = s_row.opening_balance
-                        r_entry.expected_interest = s_row.expected_interest
-                        r_entry.expected_principal = s_row.expected_principal
-                        r_entry.closing_balance = s_row.closing_balance
-                        r_entry.expected_amount = round2(
-                            s_row.expected_principal + s_row.expected_interest
-                            + r_entry.expected_fees + r_entry.expected_penalty
-                        )
-                        r_entry.save(update_fields=[
-                            "opening_balance",
-                            "expected_interest",
-                            "expected_principal",
-                            "closing_balance",
-                            "expected_amount",
-                        ])
-                        rem_int_entry = max(Decimal("0.00"), s_row.expected_interest - r_entry.paid_interest)
-                        new_future_interest_total += rem_int_entry
-
-                    loan.interest_balance = round2(new_future_interest_total)
-
-                else:
-                    rate_pct = loan.interest_rate / Decimal("100")
-                    if loan.loan_product and loan.loan_product.interest_period == "yearly":
-                        r_per = rate_pct / Decimal("12")
+                for idx, r_entry in enumerate(remaining_unpaid_entries):
+                    r_entry.opening_balance = round2(sim_bal)
+                    if is_weekly:
+                        int_charge = Decimal("0.00")
                     else:
-                        r_per = rate_pct
-
-                    rem_prn_per_period = round2(loan.principal_balance / Decimal(str(num_rem)))
-                    sim_bal = loan.principal_balance
-                    new_future_interest_total = Decimal("0.00")
-
-                    for idx, r_entry in enumerate(remaining_unpaid_entries):
-                        r_entry.opening_balance = round2(sim_bal)
                         int_charge = round2(sim_bal * r_per)
-                        r_entry.expected_interest = int_charge
 
-                        if idx == num_rem - 1:
-                            prn_comp = sim_bal
-                            r_entry.closing_balance = Decimal("0.00")
-                        else:
-                            prn_comp = rem_prn_per_period
-                            r_entry.closing_balance = round2(sim_bal - prn_comp)
+                    r_entry.expected_interest = int_charge
 
-                        r_entry.expected_principal = prn_comp
-                        r_entry.expected_amount = round2(
-                            prn_comp + int_charge + r_entry.expected_fees + r_entry.expected_penalty
-                        )
-                        r_entry.save(update_fields=[
-                            "opening_balance",
-                            "expected_interest",
-                            "expected_principal",
-                            "closing_balance",
-                            "expected_amount",
-                        ])
-                        sim_bal = r_entry.closing_balance
-                        rem_int_entry = max(Decimal("0.00"), int_charge - r_entry.paid_interest)
-                        new_future_interest_total += rem_int_entry
+                    if idx == num_rem - 1:
+                        prn_comp = sim_bal
+                        r_entry.closing_balance = Decimal("0.00")
+                    else:
+                        prn_comp = rem_prn_per_period
+                        r_entry.closing_balance = round2(sim_bal - prn_comp)
 
-                    loan.interest_balance = round2(new_future_interest_total)
+                    r_entry.expected_principal = prn_comp
+                    r_entry.expected_amount = round2(
+                        prn_comp + int_charge + r_entry.expected_fees + r_entry.expected_penalty
+                    )
+                    r_entry.save(update_fields=[
+                        "opening_balance",
+                        "expected_interest",
+                        "expected_principal",
+                        "closing_balance",
+                        "expected_amount",
+                    ])
+                    sim_bal = r_entry.closing_balance
 
         loan.outstanding_balance = (
             loan.principal_balance

@@ -24,6 +24,16 @@ class LoanProductFeeSerializer(serializers.ModelSerializer):
             data = data.copy()
             if data.get("fee_type") == "fixed":
                 data["fee_type"] = "fixed_amount"
+            if not data.get("ledger_account_name"):
+                data["ledger_account_name"] = "Loan Processing Fee Income"
+            if not data.get("fee_basis") or data.get("fee_basis") == "loan_amount":
+                data["fee_basis"] = "principal"
+            if data.get("fee_value") in ("", None):
+                data["fee_value"] = 0
+            if "show_in_statement" not in data:
+                data["show_in_statement"] = True
+            if "affects_principal" not in data:
+                data["affects_principal"] = False
         return super().to_internal_value(data)
 
 
@@ -46,6 +56,12 @@ class LoanProductPenaltySerializer(serializers.ModelSerializer):
             data = data.copy()
             if data.get("penalty_type") == "fixed":
                 data["penalty_type"] = "fixed_amount"
+            if not data.get("ledger_account_name"):
+                data["ledger_account_name"] = "Penalty Income"
+            if data.get("penalty_value") in ("", None):
+                data["penalty_value"] = 0
+            if data.get("grace_period_days") in ("", None):
+                data["grace_period_days"] = 0
         return super().to_internal_value(data)
 
 

@@ -199,14 +199,37 @@ export default function LoanProductForm({
         `Failed to ${mode === "edit" ? "update" : "create"} loan product:`,
         error,
       );
+      const formatValidationErrors = (data: any): string => {
+        if (!data) return "";
+        if (typeof data === "string") return data;
+        if (Array.isArray(data)) {
+          return data
+            .map((item) => formatValidationErrors(item))
+            .filter(Boolean)
+            .join(", ");
+        }
+        if (typeof data === "object") {
+          return Object.entries(data)
+            .map(([k, v]) => {
+              const formattedVal = formatValidationErrors(v);
+              if (!formattedVal) return "";
+              if (k === "detail" || k === "error" || k === "non_field_errors") {
+                return formattedVal;
+              }
+              return `${k.replace(/_/g, " ")}: ${formattedVal}`;
+            })
+            .filter(Boolean)
+            .join(" | ");
+        }
+        return String(data);
+      };
+
       let msg =
         error.response?.data?.detail ||
         error.response?.data?.error;
 
-      if (!msg && error.response?.data && typeof error.response.data === "object") {
-        msg = Object.entries(error.response.data)
-          .map(([k, v]) => `${k.replace(/_/g, " ")}: ${Array.isArray(v) ? v.join(", ") : v}`)
-          .join(" | ");
+      if (!msg && error.response?.data) {
+        msg = formatValidationErrors(error.response.data);
       }
 
       msg = msg || error.message || `Failed to ${mode === "edit" ? "update" : "create"} loan product.`;

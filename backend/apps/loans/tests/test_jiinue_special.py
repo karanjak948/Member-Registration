@@ -110,30 +110,12 @@ class JiinueLoanSpecialTests(TestCase):
         self.assertEqual(res.monthly_interest_breakdown[2]["interest"], Decimal("2000.00"))
 
         # Verify weekly schedule entries match Peter's handwritten numbers
-        expected_balances = [
-            (1, Decimal("42000.00"), Decimal("3500.00"), Decimal("38500.00")),
-            (2, Decimal("38500.00"), Decimal("3500.00"), Decimal("35000.00")),
-            (3, Decimal("35000.00"), Decimal("3500.00"), Decimal("31500.00")),
-            (4, Decimal("31500.00"), Decimal("3500.00"), Decimal("28000.00")),
-            (5, Decimal("28000.00"), Decimal("3500.00"), Decimal("24500.00")),
-            (6, Decimal("24500.00"), Decimal("3500.00"), Decimal("21000.00")),
-            (7, Decimal("21000.00"), Decimal("3500.00"), Decimal("17500.00")),
-            (8, Decimal("17500.00"), Decimal("3500.00"), Decimal("14000.00")),
-            (9, Decimal("14000.00"), Decimal("3500.00"), Decimal("10500.00")),
-            (10, Decimal("10500.00"), Decimal("3500.00"), Decimal("7000.00")),
-            (11, Decimal("7000.00"), Decimal("3500.00"), Decimal("3500.00")),
-            (12, Decimal("3500.00"), Decimal("3500.00"), Decimal("0.00")),
-        ]
-
         self.assertEqual(len(res.schedule), 12)
-        for i, (period, open_b, exp_amt, close_b) in enumerate(expected_balances):
-            row = res.schedule[i]
-            self.assertEqual(row.period_number, period)
-            self.assertEqual(row.opening_balance, open_b)
-            self.assertEqual(row.expected_amount, exp_amt)
-            self.assertEqual(row.closing_balance, close_b)
-            self.assertEqual(row.expected_principal, Decimal("2500.00"))
-            self.assertEqual(row.expected_interest, Decimal("1000.00"))
+        # Period 1 starts at 36,000 with 6,000 month 1 interest
+        self.assertEqual(res.schedule[0].period_number, 1)
+        self.assertEqual(res.schedule[0].opening_balance, Decimal("36000.00"))
+        self.assertEqual(res.schedule[0].expected_interest, Decimal("6000.00"))
+        self.assertEqual(res.schedule[0].closing_balance, Decimal("30000.00"))
 
     def test_generate_schedule_integrates_jiinue_special(self):
         """
@@ -150,28 +132,22 @@ class JiinueLoanSpecialTests(TestCase):
         )
         self.assertEqual(len(sched), 12)
         total_interest = sum(e.expected_interest for e in sched)
-        total_payable = sum(e.expected_amount for e in sched)
         self.assertEqual(total_interest, Decimal("12000.00"))
-        self.assertEqual(total_payable, Decimal("42000.00"))
-        self.assertEqual(sched[0].expected_amount, Decimal("3500.00"))
+        self.assertEqual(sched[0].opening_balance, Decimal("36000.00"))
+        self.assertEqual(sched[0].expected_interest, Decimal("6000.00"))
+        self.assertEqual(sched[0].closing_balance, Decimal("30000.00"))
 
     def test_image2_and_3_actual_repayments_and_default_rule(self):
         """
-        Tests Peter Irungu's Image 2 & 3:
-        Loan of KES 30,000 @ 20% for 12 weeks.
-
-        Pre-schedule:
-        - Total interest = 30,000 * 20% * (3+1)/2 = 12,000
-        - Total payable = 42,000
-        - Weekly installment = 3,500 (2,500 principal + 1,000 interest)
-
-        Actual repayments:
-        - Each payment of 3,500 first covers 1,000 interest for that week then 2,500 to principal.
-        - When more than 3,500 is paid in a week, excess 100% reduces principal.
-        - After principal reduces, remaining schedule re-calculates with lower interest.
-
-        Default Rule:
-        - If loan balance > 0 after maturity date, status → DEFAULTED.
+        Tests Peter Irungu's exact Image 1, 2 & 3 scenario (LN-000031):
+        - Loan taken 30,000 at 20% interest rate for 3 months (12 weeks).
+        - Month 1: Principal 30,000, Interest 6,000, Loan Balance 36,000.
+        - Payment 1 (28/09/26): Paid 6,000 -> Allocated Interest: 6,000, Principal: 0.
+          Loan Balance becomes 30,000.
+        - Payment 2 (05/10/26): Paid 3,000 -> Allocated Interest: 0, Principal: 3,000.
+          Loan Balance becomes 27,000.
+        - Default Rule:
+          If balance > 0 after maturity, status becomes DEFAULTED.
         """
         disb_date = date(2026, 9, 21)
         principal = Decimal("30000.00")
@@ -186,11 +162,12 @@ class JiinueLoanSpecialTests(TestCase):
             num_periods=num_periods,
             disbursement_date=disb_date,
         )
-        total_interest = sum(item.expected_interest for item in schedule)
-        self.assertEqual(total_interest, Decimal("12000.00"))
+
+        initial_cycle_interest = Decimal("6000.00")
+        opening_balance = principal + initial_cycle_interest
 
         loan = Loan.objects.create(
-            loan_number="LN-JIN-SPEC-001",
+            loan_number="LN-000031",
             member=self.member,
             loan_product=self.product,
             principal_amount=principal,
@@ -205,8 +182,8 @@ class JiinueLoanSpecialTests(TestCase):
             disbursement_date=disb_date,
             maturity_date=schedule[-1].due_date,
             principal_balance=principal,
-            interest_balance=total_interest,
-            outstanding_balance=principal + total_interest,
+            interest_balance=initial_cycle_interest,
+            outstanding_balance=opening_balance,
             reference_weekly_installment=Decimal("3500.00"),
         )
 
@@ -222,41 +199,55 @@ class JiinueLoanSpecialTests(TestCase):
                 closing_balance=s.closing_balance,
             )
 
-        # Repayment 1: KES 3,500 (exact weekly installment) on Week 1 due date
-        # Interest: 1,000, Principal: 2,500 → balance goes from 42,000 to 38,500
+        # Repayment 1 (Peter's 6,000 payment on LN-000031):
+        # Covers Month 1 interest in full (6,000 interest, 0 principal).
+        # Outstanding balance reduces from 36,000 to 30,000.
         r1 = RepaymentSerializer(data={
             "loan": loan.id,
-            "amount_paid": "3500.00",
-            "payment_date": schedule[0].due_date.isoformat(),
+            "amount_paid": "6000.00",
+            "payment_date": disb_date.isoformat(),
             "payment_method": "mpesa",
-            "transaction_reference": "TXN_JIN_01",
+            "transaction_reference": "TXN-1790150852148",
         })
         self.assertTrue(r1.is_valid(), r1.errors)
         r1_rpy = r1.save()
-        self.assertEqual(r1_rpy.allocated_interest, Decimal("1000.00"))
-        self.assertEqual(r1_rpy.allocated_principal, Decimal("2500.00"))
+        self.assertEqual(r1_rpy.allocated_interest, Decimal("6000.00"))
+        self.assertEqual(r1_rpy.allocated_principal, Decimal("0.00"))
 
         loan.refresh_from_db()
-        self.assertEqual(loan.principal_balance, Decimal("27500.00"))
-        self.assertLess(loan.outstanding_balance, Decimal("42000.00"))
+        self.assertEqual(loan.interest_balance, Decimal("0.00"))
+        self.assertEqual(loan.principal_balance, Decimal("30000.00"))
+        self.assertEqual(loan.outstanding_balance, Decimal("30000.00"))
+        self.assertEqual(loan.total_interest_paid, Decimal("6000.00"))
+        self.assertEqual(loan.total_principal_paid, Decimal("0.00"))
 
-        # Repayment 2: KES 7,000 (double payment) on Week 2 due date
-        # Week 2 interest is from recalculated schedule on 27,500.
-        # After paying 7,000: interest_week2 is covered, extra reduces principal further.
+        # Verify Schedule row 1 closing balance is 30,000 and status is Paid
+        s1 = loan.schedule_entries.get(period_number=1)
+        self.assertTrue(s1.is_paid)
+        self.assertEqual(s1.paid_interest, Decimal("6000.00"))
+        self.assertEqual(s1.paid_principal, Decimal("0.00"))
+        self.assertEqual(s1.closing_balance, Decimal("30000.00"))
+
+        # Repayment 2: KES 3,000 on 05/10/26 (Image 1):
+        # Month 1 interest is already 0, so 100% reduces principal!
+        # Balance reduces from 30,000 to 27,000.
         r2 = RepaymentSerializer(data={
             "loan": loan.id,
-            "amount_paid": "7000.00",
-            "payment_date": schedule[1].due_date.isoformat(),
+            "amount_paid": "3000.00",
+            "payment_date": (disb_date + timedelta(days=14)).isoformat(),
             "payment_method": "mpesa",
             "transaction_reference": "TXN_JIN_02",
         })
         self.assertTrue(r2.is_valid(), r2.errors)
-        r2.save()
+        r2_rpy = r2.save()
+        self.assertEqual(r2_rpy.allocated_interest, Decimal("0.00"))
+        self.assertEqual(r2_rpy.allocated_principal, Decimal("3000.00"))
 
         loan.refresh_from_db()
-        # After paying 3,500 + 7,000 = 10,500 total, principal should have reduced substantially
-        self.assertLess(loan.principal_balance, Decimal("27500.00"))
-        self.assertGreater(loan.outstanding_balance, Decimal("0.00"))
+        self.assertEqual(loan.interest_balance, Decimal("0.00"))
+        self.assertEqual(loan.principal_balance, Decimal("27000.00"))
+        self.assertEqual(loan.outstanding_balance, Decimal("27000.00"))
+        self.assertEqual(loan.total_principal_paid, Decimal("3000.00"))
 
         # Check default rule: if balance > 0 after maturity, status becomes DEFAULTED
         past_maturity_date = loan.maturity_date + timedelta(days=2)
@@ -264,3 +255,4 @@ class JiinueLoanSpecialTests(TestCase):
         self.assertTrue(is_defaulted)
         loan.refresh_from_db()
         self.assertEqual(loan.status, LoanStatus.DEFAULTED)
+

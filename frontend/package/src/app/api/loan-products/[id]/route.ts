@@ -63,6 +63,32 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
   }
 }
 
+export async function PATCH(request: NextRequest, { params }: RouteContext) {
+  try {
+    const { id } = await params;
+    const session = await getServerSession(authOptions);
+    const body = await request.json();
+    const headers: Record<string, string> = {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    };
+    if (session?.accessToken) {
+      headers["Authorization"] = `Bearer ${session.accessToken}`;
+    }
+
+    const response = await fetch(`${API_BASE_URL.replace(/\/$/, "")}/loan-products/${id}/`, {
+      method: "PATCH",
+      headers,
+      body: JSON.stringify(body),
+    });
+
+    const data = await response.json();
+    return NextResponse.json(data, { status: response.status });
+  } catch (error: any) {
+    return NextResponse.json({ detail: error?.message || "Server error" }, { status: 500 });
+  }
+}
+
 export async function DELETE(request: NextRequest, { params }: RouteContext) {
   try {
     const { id } = await params;
