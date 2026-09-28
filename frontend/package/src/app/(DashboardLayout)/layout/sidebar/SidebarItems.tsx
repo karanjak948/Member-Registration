@@ -43,7 +43,7 @@ export default function SidebarItems() {
     if (pathname) {
       if (pathname.startsWith("/members")) {
         setOpenSections((prev) => ({ ...prev, "members-menu": true }));
-      } else if (pathname.startsWith("/loans")) {
+      } else if (pathname.startsWith("/loans") || pathname.startsWith("/loan-products")) {
         setOpenSections((prev) => ({ ...prev, "jinue-loans": true }));
       } else if (pathname.startsWith("/collections")) {
         setOpenSections((prev) => ({ ...prev, "collections": true }));

@@ -103,6 +103,32 @@ class LoanViewSet(viewsets.ModelViewSet):
 
     @transaction.atomic
     def perform_create(self, serializer):
+        member = serializer.validated_data.get("member")
+        open_statuses = [
+            LoanStatus.PENDING_APPLICATION,
+            LoanStatus.APPRAISED,
+            LoanStatus.APPROVED,
+            LoanStatus.ACTIVE,
+            LoanStatus.WATCHFUL,
+            LoanStatus.NON_PERFORMING,
+            LoanStatus.DOUBTFUL,
+            LoanStatus.DEFAULTED,
+        ]
+        if member is not None:
+            existing = (
+                Loan.objects.filter(member=member, status__in=open_statuses)
+                .order_by("-id")
+                .first()
+            )
+            if existing is not None:
+                from rest_framework.exceptions import ValidationError
+                raise ValidationError({
+                    "error": (
+                        f"{member.first_name} still has loan {existing.loan_number} "
+                        f"({existing.get_status_display()}). Complete that loan before applying for a new one."
+                    )
+                })
+
         product: LoanProduct = serializer.validated_data["loan_product"]
         guarantors_data = serializer.validated_data.pop("guarantors_data", [])
         collaterals_data = serializer.validated_data.pop("collaterals_data", [])
@@ -255,6 +281,11 @@ class LoanViewSet(viewsets.ModelViewSet):
         loan.appraised_by = request.user if request.user and request.user.is_authenticated else None
         loan.appraised_at = timezone.now()
         loan.save()
+        try:
+            from apps.common.notification_service import NotificationService
+            NotificationService.notify_loan_appraisal(loan)
+        except Exception as notif_err:
+            logger.error(f"Failed to dispatch loan appraisal SMS for {loan.loan_number}: {notif_err}")
         return Response(LoanDetailSerializer(loan).data)
 
     @action(detail=True, methods=["post"], url_path="approve")
@@ -318,6 +349,11 @@ class LoanViewSet(viewsets.ModelViewSet):
         loan.rejected_by = request.user if request.user and request.user.is_authenticated else None
         loan.rejected_at = timezone.now()
         loan.save()
+        try:
+            from apps.common.notification_service import NotificationService
+            NotificationService.notify_loan_rejection(loan, reason=reason)
+        except Exception as notif_err:
+            logger.error(f"Failed to dispatch loan rejection SMS for {loan.loan_number}: {notif_err}")
         return Response(LoanDetailSerializer(loan).data)
 
     @action(detail=True, methods=["post"], url_path="disburse")

@@ -4,6 +4,15 @@ from rest_framework.response import Response
 from apps.loans.models import LoanProduct
 from apps.loans.serializers import LoanProductSerializer
 from apps.organizations.permissions import is_admin_or_owner_user
+from apps.organizations.services import OrganizationAccessService
+
+
+def _can(user, code: str) -> bool:
+    if is_admin_or_owner_user(user):
+        return True
+    if not (user and getattr(user, "is_authenticated", False)):
+        return False
+    return code in OrganizationAccessService.get_permission_codes(user)
 
 
 class LoanProductViewSet(viewsets.ModelViewSet):
@@ -20,33 +29,33 @@ class LoanProductViewSet(viewsets.ModelViewSet):
     ordering = ["product_code", "-version_number"]
 
     def create(self, request, *args, **kwargs):
-        if not is_admin_or_owner_user(request.user):
+        if not _can(request.user, "create_loan_products"):
             return Response(
-                {"error": "Permission denied. Only administrators or organization owners can create loan products."},
+                {"error": "Permission denied. You need the create loan product permission."},
                 status=status.HTTP_403_FORBIDDEN,
             )
         return super().create(request, *args, **kwargs)
 
     def update(self, request, *args, **kwargs):
-        if not is_admin_or_owner_user(request.user):
+        if not _can(request.user, "edit_loan_products"):
             return Response(
-                {"error": "Permission denied. Only administrators or organization owners can modify loan products."},
+                {"error": "Permission denied. You need the edit loan product permission."},
                 status=status.HTTP_403_FORBIDDEN,
             )
         return super().update(request, *args, **kwargs)
 
     def partial_update(self, request, *args, **kwargs):
-        if not is_admin_or_owner_user(request.user):
+        if not _can(request.user, "edit_loan_products"):
             return Response(
-                {"error": "Permission denied. Only administrators or organization owners can modify loan products."},
+                {"error": "Permission denied. You need the edit loan product permission."},
                 status=status.HTTP_403_FORBIDDEN,
             )
         return super().partial_update(request, *args, **kwargs)
 
     def destroy(self, request, *args, **kwargs):
-        if not is_admin_or_owner_user(request.user):
+        if not _can(request.user, "delete_loan_products"):
             return Response(
-                {"error": "Permission denied. Only administrators or organization owners can delete loan products."},
+                {"error": "Permission denied. You need the delete loan product permission."},
                 status=status.HTTP_403_FORBIDDEN,
             )
         return super().destroy(request, *args, **kwargs)
@@ -58,10 +67,14 @@ class LoanProductViewSet(viewsets.ModelViewSet):
         For normal users, inactive/hidden products return 404.
         """
         user = getattr(self.request, "user", None)
-        is_admin = bool(user and user.is_authenticated and is_admin_or_owner_user(user))
+        can_manage_hidden = bool(
+            user
+            and user.is_authenticated
+            and _can(user, "toggle_loan_products")
+        )
 
         queryset = LoanProduct.objects.all().prefetch_related("fees", "penalties")
-        if not is_admin:
+        if not can_manage_hidden:
             queryset = queryset.filter(is_active=True)
 
         lookup_url_kwarg = self.lookup_url_kwarg or self.lookup_field
@@ -77,9 +90,9 @@ class LoanProductViewSet(viewsets.ModelViewSet):
         """
         Enable or hide/archive a loan product.
         """
-        if not is_admin_or_owner_user(request.user):
+        if not _can(request.user, "toggle_loan_products"):
             return Response(
-                {"error": "Permission denied. Only administrators or organization owners can enable or hide loan products."},
+                {"error": "Permission denied. You need the enable or hide loan product permission."},
                 status=status.HTTP_403_FORBIDDEN,
             )
         try:
@@ -112,12 +125,14 @@ class LoanProductViewSet(viewsets.ModelViewSet):
         qs = super().get_queryset()
 
         user = getattr(self.request, "user", None)
-        is_admin = bool(user and user.is_authenticated and is_admin_or_owner_user(user))
+        can_manage_hidden = bool(
+            user
+            and user.is_authenticated
+            and _can(user, "toggle_loan_products")
+        )
 
-        # CRITICAL PRIVILEGE ENFORCEMENT:
-        # Standard / normal users can ONLY ever see active & visible loan products.
-        # When an admin hides a loan product, it must DISAPPEAR COMPLETELY for normal users.
-        if not is_admin:
+        # Users without hide permission only see products that are still on the catalog.
+        if not can_manage_hidden:
             return qs.filter(is_active=True)
 
         # For Administrators and Owners:

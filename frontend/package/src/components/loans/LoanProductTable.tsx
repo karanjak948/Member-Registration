@@ -50,27 +50,43 @@ interface Props {
 export default function LoanProductTable({ products, loading = false, onRefresh }: Props) {
   const router = useRouter();
   const { isAdmin, can } = usePermissions();
-  // Strictly Admin or Owner has the right to hide and unhide loan products tiers
-  const canToggleProducts = isAdmin;
-  const canManageProducts = isAdmin || can(PERMISSIONS.CREATE_LOAN_PRODUCTS) || can(PERMISSIONS.EDIT_LOAN_PRODUCTS);
+  const canToggleProducts = isAdmin || can(PERMISSIONS.TOGGLE_LOAN_PRODUCTS);
+  const canCreateProducts = isAdmin || can(PERMISSIONS.CREATE_LOAN_PRODUCTS);
+  const canManageProducts = canCreateProducts || can(PERMISSIONS.EDIT_LOAN_PRODUCTS);
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"ALL" | "ACTIVE" | "INACTIVE">("ALL");
+  const [activity, setActivity] = useState<Record<number, boolean>>({});
   const [togglingId, setTogglingId] = useState<number | null>(null);
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
 
-  const isProductActive = (product: LoanProduct) =>
-    product.is_active === true ||
-    product.is_active === 1 ||
-    (product as any).is_active === "1" ||
-    (product as any).status === 1 ||
-    (product as any).status === "1" ||
-    (product as any).status === "active";
+  const isProductActive = (product: LoanProduct) => {
+    if (Object.prototype.hasOwnProperty.call(activity, product.id)) {
+      return activity[product.id];
+    }
+    return (
+      product.is_active === true ||
+      product.is_active === 1 ||
+      (product as any).is_active === "1" ||
+      (product as any).status === 1 ||
+      (product as any).status === "1" ||
+      (product as any).status === "active"
+    );
+  };
 
   const handleToggleProduct = async (product: LoanProduct) => {
+    const active = isProductActive(product);
+    const confirmed = window.confirm(
+      active
+        ? `Hide "${product.product_name}"? It will leave this grid and new loan applications. You can show it again from Hidden / Archived.`
+        : `Show "${product.product_name}" on loan applications again?`
+    );
+    if (!confirmed) return;
+
     try {
       setTogglingId(product.id);
-      const res = await loanProductService.toggleStatus(product.id);
+      const res = await loanProductService.toggleStatus(product.id, !active);
+      setActivity((prev) => ({ ...prev, [product.id]: Boolean(res.is_active) }));
       setFeedback({
         type: "success",
         message: res.message || `Loan product '${product.product_name}' status updated.`,
@@ -81,7 +97,10 @@ export default function LoanProductTable({ products, loading = false, onRefresh 
     } catch (err: any) {
       setFeedback({
         type: "error",
-        message: err?.response?.data?.error || "Failed to update loan product status.",
+        message:
+          err?.response?.data?.error ||
+          err?.response?.data?.detail ||
+          "Failed to update loan product status.",
       });
     } finally {
       setTogglingId(null);
@@ -90,9 +109,9 @@ export default function LoanProductTable({ products, loading = false, onRefresh 
 
   // For non-admin users, hidden/archived products are completely filtered out (they disappear)
   const visibleProducts = useMemo(() => {
-    if (isAdmin) return products;
+    if (canToggleProducts) return products;
     return products.filter(isProductActive);
-  }, [products, isAdmin]);
+  }, [products, canToggleProducts, activity]);
 
   const filteredProducts = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -112,27 +131,20 @@ export default function LoanProductTable({ products, loading = false, onRefresh 
 
       const active = isProductActive(product);
 
-      // Non-admin normal users NEVER see inactive/hidden products under any circumstance
-      if (!isAdmin) {
-        return matchesSearch && active;
-      }
-
-      const matchesStatus =
-        statusFilter === "ALL" ||
-        (statusFilter === "ACTIVE" && active) ||
-        (statusFilter === "INACTIVE" && !active);
+      // Hidden products leave All Products and Active. They stay on Hidden / Archived.
+      const matchesStatus = statusFilter === "INACTIVE" ? !active : active;
 
       return matchesSearch && matchesStatus;
     });
-  }, [visibleProducts, search, statusFilter, isAdmin]);
+  }, [visibleProducts, search, statusFilter, activity]);
 
   // Compute KPI metrics
   const metrics = useMemo(() => {
     const activeProducts = products.filter(isProductActive);
-    const totalCount = isAdmin ? products.length : activeProducts.length;
+    const totalCount = canToggleProducts ? products.length : activeProducts.length;
     const activeCount = activeProducts.length;
     const hiddenCount = Math.max(0, products.length - activeCount);
-    const sourceList = isAdmin ? products : activeProducts;
+    const sourceList = canToggleProducts ? products : activeProducts;
 
     const rates = sourceList.map((p) => Number(p.interest_rate) || 0).filter((r) => r > 0);
     const minRate = rates.length ? Math.min(...rates) : 0;
@@ -148,7 +160,7 @@ export default function LoanProductTable({ products, loading = false, onRefresh 
       maxTenor: maxTenor ? `${maxTenor} Months` : "—",
       requireGuarantors,
     };
-  }, [products, isAdmin]);
+  }, [products, canToggleProducts, activity]);
 
   const exportColumns = useMemo(
     () => [
@@ -367,8 +379,9 @@ export default function LoanProductTable({ products, loading = false, onRefresh 
             )}
 
             {canToggleProducts && (
-              <Tooltip title={isActive ? "Hide Product (Archived from loan applications)" : "Enable Product (Visible for loan applications)"}>
+              <Tooltip title={isActive ? "Hide this product from new loan applications" : "Show this product on loan applications"}>
                 <IconButton
+                  aria-label={isActive ? "Hide product" : "Show product"}
                   size="small"
                   disabled={isToggling}
                   onClick={() => handleToggleProduct(row)}
@@ -461,7 +474,7 @@ export default function LoanProductTable({ products, loading = false, onRefresh 
                 Loan Portfolio
               </Button>
 
-              {canManageProducts && (
+              {canCreateProducts && (
                 <Button
                   variant="contained"
                   startIcon={<IconPlus size={18} />}
@@ -501,10 +514,10 @@ export default function LoanProductTable({ products, loading = false, onRefresh 
                 <Stack direction="row" justifyContent="space-between" alignItems="center">
                   <Box>
                     <Typography variant="caption" sx={{ color: "#64748b", fontWeight: 700, textTransform: "uppercase" }}>
-                      {isAdmin ? "Active Product Tiers" : "Available Product Tiers"}
+                      {canToggleProducts ? "Active Product Tiers" : "Available Product Tiers"}
                     </Typography>
                     <Typography variant="h5" fontWeight={900} sx={{ color: "#065f46", mt: 0.5 }}>
-                      {isAdmin ? (
+                      {canToggleProducts ? (
                         <>
                           {metrics.activeCount} <span style={{ fontSize: "0.85rem", color: "#64748b", fontWeight: 600 }}>/ {metrics.totalCount} Total</span>
                         </>
@@ -653,15 +666,11 @@ export default function LoanProductTable({ products, loading = false, onRefresh 
             />
 
             <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
-              {isAdmin ? (
+              {canToggleProducts ? (
                 (["ALL", "ACTIVE", "INACTIVE"] as const).map((key) => {
                   const isActive = statusFilter === key;
                   const count =
-                    key === "ALL"
-                      ? metrics.totalCount
-                      : key === "ACTIVE"
-                      ? metrics.activeCount
-                      : metrics.hiddenCount;
+                    key === "INACTIVE" ? metrics.hiddenCount : metrics.activeCount;
                   return (
                     <Chip
                       key={key}

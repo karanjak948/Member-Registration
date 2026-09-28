@@ -59,7 +59,7 @@ export default function LoanProductDetails({ product }: Props) {
   const router = useRouter();
   const { isAdmin, can } = usePermissions();
   // Strictly Admin or Owner has the right to hide and unhide loan products tiers
-  const canToggleProducts = isAdmin;
+  const canToggleProducts = isAdmin || can(PERMISSIONS.TOGGLE_LOAN_PRODUCTS);
   const canManageProducts = isAdmin || can(PERMISSIONS.CREATE_LOAN_PRODUCTS) || can(PERMISSIONS.EDIT_LOAN_PRODUCTS);
 
   const [currentActive, setCurrentActive] = React.useState<boolean>(

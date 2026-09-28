@@ -84,6 +84,7 @@ class MpesaC2BService:
             LoanStatus.WATCHFUL,
             LoanStatus.NON_PERFORMING,
             LoanStatus.DOUBTFUL,
+            LoanStatus.DEFAULTED,
         ]
 
         if ref:
@@ -378,3 +379,110 @@ class MpesaC2BService:
             mpesa_tx.save(update_fields=["error_message", "status"])
 
         return mpesa_tx, {"ResultCode": 0, "ResultDesc": "Accepted"}
+
+    @staticmethod
+    def extract_payment_payload(raw) -> dict:
+        """Return the Safaricom payment object from a stored webhook body."""
+        import json
+
+        if isinstance(raw, str):
+            try:
+                raw = json.loads(raw)
+            except (TypeError, ValueError):
+                return {}
+        if not isinstance(raw, dict):
+            return {}
+        nested = raw.get("paymentPayload") or raw.get("payment") or raw.get("data")
+        if isinstance(nested, str):
+            try:
+                nested = json.loads(nested)
+            except (TypeError, ValueError):
+                nested = None
+        if isinstance(nested, dict) and (nested.get("TransID") or nested.get("BillRefNumber")):
+            return nested
+        if raw.get("TransID") or raw.get("BillRefNumber"):
+            return raw
+        return {}
+
+    @classmethod
+    def ingest_received_payments(cls) -> int:
+        """
+        Copy received webhook payloads that never became a transaction row
+        so the M-Pesa report can list them.
+        """
+        from apps.loans.models import MpesaReceivedPayment
+
+        existing = set(MpesaTransaction.objects.values_list("trans_id", flat=True))
+        created = 0
+        rows = MpesaReceivedPayment.objects.exclude(mpesa_payload__isnull=True).exclude(mpesa_payload="").order_by("-createdon")[:1000]
+        for row in rows:
+            payload = cls.extract_payment_payload(row.mpesa_payload)
+            trans_id = str(payload.get("TransID") or payload.get("trans_id") or row.transID or "").strip().upper()
+            if not trans_id or trans_id in existing:
+                continue
+            amount_raw = payload.get("TransAmount") or payload.get("amount") or "0"
+            try:
+                amount = Decimal(str(amount_raw))
+            except Exception:
+                amount = Decimal("0.00")
+            bill_ref = str(payload.get("BillRefNumber") or payload.get("bill_ref_number") or "").strip()
+            MpesaTransaction.objects.create(
+                trans_id=trans_id,
+                transaction_type=str(payload.get("TransactionType") or "Pay Bill")[:50],
+                trans_time=cls.parse_trans_time(payload.get("TransTime")) if payload.get("TransTime") else (row.createdon or timezone.now()),
+                trans_amount=amount,
+                business_short_code=str(payload.get("BusinessShortCode") or "")[:20],
+                bill_ref_number=bill_ref[:100],
+                invoice_number=str(payload.get("InvoiceNumber") or "")[:100],
+                msisdn=str(payload.get("MSISDN") or payload.get("msisdn") or "")[:30],
+                first_name=str(payload.get("FirstName") or "")[:100],
+                raw_payload=payload or {"source": "mpesa_receivedmpesapayments", "id": row.id},
+                unique_serial=str(row.unique_serial) if row.unique_serial is not None else None,
+                verify_url=row.verify_url,
+                status=MpesaTransactionStatus.UNALLOCATED,
+            )
+            existing.add(trans_id)
+            created += 1
+        return created
+
+    @classmethod
+    @transaction.atomic
+    def reset_loan_from_bill_ref(cls, tx: MpesaTransaction) -> MpesaTransaction:
+        """
+        Apply this payment to the member loan identified by BillRefNumber.
+        """
+        if tx.repayment_id:
+            raise ValueError(f"Transaction already allocated to repayment {tx.repayment.repayment_number}.")
+
+        payload = tx.raw_payload if isinstance(tx.raw_payload, dict) else {}
+        bill_ref = (tx.bill_ref_number or str(payload.get("BillRefNumber") or "")).strip()
+        if not bill_ref:
+            raise ValueError("This payment has no BillRefNumber, so the member loan cannot be matched.")
+
+        loan, member = cls.match_account(bill_ref, tx.msisdn or payload.get("MSISDN"))
+        if loan is None:
+            raise ValueError(f"No open loan matches BillRefNumber '{bill_ref}'.")
+
+        payer_info = f"{tx.first_name} ({tx.msisdn})".strip()
+        notes = f"M-Pesa payment reset from BillRefNumber {bill_ref}. Payer: {payer_info}."
+        serializer = RepaymentSerializer(
+            data={
+                "loan": loan.id,
+                "amount_paid": tx.trans_amount,
+                "payment_date": tx.trans_time.date() if tx.trans_time else timezone.now().date(),
+                "payment_method": "mpesa",
+                "transaction_reference": tx.trans_id,
+                "notes": notes,
+            }
+        )
+        serializer.is_valid(raise_exception=True)
+        repayment = serializer.save()
+
+        tx.loan = loan
+        tx.member = member or loan.member
+        tx.bill_ref_number = bill_ref[:100]
+        tx.repayment = repayment
+        tx.status = MpesaTransactionStatus.COMPLETED
+        tx.error_message = ""
+        tx.save(update_fields=["loan", "member", "bill_ref_number", "repayment", "status", "error_message"])
+        return tx

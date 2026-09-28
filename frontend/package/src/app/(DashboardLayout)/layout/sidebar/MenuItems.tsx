@@ -213,7 +213,7 @@ export function getMenuItems(
   if (loanChildren.length > 0) {
     items.push({
       id: "jinue-loans",
-      title: "Jinue Loans",
+      title: "Loans",
       icon: IconBriefcase,
       children: loanChildren,
     });

@@ -114,7 +114,10 @@ export default function LoanProductForm({
 
   const router = useRouter();
   const { isAdmin, can, loading: authLoading } = usePermissions();
-  const canManage = isAdmin || can(PERMISSIONS.CREATE_LOAN_PRODUCTS) || can(PERMISSIONS.EDIT_LOAN_PRODUCTS);
+  const canManage =
+    mode === "create"
+      ? isAdmin || can(PERMISSIONS.CREATE_LOAN_PRODUCTS)
+      : isAdmin || can(PERMISSIONS.EDIT_LOAN_PRODUCTS) || can(PERMISSIONS.CREATE_LOAN_PRODUCTS);
 
   const [loading, setLoading] = useState(false);
   const [snackbar, setSnackbar] = useState<{

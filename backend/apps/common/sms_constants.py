@@ -4,7 +4,9 @@ from django.db import models
 class SMSEventType(models.TextChoices):
     BULK_BROADCAST = "bulk_broadcast", "Bulk Broadcast"
     LOAN_APPLICATION = "loan_application", "Loan Application"
+    LOAN_APPRAISAL = "loan_appraisal", "Loan Appraisal"
     LOAN_APPROVAL = "loan_approval", "Loan Approval"
+    LOAN_REJECTION = "loan_rejection", "Loan Rejection"
     LOAN_DISBURSEMENT = "loan_disbursement", "Loan Disbursement"
     REPAYMENT_CONFIRMATION = "repayment_confirmation", "Repayment Confirmation"
     DUE_DATE_REMINDER = "due_date_reminder", "Due Date Reminder"

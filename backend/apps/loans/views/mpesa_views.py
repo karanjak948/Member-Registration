@@ -398,16 +398,35 @@ class MpesaTransactionViewSet(viewsets.ReadOnlyModelViewSet):
     ordering = ["-trans_time"]
 
     def get_queryset(self):
+        from django.db.models import Q
+        from django.utils.dateparse import parse_date
+        from datetime import datetime, time
+        from django.utils import timezone
+
+        try:
+            MpesaC2BService.ingest_received_payments()
+        except Exception:
+            logger.exception("Could not ingest received M-Pesa payments into the report")
+
         qs = super().get_queryset()
-        status_filter = self.request.query_params.get("status")
+        status_filter = (self.request.query_params.get("status") or "").strip()
         if status_filter and status_filter.upper() != "ALL":
-            qs = qs.filter(status__iexact=status_filter)
-        date_from = self.request.query_params.get("date_from")
+            if status_filter.upper() == "FAILED":
+                qs = qs.filter(status__in=[
+                    MpesaTransactionStatus.FAILED,
+                    MpesaTransactionStatus.VERIFICATION_FAILED,
+                ])
+            else:
+                qs = qs.filter(status__iexact=status_filter)
+
+        date_from = parse_date(self.request.query_params.get("date_from") or "")
         if date_from:
-            qs = qs.filter(trans_time__date__gte=date_from)
-        date_to = self.request.query_params.get("date_to")
+            start = timezone.make_aware(datetime.combine(date_from, time.min))
+            qs = qs.filter(Q(trans_time__gte=start) | Q(created_at__gte=start))
+        date_to = parse_date(self.request.query_params.get("date_to") or "")
         if date_to:
-            qs = qs.filter(trans_time__date__lte=date_to)
+            end = timezone.make_aware(datetime.combine(date_to, time.max))
+            qs = qs.filter(Q(trans_time__lte=end) | Q(created_at__lte=end))
         return qs
 
     @action(detail=False, methods=["get"], url_path="stats")
@@ -489,6 +508,21 @@ class MpesaTransactionViewSet(viewsets.ReadOnlyModelViewSet):
         tx.error_message = ""
         tx.save(update_fields=["loan", "member", "repayment", "status", "error_message"])
 
+        return Response(MpesaTransactionSerializer(tx).data)
+
+    @action(detail=True, methods=["post"], url_path="reset-loan")
+    def reset_loan(self, request, pk=None):
+        """
+        Apply this payment to the member loan matched by BillRefNumber.
+        """
+        tx: MpesaTransaction = self.get_object()
+        try:
+            tx = MpesaC2BService.reset_loan_from_bill_ref(tx)
+        except ValueError as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as exc:
+            logger.exception("M-Pesa loan reset failed for %s", tx.trans_id)
+            return Response({"error": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
         return Response(MpesaTransactionSerializer(tx).data)
 
 

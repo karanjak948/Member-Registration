@@ -26,8 +26,10 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # Copy backend source code
 COPY . .
 
+RUN chmod +x /app/docker-entrypoint.sh
+
 # Expose Django port
 EXPOSE 8000
 
-# Start command via Gunicorn
-CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "3", "--timeout", "120"]
+# Wait for MySQL, migrate, then start Gunicorn
+CMD ["/app/docker-entrypoint.sh"]

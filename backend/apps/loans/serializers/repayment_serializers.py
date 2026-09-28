@@ -326,7 +326,7 @@ class RepaymentSerializer(serializers.ModelSerializer):
                 rem_entry.is_paid = True
                 rem_entry.paid_date = payment_date
                 rem_entry.save()
-        elif loan.principal_balance <= Decimal("0.01"):
+        elif loan.principal_balance <= Decimal("0.01") and not is_jiinue_special:
             loan.principal_balance = Decimal("0.00")
             loan.interest_balance = Decimal("0.00")
             for rem_entry in loan.schedule_entries.filter(is_paid=False):

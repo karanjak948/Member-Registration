@@ -32,6 +32,7 @@ import {
   Alert,
   Snackbar,
 } from "@mui/material";
+import api from "@/services/api";
 import {
   IconReceipt,
   IconSearch,
@@ -143,27 +144,27 @@ export default function MpesaReportsView() {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams();
-      if (statusFilter && statusFilter !== "ALL") params.append("status", statusFilter);
-      if (dateFrom) params.append("date_from", dateFrom);
-      if (dateTo) params.append("date_to", dateTo);
-      if (searchQuery.trim()) params.append("search", searchQuery.trim());
+      const params: Record<string, string> = {};
+      if (statusFilter && statusFilter !== "ALL") params.status = statusFilter;
+      if (dateFrom) params.date_from = dateFrom;
+      if (dateTo) params.date_to = dateTo;
+      if (searchQuery.trim()) params.search = searchQuery.trim();
 
       const [txRes, statsRes] = await Promise.all([
-        fetch(`/api/mpesa/transactions?${params.toString()}`),
-        fetch(`/api/mpesa/transactions/stats?${params.toString()}`),
+        api.get("/mpesa/transactions/", { params }),
+        api.get("/mpesa/transactions/stats/", { params }),
       ]);
 
-      if (txRes.ok) {
-        const txData = await txRes.json();
-        setTransactions(Array.isArray(txData) ? txData : txData?.results || []);
-      }
-      if (statsRes.ok) {
-        const statsData = await statsRes.json();
-        setStats(statsData);
-      }
+      const txData = txRes.data;
+      setTransactions(Array.isArray(txData) ? txData : txData?.results || []);
+      if (statsRes.data) setStats(statsRes.data);
     } catch (err) {
       console.error("Failed to load M-Pesa reports:", err);
+      setToast({
+        open: true,
+        message: "M-Pesa payments could not be loaded.",
+        severity: "error",
+      });
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -236,6 +237,30 @@ export default function MpesaReportsView() {
     setAllocateOpen(true);
   };
 
+  const handleResetLoan = async (tx: MpesaTransactionItem) => {
+    const ref = tx.bill_ref_number || "the BillRefNumber on this payment";
+    if (!window.confirm(`Reset the member loan using BillRefNumber ${ref}? The payment of KES ${tx.trans_amount} will be applied to that loan.`)) {
+      return;
+    }
+    try {
+      const res = await api.post(`/mpesa/transactions/${tx.id}/reset-loan/`);
+      setToast({
+        open: true,
+        message: res.data?.loan_number
+          ? `Payment ${tx.trans_id} reset loan ${res.data.loan_number}.`
+          : `Payment ${tx.trans_id} was applied to the member loan.`,
+        severity: "success",
+      });
+      fetchData();
+    } catch (err: any) {
+      setToast({
+        open: true,
+        message: err?.response?.data?.error || err?.response?.data?.detail || "Could not reset the loan from this payment.",
+        severity: "error",
+      });
+    }
+  };
+
   const handleConfirmAllocate = async () => {
     if (!allocateTx || !selectedLoanId) return;
     setAllocating(true);
@@ -276,11 +301,19 @@ export default function MpesaReportsView() {
   // Filtered transactions in view
   const filteredTransactions = useMemo(() => {
     return transactions.filter((tx) => {
+      const status = (tx.status || "").toUpperCase();
+      if (statusFilter === "FAILED" && status !== "FAILED" && status !== "VERIFICATION_FAILED") return false;
+      if (statusFilter !== "ALL" && statusFilter !== "FAILED" && status !== statusFilter) return false;
+
+      const txDate = (tx.trans_time || tx.created_at || "").slice(0, 10);
+      if (dateFrom && txDate && txDate < dateFrom) return false;
+      if (dateTo && txDate && txDate > dateTo) return false;
+
       const q = searchQuery.toLowerCase().trim();
       if (!q) return true;
       return (
-        tx.trans_id.toLowerCase().includes(q) ||
-        tx.bill_ref_number.toLowerCase().includes(q) ||
+        (tx.trans_id || "").toLowerCase().includes(q) ||
+        (tx.bill_ref_number || "").toLowerCase().includes(q) ||
         (tx.first_name || "").toLowerCase().includes(q) ||
         (tx.member_name || "").toLowerCase().includes(q) ||
         (tx.member_number || "").toLowerCase().includes(q) ||
@@ -289,7 +322,7 @@ export default function MpesaReportsView() {
         (tx.loan_number || "").toLowerCase().includes(q)
       );
     });
-  }, [transactions, searchQuery]);
+  }, [transactions, searchQuery, statusFilter, dateFrom, dateTo]);
 
   const paginatedTransactions = useMemo(() => {
     return filteredTransactions.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
@@ -896,6 +929,27 @@ export default function MpesaReportsView() {
                                 <IconEye size={16} />
                               </IconButton>
                             </Tooltip>
+
+                            {tx.status !== "COMPLETED" && (
+                              <Tooltip title="Reset the member loan using BillRefNumber">
+                                <Button
+                                  size="small"
+                                  variant="contained"
+                                  onClick={() => handleResetLoan(tx)}
+                                  sx={{
+                                    bgcolor: "#065f46",
+                                    "&:hover": { bgcolor: "#047857" },
+                                    textTransform: "none",
+                                    fontSize: "0.72rem",
+                                    fontWeight: 700,
+                                    py: 0.4,
+                                    px: 1,
+                                  }}
+                                >
+                                  Reset loan
+                                </Button>
+                              </Tooltip>
+                            )}
 
                             {tx.status === "UNALLOCATED" && (
                               <Tooltip title="Allocate to Member Loan">

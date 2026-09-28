@@ -76,6 +76,7 @@ export default function ApplyLoanForm() {
   }, []);
 
   const [loading, setLoading] = useState(false);
+  const [openLoanNotice, setOpenLoanNotice] = useState("");
   const [snackbar, setSnackbar] = useState<{
     open: boolean;
     message: string;
@@ -272,6 +273,15 @@ export default function ApplyLoanForm() {
         return;
       }
 
+      if (openLoanNotice) {
+        setSnackbar({
+          open: true,
+          message: openLoanNotice,
+          severity: "warning",
+        });
+        return;
+      }
+
       if (!data.loan_product_id) {
         console.warn("[Loan Application Guidance]: Please select a Loan Product tier.");
         setSnackbar({
@@ -430,7 +440,7 @@ export default function ApplyLoanForm() {
         } else if (d.detail) {
           errorMessage = d.detail;
         } else if (d.error) {
-          errorMessage = d.error;
+          errorMessage = Array.isArray(d.error) ? d.error.join(" ") : String(d.error);
         } else if (typeof d === "object") {
           const fieldErrors = Object.entries(d)
             .map(([field, err]: [string, any]) => {
@@ -523,6 +533,20 @@ export default function ApplyLoanForm() {
                           value={currentMember}
                           onChange={(_, newValue) => {
                             field.onChange(newValue ? newValue.id : 0);
+                            setOpenLoanNotice("");
+                            if (!newValue) return;
+                            const finished = new Set(["closed", "rejected", "written_off"]);
+                            loanService
+                              .getAll({ member_id: newValue.id })
+                              .then((rows: any) => {
+                                const list = Array.isArray(rows) ? rows : [];
+                                const open = list.find((loan) => !finished.has(String(loan.status || "").toLowerCase()));
+                                if (!open) return;
+                                const notice = `${newValue.first_name} still has loan ${open.loan_number || ""}. Complete that loan before applying for a new one.`.replace(/\s+/g, " ").trim();
+                                setOpenLoanNotice(notice);
+                                setSnackbar({ open: true, message: notice, severity: "warning" });
+                              })
+                              .catch(() => undefined);
                           }}
                           getOptionLabel={(option) =>
                             `${option.first_name || ""} ${option.other_names || ""} (${option.membership_number || option.id})`
@@ -722,7 +746,15 @@ export default function ApplyLoanForm() {
                     >
                       <MenuItem value={0}>-- Select Loan Product --</MenuItem>
                       {products
-                        .filter((p) => p.is_active === undefined || p.is_active === true || p.is_active === 1 || (p as any).is_active === "1")
+                        .filter((p) => {
+                          const inactive =
+                            p.is_active === false ||
+                            p.is_active === 0 ||
+                            (p as any).is_active === "0" ||
+                            (p as any).status === 0 ||
+                            (p as any).status === "0";
+                          return !inactive;
+                        })
                         .map((product) => (
                         <MenuItem key={product.id} value={product.id}>
                           <Stack direction="row" spacing={1} alignItems="center">

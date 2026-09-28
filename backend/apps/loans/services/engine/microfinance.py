@@ -334,20 +334,16 @@ def calculate_jiinue_special_preschedule(
     Calculates the exact Loan Pre-Schedule (Loan Calculator) for Peter Irungu's
     'Jiinue Loan Special' Reducing Balance product (Image 1).
 
-    Logic:
-    - Given Principal P (e.g. KES 30,000) over M months (e.g. 3 months = 12 weeks) at monthly rate r (e.g. 20%):
-      1. Equal monthly principal deduction expected in pre-schedule: P / M (e.g. 10,000 / month).
-      2. Month-by-month expected interest:
-         - Month 1: 30,000 * 20% = 6,000
-         - Month 2: 20,000 * 20% = 4,000
-         - Month 3: 10,000 * 20% = 2,000
-         Total Interest = 12,000.
-      3. Total Loan Plus Interest (Gross Liability) = P + Total Interest = 42,000.
-      4. Weekly Installments = Total Liability / (M * 4) = 42,000 / 12 = 3,500 / week.
-         - Principal component: 30,000 / 12 = 2,500
-         - Shared interest component: 12,000 / 12 = 1,000
-         - Total Installment = 2,500 + 1,000 = 3,500.
-      5. Pre-Schedule Table shows 12 weekly entries reducing opening balance from 42,000 to 0.
+    Logic (handwritten Jiinue ledger):
+    - Principal P at monthly rate r (e.g. 30,000 at 20% for 3 months = 12 weeks).
+    - On disbursement, month-1 interest is added immediately: P * r (6,000), so the
+      opening balance is P + interest (36,000).
+    - Weekly payments are not a fixed installment. Each payment clears outstanding
+      interest first, then reduces principal.
+    - At each later month boundary (every 28 days), new interest = r × remaining
+      principal is added. Month 2 and month 3 interest are therefore not known
+      until the principal still outstanding at that boundary is known.
+    - If any balance remains after the term, the loan is defaulted.
     """
     P = _to_d(principal)
     r_pct = _to_d(interest_rate_pct)
@@ -373,26 +369,20 @@ def calculate_jiinue_special_preschedule(
         W = n
         M = max(1, int(round(Decimal(str(W)) / Decimal("4"))))
 
-    # Calculate monthly expected reducing balance interest
-    P_mo = round2(P / _to_d(M))
-    monthly_breakdown: List[Dict[str, Any]] = []
-    total_interest = Decimal("0.00")
-    sim_balance = P
-
-    for m in range(1, M + 1):
-        int_m = round2(sim_balance * r)
-        monthly_breakdown.append({
-            "month": m,
-            "starting_principal": sim_balance,
-            "interest": int_m,
-        })
-        total_interest += int_m
-        sim_balance = max(Decimal("0.00"), sim_balance - P_mo)
-
-    total_payable = round2(P + total_interest)
-    weekly_inst = round2(total_payable / _to_d(W))
-    weekly_prn = round2(P / _to_d(W))
-    weekly_int = round2(total_interest / _to_d(W))
+    # Opening balance includes month-1 interest. Later interest is a schedule
+    # row on day 30, 60, ... calculated on the balance after payments so far.
+    month1_interest = round2(P * r)
+    term_days = W * 7
+    weekly_inst = find_weekly_payment_day_based(P, r, term_days=term_days)
+    balance = round2(P + month1_interest)
+    total_interest = month1_interest
+    monthly_breakdown: List[Dict[str, Any]] = [{
+        "month": 1,
+        "starting_principal": round2(P),
+        "interest": month1_interest,
+    }]
+    weekly_prn = weekly_inst
+    weekly_int = Decimal("0.00")
 
     schedule: List[JiinueSpecialScheduleEntry] = []
     weeks_per_month = max(1, W // M)
@@ -460,6 +450,60 @@ def calculate_jiinue_special_preschedule(
         monthly_interest_breakdown=monthly_breakdown,
         schedule=schedule,
     )
+
+
+def jiinue_special_month_index(disbursement_date: date, as_of: date) -> int:
+    """
+    Month 1 runs from disbursement through day 28 (inclusive).
+    Each following month is the next 28 days.
+    21 Sep is month 1; 19 Oct (day 28) is still month 1; 26 Oct is month 2.
+    """
+    days = (as_of - disbursement_date).days
+    if days <= 28:
+        return 1
+    return 1 + (days - 1) // 28
+
+
+def capitalize_jiinue_special_interest(loan, as_of: date) -> Decimal:
+    """
+    Post each 30-day interest row once its date has arrived.
+    The charge is the monthly rate times the balance still outstanding.
+    Month-1 interest is already on the loan at disbursement.
+    A row is already posted when paid_date is set.
+    """
+    disb = loan.disbursement_date
+    if not disb or loan.principal_balance <= Decimal("0.01"):
+        return Decimal("0.00")
+
+    rate = _to_d(loan.interest_rate) / _to_d(100)
+    added = Decimal("0.00")
+    interest_rows = [
+        entry
+        for entry in loan.schedule_entries.all().order_by("due_date", "period_number")
+        if entry.expected_amount == Decimal("0.00") and entry.expected_principal == Decimal("0.00")
+    ]
+    for entry in interest_rows:
+        if entry.due_date > as_of or entry.paid_date is not None:
+            continue
+        base = round2(loan.principal_balance + loan.interest_balance)
+        charge = round2(base * rate)
+        if charge <= Decimal("0.00"):
+            entry.paid_date = entry.due_date
+            entry.save(update_fields=["paid_date"])
+            continue
+        entry.expected_interest = charge
+        entry.opening_balance = base
+        entry.closing_balance = round2(base + charge)
+        entry.paid_date = entry.due_date
+        entry.save(update_fields=["expected_interest", "opening_balance", "closing_balance", "paid_date"])
+        loan.interest_balance = round2(loan.interest_balance + charge)
+        added += charge
+
+    if added > Decimal("0.00"):
+        loan.outstanding_balance = round2(
+            loan.principal_balance + loan.interest_balance + loan.fees_balance + loan.penalty_balance
+        )
+    return added
 
 
 def check_loan_default_status(loan, as_of_date: date | None = None) -> bool:

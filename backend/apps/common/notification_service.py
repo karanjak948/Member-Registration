@@ -104,6 +104,26 @@ class NotificationService:
         )
 
     # -------------------------------------------------------------------------
+    # 1b. Loan Appraisal
+    # -------------------------------------------------------------------------
+    @classmethod
+    def notify_loan_appraisal(cls, loan) -> Dict[str, Any]:
+        member = loan.member
+        first_name = member.first_name.title()
+        amt_str = _format_curr(loan.principal_amount)
+        message = (
+            f"Dear {first_name}, your loan application {loan.loan_number} for KES {amt_str} "
+            f"has been APPRAISED and is awaiting approval. Royal SACCO."
+        )
+        return cls._dispatch_and_log(
+            phone_number=member.phone_number,
+            message=message,
+            event_type=SMSEventType.LOAN_APPRAISAL,
+            member=member,
+            recipient_name=f"{member.first_name} {member.other_names}".strip(),
+        )
+
+    # -------------------------------------------------------------------------
     # 2. Loan Approval Confirmation
     # -------------------------------------------------------------------------
     @classmethod
@@ -125,6 +145,23 @@ class NotificationService:
             phone_number=member.phone_number,
             message=message,
             event_type=SMSEventType.LOAN_APPROVAL,
+            member=member,
+            recipient_name=f"{member.first_name} {member.other_names}".strip(),
+        )
+
+    @classmethod
+    def notify_loan_rejection(cls, loan, reason: str = "") -> Dict[str, Any]:
+        member = loan.member
+        first_name = member.first_name.title()
+        reason_text = f" Reason: {reason}." if reason else ""
+        message = (
+            f"Dear {first_name}, your loan application {loan.loan_number} has been DECLINED."
+            f"{reason_text} Contact Royal SACCO for assistance."
+        )
+        return cls._dispatch_and_log(
+            phone_number=member.phone_number,
+            message=message,
+            event_type=SMSEventType.LOAN_REJECTION,
             member=member,
             recipient_name=f"{member.first_name} {member.other_names}".strip(),
         )
