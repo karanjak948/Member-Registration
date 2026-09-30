@@ -26,6 +26,8 @@ import {
   IconPigMoney,
   IconBook2,
   IconCoins,
+  IconFileSpreadsheet,
+  IconUpload,
 } from "@tabler/icons-react";
 
 import type { ElementType } from "react";
@@ -333,6 +335,32 @@ export function getMenuItems(
       children: sharesChildren,
     });
   }
+
+  // ============================================================
+  // MONTHLY DEDUCTIONS
+  // ============================================================
+  const deductionsChildren: MenuLink[] = [
+    {
+      id: "deductions-schedule",
+      title: "Deductions Roll",
+      icon: IconFileSpreadsheet,
+      href: "/deductions",
+    },
+    {
+      id: "deductions-bulk-upload",
+      title: "Bulk Upload Deductions",
+      icon: IconUpload,
+      href: "/deductions/upload",
+    },
+  ];
+
+  items.push({
+    id: "monthly-deductions-menu",
+    title: "Monthly Deductions",
+    icon: IconFileSpreadsheet,
+    href: "/deductions",
+    children: deductionsChildren,
+  });
 
   // ============================================================
   // FINANCE

@@ -51,6 +51,8 @@ export default function SidebarItems() {
         setOpenSections((prev) => ({ ...prev, "mpa": true }));
       } else if (pathname.startsWith("/shares")) {
         setOpenSections((prev) => ({ ...prev, "shares": true }));
+      } else if (pathname.startsWith("/deductions")) {
+        setOpenSections((prev) => ({ ...prev, "monthly-deductions-menu": true }));
       } else if (pathname.startsWith("/finance")) {
         setOpenSections((prev) => ({ ...prev, "finance": true }));
       } else if (pathname.startsWith("/reports")) {

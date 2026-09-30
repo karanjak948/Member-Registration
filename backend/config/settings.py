@@ -60,6 +60,7 @@ INSTALLED_APPS = [
     "apps.shares",
     "apps.reports",
     "apps.organizations",
+    "apps.deductions",
     "apps.common",
 ]
 
