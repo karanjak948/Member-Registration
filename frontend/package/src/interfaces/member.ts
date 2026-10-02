@@ -62,6 +62,14 @@ export interface Member {
   activated_by: number | null;
   activated_by_username: string | null;
   activated_at: string | null;
+
+  // Onboarding Financial Contributions & Registration Fee
+  registration_fee_paid?: boolean;
+  registration_fee_amount?: number | string;
+  initial_savings_amount?: number | string;
+  initial_shares_amount?: number | string;
+  payment_channel?: string;
+  payment_reference?: string;
 }
 
 export interface CreateMemberRequest {
@@ -82,6 +90,13 @@ export interface CreateMemberRequest {
   occupation?: string;
 
   kra_pin?: string;
+
+  registration_fee_paid?: boolean;
+  registration_fee_amount?: number | string;
+  initial_savings_amount?: number | string;
+  initial_shares_amount?: number | string;
+  payment_channel?: string;
+  payment_reference?: string;
 }
 
 export interface UpdateMemberRequest

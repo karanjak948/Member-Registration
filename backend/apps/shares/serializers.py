@@ -43,12 +43,16 @@ class SharePaymentSerializer(serializers.ModelSerializer):
             "month",
             "year",
             "remarks",
+            "is_reversed",
+            "reversed_at",
+            "reversal_reason",
             "recorded_by",
             "recorded_by_username",
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["id", "created_at", "updated_at"]
+        read_only_fields = ["id", "is_reversed", "reversed_at", "reversal_reason", "created_at", "updated_at"]
+
 
     def get_member_name(self, obj):
         if obj.member:
@@ -168,3 +172,83 @@ class SharePaymentCreateSerializer(serializers.ModelSerializer):
             print(f"Ledger posting notice for share payment #{instance.id}: {exc}")
 
         return instance
+
+
+class ShareTransferSerializer(serializers.ModelSerializer):
+    """
+    Serializer for Share Transfers & Withdrawals matching Jimanage system.
+    """
+    from_member_name = serializers.CharField(source="from_member.full_name", read_only=True)
+    from_member_no = serializers.CharField(source="from_member.membership_number", read_only=True)
+    to_member_name = serializers.CharField(source="to_member.full_name", read_only=True, default="SACCO Pool")
+    to_member_no = serializers.CharField(source="to_member.membership_number", read_only=True, default="")
+    share_type_display = serializers.CharField(source="get_share_type_display", read_only=True)
+
+    class Meta:
+        from apps.shares.models import ShareTransfer
+        model = ShareTransfer
+        fields = [
+            "id",
+            "organization",
+            "from_member",
+            "from_member_name",
+            "from_member_no",
+            "to_member",
+            "to_member_name",
+            "to_member_no",
+            "share_type",
+            "share_type_display",
+            "number_of_shares",
+            "shares_amount",
+            "total_amount",
+            "date_transferred",
+            "remarks",
+            "is_active",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["id", "organization", "total_amount", "created_at", "updated_at"]
+
+    def validate(self, attrs):
+        from_member = attrs.get("from_member")
+        to_member = attrs.get("to_member")
+        num_shares = attrs.get("number_of_shares")
+        share_price = attrs.get("shares_amount") or Decimal("100.00")
+
+        if num_shares and num_shares <= Decimal("0.00"):
+            raise serializers.ValidationError({"number_of_shares": "Number of shares must be greater than zero."})
+
+        if from_member and to_member and from_member == to_member:
+            raise serializers.ValidationError({"to_member": "Cannot transfer shares to the same member."})
+
+        # Check that from_member actually has sufficient unreversed shares
+        if from_member and num_shares:
+            from django.db.models import Sum
+            purchased_shares = SharePayment.objects.filter(
+                member=from_member,
+                is_reversed=False,
+            ).aggregate(total=Sum("number_of_shares"))["total"] or Decimal("0.00")
+
+            from apps.shares.models import ShareTransfer
+            transferred_out = ShareTransfer.objects.filter(
+                from_member=from_member,
+                is_active=True,
+            ).aggregate(total=Sum("number_of_shares"))["total"] or Decimal("0.00")
+
+            transferred_in = ShareTransfer.objects.filter(
+                to_member=from_member,
+                is_active=True,
+            ).aggregate(total=Sum("number_of_shares"))["total"] or Decimal("0.00")
+
+            available_shares = (purchased_shares + transferred_in) - transferred_out
+            if num_shares > available_shares:
+                raise serializers.ValidationError({
+                    "number_of_shares": f"Insufficient shares. Member currently owns {available_shares:,.2f} active shares."
+                })
+
+        # Auto-compute total_amount
+        if num_shares and share_price:
+            attrs["total_amount"] = num_shares * share_price
+
+        return attrs
+

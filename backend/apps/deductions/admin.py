@@ -1,5 +1,5 @@
 from django.contrib import admin
-from apps.deductions.models import MonthlyDeduction, MonthlyDeductionBatch
+from apps.deductions.models import MonthlyDeduction, MonthlyDeductionBatch, MonthlyDeductionItemLog
 
 
 @admin.register(MonthlyDeduction)
@@ -41,3 +41,24 @@ class MonthlyDeductionBatchAdmin(admin.ModelAdmin):
     list_filter = ("year", "month", "organization")
     search_fields = ("batch_no", "remarks")
     readonly_fields = ("created_at", "updated_at")
+
+
+@admin.register(MonthlyDeductionItemLog)
+class MonthlyDeductionItemLogAdmin(admin.ModelAdmin):
+    from apps.deductions.models import MonthlyDeductionItemLog
+    list_display = (
+        "id",
+        "batch",
+        "row_number",
+        "raw_employee_no",
+        "raw_employee_name",
+        "raw_total_ded",
+        "amount_loan_principal",
+        "amount_loan_interest",
+        "amount_savings",
+        "amount_shares",
+        "status",
+    )
+    list_filter = ("status", "batch__year", "batch__month")
+    search_fields = ("raw_employee_no", "raw_employee_name", "member__membership_number")
+

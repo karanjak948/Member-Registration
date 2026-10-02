@@ -37,6 +37,9 @@ class RepaymentSerializer(serializers.ModelSerializer):
             "unallocated_amount",
             "is_early_settlement",
             "notes",
+            "is_reversed",
+            "reversed_at",
+            "reversal_reason",
             "recorded_by",
             "created_at",
         ]
@@ -48,9 +51,13 @@ class RepaymentSerializer(serializers.ModelSerializer):
             "allocated_fees",
             "allocated_penalty",
             "unallocated_amount",
+            "is_reversed",
+            "reversed_at",
+            "reversal_reason",
             "recorded_by",
             "created_at",
         ]
+
 
     def get_member_name(self, obj):
         return f"{obj.loan.member.first_name} {obj.loan.member.other_names}".strip()

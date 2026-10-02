@@ -90,6 +90,14 @@ class MemberSerializer(serializers.ModelSerializer):
             "passport_photo",
             "kra_pin",
 
+            # Onboarding Financial Contributions & Registration Fee
+            "registration_fee_paid",
+            "registration_fee_amount",
+            "initial_savings_amount",
+            "initial_shares_amount",
+            "payment_channel",
+            "payment_reference",
+
             "status",
             "registration_stage",
 

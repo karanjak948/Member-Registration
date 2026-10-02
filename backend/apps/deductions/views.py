@@ -367,3 +367,43 @@ class MonthlyDeductionBatchViewSet(viewsets.ReadOnlyModelViewSet):
         if org:
             qs = qs.filter(organization=org)
         return qs
+
+    @action(detail=True, methods=["get"], url_path="items")
+    def items(self, request, pk=None):
+        """
+        Retrieves line-item logs for this upload batch.
+        Shows exact uploaded Excel data vs what was allocated to loans, savings, charges, shares, surplus.
+        """
+        batch = self.get_object()
+        from apps.deductions.models import MonthlyDeductionItemLog
+        from apps.deductions.serializers import MonthlyDeductionItemLogSerializer
+        from django.db.models import Q
+
+        status_filter = request.query_params.get("status")
+        search = request.query_params.get("search")
+
+        qs = MonthlyDeductionItemLog.objects.filter(batch=batch).select_related("member", "deduction")
+        if status_filter:
+            qs = qs.filter(status=status_filter)
+        if search:
+            qs = qs.filter(
+                Q(raw_employee_no__icontains=search)
+                | Q(raw_employee_name__icontains=search)
+                | Q(member__first_name__icontains=search)
+                | Q(member__last_name__icontains=search)
+                | Q(member__membership_number__icontains=search)
+            )
+
+        serializer = MonthlyDeductionItemLogSerializer(qs, many=True)
+        return Response({
+            "batch_id": batch.id,
+            "batch_no": batch.batch_no,
+            "month": batch.month,
+            "year": batch.year,
+            "total_amount": str(batch.total_amount),
+            "row_count": batch.row_count,
+            "success_count": batch.success_count,
+            "error_count": batch.error_count,
+            "items": serializer.data,
+        })
+

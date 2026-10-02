@@ -8,7 +8,11 @@ from django.db.models import Q
 from django.utils import timezone
 
 from apps.members.models import Member
-from apps.deductions.models import MonthlyDeduction, MonthlyDeductionBatch
+from apps.deductions.models import (
+    MonthlyDeduction,
+    MonthlyDeductionBatch,
+    MonthlyDeductionItemLog,
+)
 from apps.savings.models import SavingsPayment
 from apps.shares.models import SharePayment
 from apps.loans.models import Loan, LoanStatus
@@ -134,7 +138,7 @@ def process_deductions_bulk_upload(
 
     with transaction.atomic():
         for idx, row in enumerate(rows_data, start=2):
-            # 1. Extract member identifier (EMPLOYEE NO / MEMBER NO)
+            # 1. Extract member identifier (EMPLOYEE NO / MEMBER NO) and Name
             emp_no = (
                 row.get("employee_no")
                 or row.get("employeeno")
@@ -147,9 +151,27 @@ def process_deductions_bulk_upload(
                 or row.get("id_no")
                 or row.get("national_id")
             )
+            raw_name = (
+                row.get("employee_name")
+                or row.get("employeename")
+                or row.get("member_name")
+                or row.get("name")
+                or ""
+            )
 
             if not emp_no or str(emp_no).strip() == "":
-                errors.append(f"Row {idx}: Missing employee/member number.")
+                err = f"Row {idx}: Missing employee/member number."
+                errors.append(err)
+                MonthlyDeductionItemLog.objects.create(
+                    batch=batch,
+                    row_number=idx,
+                    raw_employee_no="",
+                    raw_employee_name=str(raw_name or ""),
+                    raw_total_ded=Decimal("0.00"),
+                    status=MonthlyDeductionItemLog.ItemStatus.FAILED,
+                    error_message=err,
+                    created_by=user,
+                )
                 continue
 
             emp_str = str(emp_no).strip()
@@ -163,7 +185,18 @@ def process_deductions_bulk_upload(
             ).first()
 
             if not member:
-                errors.append(f"Row {idx}: Member '{emp_str}' not found in system.")
+                err = f"Row {idx}: Member '{emp_str}' not found in system."
+                errors.append(err)
+                MonthlyDeductionItemLog.objects.create(
+                    batch=batch,
+                    row_number=idx,
+                    raw_employee_no=emp_str,
+                    raw_employee_name=str(raw_name or ""),
+                    raw_total_ded=Decimal("0.00"),
+                    status=MonthlyDeductionItemLog.ItemStatus.FAILED,
+                    error_message=err,
+                    created_by=user,
+                )
                 continue
 
             # 2. Extract deduction amount (TOTAL DED)
@@ -177,7 +210,19 @@ def process_deductions_bulk_upload(
             )
 
             if raw_amt is None or str(raw_amt).strip() == "":
-                errors.append(f"Row {idx} ({member.full_name}): Missing TOTAL DED amount.")
+                err = f"Row {idx} ({member.full_name}): Missing TOTAL DED amount."
+                errors.append(err)
+                MonthlyDeductionItemLog.objects.create(
+                    batch=batch,
+                    member=member,
+                    row_number=idx,
+                    raw_employee_no=emp_str,
+                    raw_employee_name=str(raw_name or member.full_name),
+                    raw_total_ded=Decimal("0.00"),
+                    status=MonthlyDeductionItemLog.ItemStatus.FAILED,
+                    error_message=err,
+                    created_by=user,
+                )
                 continue
 
             try:
@@ -190,10 +235,34 @@ def process_deductions_bulk_upload(
                 )
                 remitted_amount = Decimal(amt_cleaned)
                 if remitted_amount < 0:
-                    errors.append(f"Row {idx} ({member.full_name}): Negative deduction amount.")
+                    err = f"Row {idx} ({member.full_name}): Negative deduction amount."
+                    errors.append(err)
+                    MonthlyDeductionItemLog.objects.create(
+                        batch=batch,
+                        member=member,
+                        row_number=idx,
+                        raw_employee_no=emp_str,
+                        raw_employee_name=str(raw_name or member.full_name),
+                        raw_total_ded=Decimal("0.00"),
+                        status=MonthlyDeductionItemLog.ItemStatus.FAILED,
+                        error_message=err,
+                        created_by=user,
+                    )
                     continue
             except Exception:
-                errors.append(f"Row {idx} ({member.full_name}): Invalid amount '{raw_amt}'.")
+                err = f"Row {idx} ({member.full_name}): Invalid amount '{raw_amt}'."
+                errors.append(err)
+                MonthlyDeductionItemLog.objects.create(
+                    batch=batch,
+                    member=member,
+                    row_number=idx,
+                    raw_employee_no=emp_str,
+                    raw_employee_name=str(raw_name or member.full_name),
+                    raw_total_ded=Decimal("0.00"),
+                    status=MonthlyDeductionItemLog.ItemStatus.FAILED,
+                    error_message=err,
+                    created_by=user,
+                )
                 continue
 
             # 3. Get or create MonthlyDeduction record for (org, member, month, year)
@@ -232,20 +301,32 @@ def process_deductions_bulk_upload(
             alloc_principal = min(remaining_remittance, deduction.loan_principal)
             remaining_remittance -= alloc_principal
 
-            # D. Savings
+            # D. Registration Fee (if unpaid)
+            alloc_reg_fee = Decimal("0.00")
+            if not getattr(member, "registration_fee_paid", False) and deduction.registration_fee > Decimal("0.00"):
+                alloc_reg_fee = min(remaining_remittance, deduction.registration_fee)
+                remaining_remittance -= alloc_reg_fee
+                if alloc_reg_fee >= deduction.registration_fee:
+                    member.registration_fee_paid = True
+                    member.save(update_fields=["registration_fee_paid"])
+
+            # E. Savings
             alloc_savings = min(remaining_remittance, deduction.savings)
             remaining_remittance -= alloc_savings
 
-            # E. Shares
+            # F. Shares
             alloc_shares = min(remaining_remittance, deduction.shares)
             remaining_remittance -= alloc_shares
 
-            # F. Others
+            # G. Others
             alloc_others = min(remaining_remittance, deduction.others)
             remaining_remittance -= alloc_others
+            alloc_others += alloc_reg_fee
 
             # G. Any remaining surplus goes into Savings
+            surplus_allocated = Decimal("0.00")
             if remaining_remittance > Decimal("0.00"):
+                surplus_allocated = remaining_remittance
                 alloc_savings += remaining_remittance
                 remaining_remittance = Decimal("0.00")
 
@@ -289,7 +370,6 @@ def process_deductions_bulk_upload(
             loan_allocated = alloc_charges + alloc_interest + alloc_principal
             if loan_allocated > Decimal("0.00"):
                 total_loans_allocated += loan_allocated
-                # Find active schedule entries for this member in month/year
                 schedule_entries = LoanScheduleEntry.objects.filter(
                     loan__member=member,
                     loan__status__in=[
@@ -316,6 +396,26 @@ def process_deductions_bulk_upload(
             deduction.date_paid = date_paid
             deduction.updated_by = user
             deduction.save()
+
+            # 7. Create Item Log explicitly recording upload data & usage breakdown
+            MonthlyDeductionItemLog.objects.create(
+                batch=batch,
+                deduction=deduction,
+                member=member,
+                row_number=idx,
+                raw_employee_no=emp_str,
+                raw_employee_name=str(raw_name or member.full_name),
+                raw_total_ded=remitted_amount,
+                amount_charges=alloc_charges,
+                amount_loan_interest=alloc_interest,
+                amount_loan_principal=alloc_principal,
+                amount_savings=alloc_savings,
+                amount_shares=alloc_shares,
+                amount_others=alloc_others,
+                amount_surplus=surplus_allocated,
+                status=MonthlyDeductionItemLog.ItemStatus.SUCCESS,
+                created_by=user,
+            )
 
             total_remitted += remitted_amount
             success_items.append({

@@ -53,7 +53,9 @@ import {
   IconDownload,
   IconShieldCheck,
   IconShieldLock,
+  IconArrowBackUp,
 } from "@tabler/icons-react";
+
 import { usePermissions } from "@/hooks/usePermissions";
 import { PERMISSIONS } from "@/constants/permissions";
 
@@ -96,6 +98,11 @@ export default function SavingsPaymentsPage() {
 
   // View modal state
   const [viewPayment, setViewPayment] = useState<SavingsPayment | null>(null);
+
+  // Reversal modal state
+  const [reversingPayment, setReversingPayment] = useState<SavingsPayment | null>(null);
+  const [reversalReason, setReversalReason] = useState("");
+  const [reversingLoading, setReversingLoading] = useState(false);
 
   // Delete modal state
   const [deleteTarget, setDeleteTarget] = useState<SavingsPayment | null>(null);
@@ -192,6 +199,27 @@ export default function SavingsPaymentsPage() {
       console.error("Error loading savings data:", err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleConfirmReverse = async () => {
+    if (!reversingPayment) return;
+    if (!reversalReason.trim()) {
+      setAlertInfo({ type: "error", message: "Please provide a valid reason for reversing this payment." });
+      return;
+    }
+    setReversingLoading(true);
+    try {
+      await savingsService.reversePayment(reversingPayment.id, reversalReason.trim());
+      setAlertInfo({ type: "success", message: `Payment ${reversingPayment.document_no} successfully reversed!` });
+      setReversingPayment(null);
+      setReversalReason("");
+      await loadData();
+    } catch (err: any) {
+      console.error("Reversal error:", err);
+      setAlertInfo({ type: "error", message: err?.response?.data?.error || "Failed to reverse payment." });
+    } finally {
+      setReversingLoading(false);
     }
   };
 
@@ -426,6 +454,23 @@ export default function SavingsPaymentsPage() {
               }}
             >
               New Savings Payment
+            </Button>
+            <Button
+              component={Link}
+              href="/savings/withdrawals"
+              variant="outlined"
+              startIcon={<IconArrowsExchange size={18} />}
+              sx={{
+                borderColor: "#0f766e",
+                color: "#0f766e",
+                fontWeight: 700,
+                textTransform: "none",
+                borderRadius: 1.5,
+                px: 2,
+                "&:hover": { bgcolor: "#f0fdfa", borderColor: "#0d9488" },
+              }}
+            >
+              Savings Withdrawals
             </Button>
             <Button
               variant="contained"
@@ -803,7 +848,7 @@ export default function SavingsPaymentsPage() {
                           {item.remarks || "-"}
                         </TableCell>
                         <TableCell align="center">
-                          <Stack direction="row" spacing={0.75} justifyContent="center">
+                          <Stack direction="row" spacing={0.75} justifyContent="center" alignItems="center">
                             <Tooltip title="View Receipt">
                               <IconButton
                                 size="small"
@@ -820,7 +865,44 @@ export default function SavingsPaymentsPage() {
                                 <IconEye size={15} />
                               </IconButton>
                             </Tooltip>
-                            {isAdmin && (
+                            {item.is_reversed ? (
+                              <Tooltip title={`Reversed: ${item.reversal_reason || "Reversed"}`}>
+                                <Chip
+                                  label="REVERSED"
+                                  size="small"
+                                  sx={{
+                                    bgcolor: "#fee2e2",
+                                    color: "#991b1b",
+                                    fontWeight: 800,
+                                    fontSize: "0.68rem",
+                                    height: 24,
+                                  }}
+                                />
+                              </Tooltip>
+                            ) : (
+                              isAdmin && (
+                                <Tooltip title="Reverse Payment">
+                                  <IconButton
+                                    size="small"
+                                    onClick={() => {
+                                      setReversingPayment(item);
+                                      setReversalReason("");
+                                    }}
+                                    sx={{
+                                      bgcolor: "#f59e0b",
+                                      color: "#ffffff",
+                                      "&:hover": { bgcolor: "#d97706" },
+                                      borderRadius: 1,
+                                      width: 26,
+                                      height: 26,
+                                    }}
+                                  >
+                                    <IconArrowBackUp size={15} />
+                                  </IconButton>
+                                </Tooltip>
+                              )
+                            )}
+                            {isAdmin && !item.is_reversed && (
                               <Tooltip title="Delete">
                                 <IconButton
                                   size="small"
@@ -1283,6 +1365,61 @@ export default function SavingsPaymentsPage() {
             </DialogActions>
           </Dialog>
         )}
+
+        {/* Reversal Confirmation Dialog */}
+        <Dialog
+          open={Boolean(reversingPayment)}
+          onClose={() => !reversingLoading && setReversingPayment(null)}
+          maxWidth="sm"
+          fullWidth
+        >
+          <DialogTitle sx={{ fontWeight: 800, color: "#991b1b", display: "flex", alignItems: "center", gap: 1 }}>
+            <IconArrowBackUp size={22} color="#dc2626" />
+            Reverse Savings Payment
+          </DialogTitle>
+          <DialogContent dividers>
+            <Typography variant="body1" mb={2}>
+              Are you sure you want to reverse payment <strong>{reversingPayment?.document_no}</strong> for{" "}
+              <strong>{reversingPayment?.member_name}</strong>?
+            </Typography>
+            <Alert severity="warning" sx={{ mb: 2.5, fontWeight: 500 }}>
+              Reversing this payment will deduct{" "}
+              <strong>KES {Number(reversingPayment?.money_in || 0).toLocaleString()}</strong> from the member&apos;s active savings
+              balance and generate an irreversible database trigger audit log.
+            </Alert>
+            <TextField
+              label="Reversal Reason *"
+              fullWidth
+              multiline
+              rows={3}
+              value={reversalReason}
+              onChange={(e) => setReversalReason(e.target.value)}
+              placeholder="e.g. Member deposited by error, wrong payroll deduction entry, bounced cheque..."
+            />
+          </DialogContent>
+          <DialogActions sx={{ p: 2 }}>
+            <Button
+              onClick={() => setReversingPayment(null)}
+              disabled={reversingLoading}
+              sx={{ textTransform: "none", color: "#64748b" }}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="contained"
+              onClick={handleConfirmReverse}
+              disabled={reversingLoading || !reversalReason.trim()}
+              sx={{
+                bgcolor: "#dc2626",
+                "&:hover": { bgcolor: "#b91c1c" },
+                fontWeight: 700,
+                textTransform: "none",
+              }}
+            >
+              {reversingLoading ? "Reversing..." : "Confirm & Reverse Payment"}
+            </Button>
+          </DialogActions>
+        </Dialog>
 
         {/* ======================================================== */}
         {/* EXECUTIVE BULK SAVINGS PAYMENTS UPLOAD MODAL              */}

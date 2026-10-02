@@ -57,7 +57,45 @@ class SharesService {
     });
     return response.data;
   }
+
+  async reversePayment(id: number, reason: string): Promise<any> {
+    const response = await api.post(`/shares-payments/${id}/reverse/`, { reason });
+    return response.data;
+  }
+
+  async getTransfers(params?: {
+    from_member?: number;
+    to_member?: number;
+    share_type?: string;
+    start_date?: string;
+    end_date?: string;
+    search?: string;
+  }): Promise<any[]> {
+    const response = await api.get("/share-transfers/", { params });
+    const data = response.data;
+    if (Array.isArray(data)) return data;
+    if (Array.isArray(data?.results)) return data.results;
+    return [];
+  }
+
+  async createTransfer(payload: {
+    from_member: number;
+    to_member?: number | null;
+    share_type: string;
+    number_of_shares: number | string;
+    shares_amount: number | string;
+    date_transferred: string;
+    remarks?: string;
+  }): Promise<any> {
+    const response = await api.post("/share-transfers/", payload);
+    return response.data;
+  }
+
+  async deleteTransfer(id: number): Promise<void> {
+    await api.delete(`/share-transfers/${id}/`);
+  }
 }
+
 
 const sharesService = new SharesService();
 export default sharesService;

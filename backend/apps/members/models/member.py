@@ -1,3 +1,4 @@
+from decimal import Decimal
 from django.conf import settings
 from django.db import models
 from django.db.models import Max
@@ -145,6 +146,43 @@ class Member(AuditModel):
         "organizations.Organization",
         on_delete=models.PROTECT,
         related_name="members",
+    )
+
+    # Onboarding Financial Contributions & Registration Fee
+    registration_fee_paid = models.BooleanField(
+        default=False,
+        db_index=True,
+        help_text="Whether the one-time registration fee was paid upfront at registration",
+    )
+    registration_fee_amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=Decimal("1000.00"),
+        help_text="Standard or customized registration fee for the member",
+    )
+    initial_savings_amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=Decimal("0.00"),
+        help_text="Initial savings deposit submitted at registration",
+    )
+    initial_shares_amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=Decimal("0.00"),
+        help_text="Initial share capital contribution submitted at registration",
+    )
+    payment_channel = models.CharField(
+        max_length=50,
+        blank=True,
+        default="",
+        help_text="Payment mode used if paid upfront (e.g. MPESA, BANK, CASH, DEDUCTION)",
+    )
+    payment_reference = models.CharField(
+        max_length=100,
+        blank=True,
+        default="",
+        help_text="Transaction code or receipt reference for upfront registration payment",
     )
 
     class Meta:

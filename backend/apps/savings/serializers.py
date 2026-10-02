@@ -46,12 +46,16 @@ class SavingsPaymentSerializer(serializers.ModelSerializer):
             "month",
             "year",
             "remarks",
+            "is_reversed",
+            "reversed_at",
+            "reversal_reason",
             "recorded_by",
             "recorded_by_username",
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["id", "created_at", "updated_at"]
+        read_only_fields = ["id", "is_reversed", "reversed_at", "reversal_reason", "created_at", "updated_at"]
+
 
     def get_member_name(self, obj):
         if obj.member:
@@ -194,3 +198,67 @@ class SavingsPaymentCreateSerializer(serializers.ModelSerializer):
             print(f"Ledger posting notice for savings #{instance.id}: {exc}")
 
         return instance
+
+
+class SavingsWithdrawalSerializer(serializers.ModelSerializer):
+    member_name = serializers.CharField(source="member.full_name", read_only=True)
+    payroll_no = serializers.CharField(source="member.payroll_number", read_only=True, default="")
+    membership_number = serializers.CharField(source="member.membership_number", read_only=True)
+    withdrawal_type_display = serializers.CharField(source="get_withdrawal_type_display", read_only=True)
+    savings_drawn_from_display = serializers.CharField(source="get_savings_drawn_from_display", read_only=True)
+    bank_display = serializers.CharField(source="get_bank_display", read_only=True)
+
+    class Meta:
+        from apps.savings.models import SavingsWithdrawal
+        model = SavingsWithdrawal
+        fields = [
+            "id",
+            "organization",
+            "member",
+            "member_name",
+            "payroll_no",
+            "membership_number",
+            "withdrawal_type",
+            "withdrawal_type_display",
+            "amount",
+            "date_withdrawn",
+            "savings_drawn_from",
+            "savings_drawn_from_display",
+            "bank",
+            "bank_display",
+            "document_code",
+            "reason",
+            "is_active",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["id", "organization", "created_at", "updated_at"]
+
+    def validate(self, attrs):
+        member = attrs.get("member")
+        amount = attrs.get("amount")
+        if amount and amount <= Decimal("0.00"):
+            raise serializers.ValidationError({"amount": "Withdrawal amount must be greater than zero."})
+        
+        # Calculate active savings balance for member
+        if member and amount:
+            from django.db.models import Sum
+            money_in = SavingsPayment.objects.filter(
+                member=member,
+                transaction_type=SavingsPayment.TransactionType.MONEY_IN,
+                is_reversed=False,
+            ).aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
+
+            money_out = SavingsPayment.objects.filter(
+                member=member,
+                transaction_type=SavingsPayment.TransactionType.MONEY_OUT,
+                is_reversed=False,
+            ).aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
+
+            available_savings = money_in - money_out
+            if amount > available_savings:
+                raise serializers.ValidationError({
+                    "amount": f"Insufficient savings balance. Member has KES {available_savings:,.2f} available."
+                })
+        return attrs
+

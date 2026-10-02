@@ -38,6 +38,9 @@ import {
   IconArrowLeft,
   IconUpload,
   IconInfoCircle,
+  IconCoins,
+  IconPigMoney,
+  IconBuildingBank,
 } from "@tabler/icons-react";
 
 /* =========================================================
@@ -68,6 +71,15 @@ export interface MemberFormData {
     code: string;
   } | null;
   passport_photo: File | string | null;
+
+  // Onboarding Financial Contributions & Registration Fee
+  registration_fee_paid?: boolean;
+  registration_fee_amount?: number | string;
+  initial_savings_amount?: number | string;
+  initial_shares_amount?: number | string;
+  payment_channel?: string;
+  payment_reference?: string;
+  deduct_via_checkoff?: boolean;
 }
 
 interface MemberDetailsStepProps {
@@ -91,6 +103,14 @@ function createFormData(values?: Partial<MemberFormData>): MemberFormData {
     category: values?.category ?? "",
     category_details: values?.category_details ?? null,
     passport_photo: values?.passport_photo ?? null,
+
+    registration_fee_paid: values?.registration_fee_paid ?? true,
+    registration_fee_amount: values?.registration_fee_amount ?? 1000,
+    initial_savings_amount: values?.initial_savings_amount ?? 1500,
+    initial_shares_amount: values?.initial_shares_amount ?? 0,
+    payment_channel: values?.payment_channel ?? "MPESA",
+    payment_reference: values?.payment_reference ?? "",
+    deduct_via_checkoff: values?.deduct_via_checkoff ?? false,
   };
 }
 
@@ -1079,7 +1099,264 @@ export default function MemberDetailsStep({
           </Grid>
         </Paper>
 
-        {/* Module 3: Passport Photograph */}
+        {/* Module 3: Onboarding Contributions & Fees */}
+        <Paper
+          elevation={0}
+          sx={{
+            p: { xs: 2.5, sm: 3.5 },
+            borderRadius: 3,
+            border: "1px solid #cbd5e1",
+            bgcolor: "#ffffff",
+            boxShadow: "0 2px 8px rgba(15, 23, 42, 0.03)",
+          }}
+        >
+          <Stack
+            direction="row"
+            spacing={1.5}
+            alignItems="center"
+            mb={3}
+            pb={2}
+            borderBottom="1px solid #f1f5f9"
+          >
+            <Box
+              sx={{
+                width: 42,
+                height: 42,
+                bgcolor: "#059669",
+                color: "#ffffff",
+                borderRadius: 2.5,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                boxShadow: "0 4px 10px rgba(5, 150, 105, 0.2)",
+              }}
+            >
+              <IconCoins size={22} />
+            </Box>
+            <Box>
+              <Typography
+                variant="h6"
+                fontWeight={800}
+                sx={{ color: "#0f172a", fontSize: "1.1rem" }}
+              >
+                3. Onboarding Contributions &amp; Registration Fee
+              </Typography>
+              <Typography
+                variant="caption"
+                sx={{ color: "#64748b", fontWeight: 600 }}
+              >
+                Choose to pay registration fee, savings, and shares upfront or deduct via monthly payroll check-off
+              </Typography>
+            </Box>
+          </Stack>
+
+          {/* Payment Method Option Selector */}
+          <Grid container spacing={2} sx={{ mb: 3 }}>
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <Paper
+                elevation={0}
+                onClick={() => setForm((prev) => ({ ...prev, deduct_via_checkoff: false, registration_fee_paid: true }))}
+                sx={{
+                  p: 2.5,
+                  borderRadius: 2.5,
+                  border: !form.deduct_via_checkoff ? "2px solid #059669" : "1px solid #e2e8f0",
+                  bgcolor: !form.deduct_via_checkoff ? "#f0fdf4" : "#f8fafc",
+                  cursor: "pointer",
+                  transition: "all 0.2s ease-in-out",
+                  "&:hover": { borderColor: "#059669" },
+                }}
+              >
+                <Stack direction="row" spacing={1.5} alignItems="flex-start">
+                  <Box
+                    sx={{
+                      width: 20,
+                      height: 20,
+                      borderRadius: "50%",
+                      border: !form.deduct_via_checkoff ? "6px solid #059669" : "2px solid #cbd5e1",
+                      bgcolor: "#ffffff",
+                      mt: 0.3,
+                      flexShrink: 0,
+                    }}
+                  />
+                  <Box>
+                    <Typography variant="subtitle2" fontWeight={800} color={!form.deduct_via_checkoff ? "#064e3b" : "#334155"}>
+                      Pay Upfront During Registration
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.5, lineHeight: 1.5 }}>
+                      Member pays registration fee, initial savings, or shares today. Effects accounts and generates receipts immediately.
+                    </Typography>
+                  </Box>
+                </Stack>
+              </Paper>
+            </Grid>
+
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <Paper
+                elevation={0}
+                onClick={() => setForm((prev) => ({ ...prev, deduct_via_checkoff: true, registration_fee_paid: false }))}
+                sx={{
+                  p: 2.5,
+                  borderRadius: 2.5,
+                  border: form.deduct_via_checkoff ? "2px solid #0284c7" : "1px solid #e2e8f0",
+                  bgcolor: form.deduct_via_checkoff ? "#f0f9ff" : "#f8fafc",
+                  cursor: "pointer",
+                  transition: "all 0.2s ease-in-out",
+                  "&:hover": { borderColor: "#0284c7" },
+                }}
+              >
+                <Stack direction="row" spacing={1.5} alignItems="flex-start">
+                  <Box
+                    sx={{
+                      width: 20,
+                      height: 20,
+                      borderRadius: "50%",
+                      border: form.deduct_via_checkoff ? "6px solid #0284c7" : "2px solid #cbd5e1",
+                      bgcolor: "#ffffff",
+                      mt: 0.3,
+                      flexShrink: 0,
+                    }}
+                  />
+                  <Box>
+                    <Typography variant="subtitle2" fontWeight={800} color={form.deduct_via_checkoff ? "#0369a1" : "#334155"}>
+                      Deduct via Monthly Deductions / Check-off
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.5, lineHeight: 1.5 }}>
+                      No payment collected today. Fees and savings will be scheduled and automatically deducted during monthly employer check-off uploads.
+                    </Typography>
+                  </Box>
+                </Stack>
+              </Paper>
+            </Grid>
+          </Grid>
+
+          {!form.deduct_via_checkoff ? (
+            <Box sx={{ p: 2.5, bgcolor: "#f8fafc", borderRadius: 2.5, border: "1px solid #e2e8f0" }}>
+              <Grid container spacing={2.5}>
+                {/* Registration Fee */}
+                <Grid size={{ xs: 12, sm: 4 }}>
+                  <Typography variant="caption" fontWeight={700} color="#334155" mb={0.8} display="block">
+                    Registration Fee (KES) *
+                  </Typography>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    type="number"
+                    value={form.registration_fee_amount}
+                    onChange={(e) => setForm({ ...form, registration_fee_amount: e.target.value })}
+                    placeholder="1000.00"
+                    InputProps={{
+                      startAdornment: <InputAdornment position="start">KES</InputAdornment>,
+                    }}
+                  />
+                  <Typography variant="caption" color="#64748b" sx={{ mt: 0.5, display: "block" }}>
+                    Standard one-time SACCO entry fee
+                  </Typography>
+                </Grid>
+
+                {/* Initial Savings */}
+                <Grid size={{ xs: 12, sm: 4 }}>
+                  <Typography variant="caption" fontWeight={700} color="#334155" mb={0.8} display="block">
+                    Initial Savings Deposit (KES)
+                  </Typography>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    type="number"
+                    value={form.initial_savings_amount}
+                    onChange={(e) => setForm({ ...form, initial_savings_amount: e.target.value })}
+                    placeholder="1500.00"
+                    InputProps={{
+                      startAdornment: <InputAdornment position="start">KES</InputAdornment>,
+                    }}
+                  />
+                  <Typography variant="caption" color="#64748b" sx={{ mt: 0.5, display: "block" }}>
+                    Credited directly to Normal Savings ledger
+                  </Typography>
+                </Grid>
+
+                {/* Initial Shares */}
+                <Grid size={{ xs: 12, sm: 4 }}>
+                  <Typography variant="caption" fontWeight={700} color="#334155" mb={0.8} display="block">
+                    Initial Shares Capital (KES)
+                  </Typography>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    type="number"
+                    value={form.initial_shares_amount}
+                    onChange={(e) => setForm({ ...form, initial_shares_amount: e.target.value })}
+                    placeholder="0.00"
+                    InputProps={{
+                      startAdornment: <InputAdornment position="start">KES</InputAdornment>,
+                    }}
+                  />
+                  <Typography variant="caption" color="#64748b" sx={{ mt: 0.5, display: "block" }}>
+                    Issues shares @ KES 100 / share
+                  </Typography>
+                </Grid>
+
+                {/* Payment Channel */}
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <Typography variant="caption" fontWeight={700} color="#334155" mb={0.8} display="block">
+                    Payment Channel *
+                  </Typography>
+                  <FormControl fullWidth size="small">
+                    <Select
+                      value={form.payment_channel || "MPESA"}
+                      onChange={(e) => setForm({ ...form, payment_channel: e.target.value })}
+                    >
+                      <MenuItem value="MPESA">M-Pesa Paybill / Till</MenuItem>
+                      <MenuItem value="BANK">Bank Deposit / Transfer</MenuItem>
+                      <MenuItem value="CASH">Cash at Counter</MenuItem>
+                      <MenuItem value="CHEQUE">Cheque</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Grid>
+
+                {/* Payment Reference */}
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <Typography variant="caption" fontWeight={700} color="#334155" mb={0.8} display="block">
+                    Payment Reference / Code
+                  </Typography>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    placeholder="e.g. MPESA-QWE876 or Slip #4021"
+                    value={form.payment_reference || ""}
+                    onChange={(e) => setForm({ ...form, payment_reference: e.target.value })}
+                  />
+                </Grid>
+              </Grid>
+
+              {/* Total Summary */}
+              <Box sx={{ mt: 2.5, p: 2, bgcolor: "#ecfdf5", borderRadius: 2, border: "1px solid #a7f3d0" }}>
+                <Stack direction="row" justifyContent="space-between" alignItems="center">
+                  <Typography variant="body2" fontWeight={800} color="#065f46">
+                    Total Upfront Amount to Collect Today:
+                  </Typography>
+                  <Typography variant="h6" fontWeight={900} color="#059669">
+                    KES {(
+                      Number(form.registration_fee_amount || 0) +
+                      Number(form.initial_savings_amount || 0) +
+                      Number(form.initial_shares_amount || 0)
+                    ).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                  </Typography>
+                </Stack>
+              </Box>
+            </Box>
+          ) : (
+            <Alert severity="info" sx={{ borderRadius: 2 }}>
+              <Typography variant="subtitle2" fontWeight={800}>
+                Monthly Deduction Check-off Scheduled
+              </Typography>
+              <Typography variant="caption">
+                The registration fee of <strong>KES {Number(form.registration_fee_amount || 1000).toLocaleString()}</strong> and monthly savings will be listed in the monthly deductions check-off schedule and automatically deducted and reconciled when the employer check-off file is uploaded.
+              </Typography>
+            </Alert>
+          )}
+        </Paper>
+
+        {/* Module 4: Passport Photograph */}
         <Paper
           elevation={0}
           sx={{
@@ -1119,7 +1396,7 @@ export default function MemberDetailsStep({
                 fontWeight={800}
                 sx={{ color: "#0f172a", fontSize: "1.1rem" }}
               >
-                3. Passport Photograph
+                4. Passport Photograph
               </Typography>
               <Typography
                 variant="caption"

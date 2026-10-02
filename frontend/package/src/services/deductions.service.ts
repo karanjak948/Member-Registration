@@ -112,7 +112,21 @@ class DeductionsService {
     });
     return response.data;
   }
+
+  async getBatches(): Promise<any[]> {
+    const response = await api.get("/deduction-batches/");
+    const data = response.data;
+    if (Array.isArray(data)) return data;
+    if (Array.isArray(data?.results)) return data.results;
+    return [];
+  }
+
+  async getBatchItems(batchId: number, params?: { status?: string; search?: string }): Promise<any> {
+    const response = await api.get(`/deduction-batches/${batchId}/items/`, { params });
+    return response.data;
+  }
 }
+
 
 export const deductionsService = new DeductionsService();
 export default deductionsService;

@@ -38,6 +38,18 @@ class Repayment(AuditModel):
     unallocated_amount = models.DecimalField(max_digits=15, decimal_places=2, default=0)
 
     notes = models.TextField(blank=True, null=True)
+    # Reversal tracking
+    is_reversed = models.BooleanField(default=False, db_index=True)
+    reversed_at = models.DateTimeField(null=True, blank=True)
+    reversed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="reversed_loan_repayments",
+    )
+    reversal_reason = models.TextField(blank=True, default="")
+
     recorded_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
@@ -51,4 +63,5 @@ class Repayment(AuditModel):
         ordering = ["-payment_date", "-created_at"]
 
     def __str__(self):
-        return f"Repayment {self.repayment_number} ({self.amount_paid}) for {self.loan.loan_number}"
+        rev = " [REVERSED]" if self.is_reversed else ""
+        return f"Repayment {self.repayment_number} ({self.amount_paid}) for {self.loan.loan_number}{rev}"

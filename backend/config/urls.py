@@ -68,6 +68,14 @@ urlpatterns = [
         "api/v1/",
         include("apps.deductions.urls"),
     ),
+    path(
+        "api/",
+        include("apps.common.urls"),
+    ),
+    path(
+        "api/v1/",
+        include("apps.common.urls"),
+    ),
 
     # Always serve media uploads directly (logos, passport photos, documents)
     re_path(

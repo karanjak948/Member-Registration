@@ -55,6 +55,26 @@ class SavingsPaymentViewSet(viewsets.ModelViewSet):
             payment.ledger_transaction.delete()
         return super().destroy(request, *args, **kwargs)
 
+    @action(detail=True, methods=["post"], url_path="reverse")
+    def reverse(self, request, pk=None):
+        """
+        Reverse a savings payment.
+        Sets is_reversed=True, records trigger audit log, and deactivates any linked withdrawal.
+        """
+        payment = self.get_object()
+        reason = request.data.get("reason", "Savings payment reversed by user action")
+        from apps.common.triggers import reverse_savings_payment
+        try:
+            reversed_payment = reverse_savings_payment(payment, user=request.user, reason=reason)
+            return Response({
+                "success": True,
+                "message": f"Savings payment #{reversed_payment.document_no} successfully reversed.",
+                "payment": SavingsPaymentSerializer(reversed_payment).data,
+            })
+        except ValueError as err:
+            return Response({"error": str(err)}, status=status.HTTP_400_BAD_REQUEST)
+
+
 
     def get_queryset(self):
         qs = super().get_queryset()
@@ -410,3 +430,84 @@ class SavingsPaymentViewSet(viewsets.ModelViewSet):
             "errors": [],
             "message": f"Successfully imported {created_count} savings payments totalling KES {total_amount:,.2f}.",
         })
+
+
+class SavingsWithdrawalViewSet(viewsets.ModelViewSet):
+    """
+    CRUD API endpoints for Savings Withdrawals matching Jimanage SACCO system.
+    Supports Exit Sacco, Loan Repayment, Saving Refund, Excess Savings, Partial Withdrawal.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    search_fields = [
+        "member__first_name",
+        "member__other_names",
+        "member__membership_number",
+        "payroll_no",
+        "document_code",
+        "reason",
+        "withdrawal_type",
+    ]
+    ordering_fields = ["date_withdrawn", "created_at", "amount"]
+    ordering = ["-date_withdrawn", "-created_at"]
+
+    def get_serializer_class(self):
+        from apps.savings.serializers import SavingsWithdrawalSerializer
+        return SavingsWithdrawalSerializer
+
+    def get_queryset(self):
+        from apps.savings.models import SavingsWithdrawal
+        from apps.organizations.models import Organization
+        org = getattr(self.request.user, "organization", None)
+        if not org:
+            org = Organization.objects.first()
+        qs = SavingsWithdrawal.objects.select_related("member", "organization").all()
+        if org:
+            qs = qs.filter(organization=org)
+
+        # Filters matching Screenshot 3: Date withdrawn from / to & Withdrawal type
+        start_date = self.request.query_params.get("start_date")
+        end_date = self.request.query_params.get("end_date")
+        w_type = self.request.query_params.get("withdrawal_type")
+        member_id = self.request.query_params.get("member")
+
+        if start_date:
+            qs = qs.filter(date_withdrawn__gte=start_date)
+        if end_date:
+            qs = qs.filter(date_withdrawn__lte=end_date)
+        if w_type and w_type != "all":
+            qs = qs.filter(withdrawal_type=w_type)
+        if member_id:
+            qs = qs.filter(member_id=member_id)
+
+        return qs
+
+    def perform_create(self, serializer):
+        from apps.organizations.models import Organization
+        member = serializer.validated_data.get("member")
+        org = (
+            getattr(member, "organization", None)
+            or getattr(self.request.user, "organization", None)
+            or Organization.objects.first()
+        )
+        user = self.request.user if getattr(self.request, "user", None) and self.request.user.is_authenticated else None
+        serializer.save(
+            organization=org,
+            created_by=user,
+            updated_by=user,
+            recorded_by=user,
+        )
+
+    def perform_update(self, serializer):
+        serializer.save(updated_by=self.request.user)
+
+    def destroy(self, request, *args, **kwargs):
+        withdrawal = self.get_object()
+        # Mark inactive and reverse linked payment instead of hard delete
+        withdrawal.is_active = False
+        withdrawal.save()
+        return Response(
+            {"message": f"Withdrawal #{withdrawal.id} marked inactive and reversed."},
+            status=status.HTTP_200_OK,
+        )
+

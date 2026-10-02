@@ -73,6 +73,15 @@ const createInitialMemberState = (): MemberState => ({
   activated_by: null,
   activated_by_username: "",
   activated_at: null,
+
+  // Onboarding Financial Contributions & Registration Fee
+  registration_fee_paid: true,
+  registration_fee_amount: 1000,
+  initial_savings_amount: 1500,
+  initial_shares_amount: 0,
+  payment_channel: "MPESA",
+  payment_reference: "",
+  deduct_via_checkoff: false,
 });
 
 const createInitialNextOfKinState =

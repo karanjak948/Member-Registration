@@ -98,6 +98,26 @@ class SharePayment(AuditModel):
         blank=True,
         null=True,
     )
+    # Reversal tracking
+    is_reversed = models.BooleanField(
+        default=False,
+        db_index=True,
+    )
+    reversed_at = models.DateTimeField(
+        null=True,
+        blank=True,
+    )
+    reversed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="reversed_share_payments",
+    )
+    reversal_reason = models.TextField(
+        blank=True,
+        default="",
+    )
     recorded_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
@@ -138,4 +158,91 @@ class SharePayment(AuditModel):
 
     def __str__(self):
         member_name = self.member.full_name if self.member else "—"
-        return f"{self.document_no} - {member_name} ({self.get_share_type_display()} KES {self.total_amount})"
+        rev = " [REVERSED]" if self.is_reversed else ""
+        return f"{self.document_no} - {member_name} ({self.get_share_type_display()} KES {self.total_amount}){rev}"
+
+
+class ShareTransfer(AuditModel):
+    """
+    Share Transfer / Withdrawal registry matching legacy Jimanage SACCO system.
+    Supports member-to-member transfers and exit redemptions to SACCO Capital Pool.
+    """
+    class ShareType(models.TextChoices):
+        ORDINARY = "ordinary", "Ordinary Shares"
+        PREFERENCE = "preference", "Preference Shares"
+        CAPITAL = "capital", "Capital Shares"
+
+    organization = models.ForeignKey(
+        "organizations.Organization",
+        on_delete=models.CASCADE,
+        related_name="share_transfers",
+    )
+    from_member = models.ForeignKey(
+        "members.Member",
+        on_delete=models.PROTECT,
+        related_name="transferred_out_shares",
+        db_index=True,
+    )
+    to_member = models.ForeignKey(
+        "members.Member",
+        on_delete=models.PROTECT,
+        related_name="transferred_in_shares",
+        null=True,
+        blank=True,
+        help_text="Recipient member, or null if redeemed / transferred to SACCO pool",
+    )
+    share_type = models.CharField(
+        max_length=30,
+        choices=ShareType.choices,
+        default=ShareType.ORDINARY,
+    )
+    number_of_shares = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+    )
+    shares_amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=Decimal("100.00"),
+        help_text="Price per share",
+    )
+    total_amount = models.DecimalField(
+        max_digits=15,
+        decimal_places=2,
+    )
+    date_transferred = models.DateField(
+        default=timezone.now,
+        db_index=True,
+    )
+    remarks = models.TextField(
+        blank=True,
+        null=True,
+    )
+    is_active = models.BooleanField(
+        default=True,
+    )
+    recorded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="recorded_share_transfers",
+    )
+
+    class Meta:
+        db_table = "tbl_share_transfers"
+        ordering = ["-date_transferred", "-created_at"]
+        verbose_name = "Share Transfer"
+        verbose_name_plural = "Share Transfers"
+
+    def save(self, *args, **kwargs):
+        if not self.total_amount:
+            shares_count = Decimal(str(self.number_of_shares or 0))
+            price = Decimal(str(self.shares_amount or 100))
+            self.total_amount = shares_count * price
+
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        to_target = self.to_member.full_name if self.to_member else "SACCO Pool"
+        return f"{self.from_member.full_name} -> {to_target} ({self.number_of_shares} shares, KES {self.total_amount})"

@@ -44,6 +44,9 @@ import {
   IconBadge,
   IconCalendar,
   IconNumber,
+  IconCoins,
+  IconPigMoney,
+  IconBuildingBank,
 } from "@tabler/icons-react";
 
 /* =========================================================
@@ -82,7 +85,13 @@ function getApiErrorMessage(error: any): string {
     }
     return responseData.detail;
   }
-  if (typeof responseData === "string") return responseData;
+  if (typeof responseData === "string") {
+    if (responseData.includes("<!DOCTYPE") || responseData.includes("<html")) {
+      const match = responseData.match(/<pre class="exception_value">([^<]+)<\/pre>/i) || responseData.match(/<h1>([^<]+)<\/h1>/i);
+      return match ? match[1].trim() : "A server error occurred during registration. Please check the backend.";
+    }
+    return responseData;
+  }
 
   if (typeof responseData === "object") {
     const messages: string[] = [];
@@ -264,6 +273,15 @@ export default function ReviewStep({
       }
 
       formData.append("category", String(member.category || ""));
+
+      // Onboarding Financial Contributions & Registration Fee
+      const isFeePaid = !member.deduct_via_checkoff && Boolean(member.registration_fee_paid ?? true);
+      formData.append("registration_fee_paid", String(isFeePaid));
+      formData.append("registration_fee_amount", String(member.registration_fee_amount || 1000));
+      formData.append("initial_savings_amount", String(!member.deduct_via_checkoff ? (member.initial_savings_amount || 0) : 0));
+      formData.append("initial_shares_amount", String(!member.deduct_via_checkoff ? (member.initial_shares_amount || 0) : 0));
+      formData.append("payment_channel", cleanString(member.payment_channel || "MPESA"));
+      formData.append("payment_reference", cleanString(member.payment_reference));
 
       if (member.passport_photo instanceof File) {
         formData.append("passport_photo", member.passport_photo);
@@ -451,10 +469,10 @@ export default function ReviewStep({
       }
 
       setSuccess(true);
+      router.push("/members");
 
       redirectTimer.current = setTimeout(() => {
         dispatch(resetRegistration());
-        router.push("/members");
       }, 1500);
     } catch (err: any) {
       console.error("Registration error:", err);
@@ -633,6 +651,51 @@ export default function ReviewStep({
         </Box>
 
         <Box sx={{ p: { xs: 2.5, sm: 3 }, bgcolor: "#fafafa" }}>{children}</Box>
+      </Paper>
+    );
+  }
+
+  if (success) {
+    return (
+      <Paper
+        elevation={0}
+        sx={{
+          p: { xs: 4, sm: 8 },
+          borderRadius: 3,
+          textAlign: "center",
+          bgcolor: "#ffffff",
+          border: "1px solid #10b981",
+          boxShadow: "0 10px 30px rgba(16, 185, 129, 0.12)",
+          my: 3,
+        }}
+      >
+        <Box
+          sx={{
+            width: 80,
+            height: 80,
+            borderRadius: "50%",
+            bgcolor: "#ecfdf5",
+            color: "#059669",
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            mb: 2.5,
+          }}
+        >
+          <IconCheck size={44} />
+        </Box>
+        <Typography variant="h4" fontWeight={800} sx={{ color: "#064e3b", mb: 1 }}>
+          Registration Completed Successfully!
+        </Typography>
+        <Typography variant="body1" sx={{ color: "#475569", mb: 3.5, fontSize: "1.05rem" }}>
+          The member record and financial contributions have been recorded. Redirecting to the Member Directory...
+        </Typography>
+        <Stack direction="row" spacing={1.5} alignItems="center" justifyContent="center">
+          <CircularProgress size={24} sx={{ color: "#059669" }} />
+          <Typography variant="body2" sx={{ color: "#059669", fontWeight: 700 }}>
+            Redirecting to members...
+          </Typography>
+        </Stack>
       </Paper>
     );
   }
@@ -887,6 +950,89 @@ export default function ReviewStep({
                 valueColor="#0369a1"
                 fullWidth
               />
+            </Grid>
+          </ReviewModuleCard>
+
+          {/* 1B. Onboarding Financial Plan & Contributions */}
+          <ReviewModuleCard
+            title="Onboarding Financial Plan &amp; Contributions"
+            subtitle="Registration fee, initial savings deposit, and share capital allocation"
+            icon={<IconCoins size={22} />}
+            accentColor="#059669"
+            headerBg="linear-gradient(135deg, #ecfdf5 0%, #ffffff 100%)"
+            completed={true}
+          >
+            <Grid container spacing={2}>
+              <DetailCell
+                label="Collection Strategy"
+                value={member.deduct_via_checkoff ? "Deduct via Monthly Check-off" : "Paid Upfront at Registration"}
+                icon={<IconBuildingBank size={16} />}
+                accentColor={member.deduct_via_checkoff ? "#0284c7" : "#059669"}
+                valueColor={member.deduct_via_checkoff ? "#0369a1" : "#064e3b"}
+                customBadge={
+                  <Chip
+                    label={member.deduct_via_checkoff ? "CHECK-OFF DEDUCTION" : "UPFRONT PAYMENT"}
+                    size="small"
+                    sx={{
+                      bgcolor: member.deduct_via_checkoff ? "#e0f2fe" : "#dcfce7",
+                      color: member.deduct_via_checkoff ? "#0369a1" : "#15803d",
+                      fontWeight: 800,
+                      fontSize: "0.75rem",
+                    }}
+                  />
+                }
+              />
+              <DetailCell
+                label="Registration Fee"
+                value={`KES ${Number(member.registration_fee_amount || 1000).toLocaleString()}`}
+                icon={<IconReceiptTax size={16} />}
+                accentColor="#059669"
+                valueColor="#064e3b"
+                customBadge={
+                  <Chip
+                    label={!member.deduct_via_checkoff ? "Paid Upfront" : "Pending Check-off"}
+                    size="small"
+                    sx={{
+                      bgcolor: !member.deduct_via_checkoff ? "#ecfdf5" : "#fef3c7",
+                      color: !member.deduct_via_checkoff ? "#047857" : "#b45309",
+                      fontWeight: 800,
+                      fontSize: "0.75rem",
+                    }}
+                  />
+                }
+              />
+              <DetailCell
+                label="Initial Savings Deposit"
+                value={!member.deduct_via_checkoff ? `KES ${Number(member.initial_savings_amount || 0).toLocaleString()}` : "Scheduled KES 1,500/mo"}
+                icon={<IconPigMoney size={16} />}
+                accentColor="#0284c7"
+                valueColor="#0369a1"
+              />
+              <DetailCell
+                label="Initial Share Capital"
+                value={!member.deduct_via_checkoff ? `KES ${Number(member.initial_shares_amount || 0).toLocaleString()}` : "Deduct via Check-off"}
+                icon={<IconCoins size={16} />}
+                accentColor="#7c3aed"
+                valueColor="#6d28d9"
+              />
+              {!member.deduct_via_checkoff && (
+                <>
+                  <DetailCell
+                    label="Payment Channel"
+                    value={member.payment_channel || "MPESA"}
+                    icon={<IconBuildingBank size={16} />}
+                    accentColor="#059669"
+                    valueColor="#064e3b"
+                  />
+                  <DetailCell
+                    label="Payment Reference"
+                    value={member.payment_reference || "Direct / Counter"}
+                    icon={<IconId size={16} />}
+                    accentColor="#0284c7"
+                    valueColor="#0369a1"
+                  />
+                </>
+              )}
             </Grid>
           </ReviewModuleCard>
 

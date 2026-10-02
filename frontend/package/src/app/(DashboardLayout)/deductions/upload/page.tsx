@@ -1,12 +1,16 @@
 "use client";
 
-import React, { useState, useRef, useMemo } from "react";
+import React, { useState, useRef, useMemo, useEffect } from "react";
 import Link from "next/link";
 import {
   Box,
   Card,
   CardContent,
   CircularProgress,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
   Divider,
   Grid,
   Paper,
@@ -30,7 +34,9 @@ import {
   LinearProgress,
   Avatar,
   IconButton,
+  Tooltip,
 } from "@mui/material";
+
 import PageContainer from "@/app/(DashboardLayout)/components/container/PageContainer";
 import ExportButton from "@/components/common/ExportButton";
 import { ExportColumn } from "@/utils/exportGrid";
@@ -51,6 +57,7 @@ import {
   IconClock,
   IconTrash,
   IconInfoCircle,
+  IconRefresh,
 } from "@tabler/icons-react";
 
 const MONTHS = [
@@ -97,12 +104,56 @@ export default function BulkUploadDeductionsPage() {
   const [uploading, setUploading] = useState(false);
   const [uploadResult, setUploadResult] = useState<BulkUploadResult | null>(null);
 
+  // Batches & Line Items Audit State
+  const [batches, setBatches] = useState<any[]>([]);
+  const [loadingBatches, setLoadingBatches] = useState(false);
+  const [batchItemsModalOpen, setBatchItemsModalOpen] = useState(false);
+  const [selectedBatchDetails, setSelectedBatchDetails] = useState<any>(null);
+  const [batchItems, setBatchItems] = useState<any[]>([]);
+  const [loadingBatchItems, setLoadingBatchItems] = useState(false);
+  const [filterItemStatus, setFilterItemStatus] = useState("all");
+  const [searchItemText, setSearchItemText] = useState("");
+
   // Snackbar Notification
   const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: "success" | "error" | "info" }>({
     open: false,
     message: "",
     severity: "info",
   });
+
+  const fetchBatches = async () => {
+    setLoadingBatches(true);
+    try {
+      const data = await deductionsService.getBatches();
+      setBatches(data);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoadingBatches(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchBatches();
+  }, []);
+
+  const handleOpenBatchItems = async (batchId: number) => {
+    setLoadingBatchItems(true);
+    setBatchItemsModalOpen(true);
+    setFilterItemStatus("all");
+    setSearchItemText("");
+    try {
+      const res = await deductionsService.getBatchItems(batchId);
+      setSelectedBatchDetails(res);
+      setBatchItems(res.items || []);
+    } catch (err) {
+      console.error(err);
+      setSnackbar({ open: true, message: "Failed to load batch line items.", severity: "error" });
+    } finally {
+      setLoadingBatchItems(false);
+    }
+  };
+
 
   // Download Sample Template
   const handleDownloadTemplate = async () => {
@@ -815,7 +866,24 @@ export default function BulkUploadDeductionsPage() {
               </TableContainer>
             )}
 
-            <Box sx={{ mt: 3, display: "flex", justifyContent: "flex-end" }}>
+            <Box sx={{ mt: 3, display: "flex", justifyContent: "flex-end", gap: 2 }}>
+              {uploadResult.batch_no && (
+                <Button
+                  variant="outlined"
+                  color="primary"
+                  onClick={() => {
+                    const matchedBatch = batches.find((b) => b.batch_no === uploadResult.batch_no);
+                    if (matchedBatch) {
+                      handleOpenBatchItems(matchedBatch.id);
+                    } else if (batches.length > 0) {
+                      handleOpenBatchItems(batches[0].id);
+                    }
+                  }}
+                  sx={{ fontWeight: 700, borderRadius: 2, textTransform: "none", px: 3 }}
+                >
+                  View Line-by-Line Upload vs Usage Audit
+                </Button>
+              )}
               <Button
                 component={Link}
                 href="/deductions"
@@ -828,7 +896,303 @@ export default function BulkUploadDeductionsPage() {
             </Box>
           </Paper>
         )}
+
+        {/* Previous Remittance Batches & Audit Logs */}
+        <Card elevation={0} sx={{ mt: 4, border: "1px solid #e2e8f0", borderRadius: 3, overflow: "hidden" }}>
+          <Box sx={{ p: 2.5, bgcolor: "#f8fafc", borderBottom: "1px solid #e2e8f0", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 2 }}>
+            <Box>
+              <Typography variant="h6" fontWeight={800} color="#1e293b">
+                Remittance Upload Batches &amp; Audit Logs
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Audit history of all uploaded employer check-off spreadsheets and waterfall allocation distributions
+              </Typography>
+            </Box>
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={<IconRefresh size={16} />}
+              onClick={fetchBatches}
+              sx={{ borderRadius: 2, textTransform: "none", fontWeight: 600 }}
+            >
+              Refresh Batches
+            </Button>
+          </Box>
+
+          <TableContainer>
+            <Table size="small">
+              <TableHead sx={{ bgcolor: "#f1f5f9" }}>
+                <TableRow>
+                  <TableCell sx={{ fontWeight: 800, color: "#475569" }}>Batch No</TableCell>
+                  <TableCell sx={{ fontWeight: 800, color: "#475569" }}>Period</TableCell>
+                  <TableCell sx={{ fontWeight: 800, color: "#475569" }}>Remittance Method</TableCell>
+                  <TableCell sx={{ fontWeight: 800, color: "#475569" }}>Date Remitted</TableCell>
+                  <TableCell sx={{ fontWeight: 800, color: "#475569", textAlign: "right" }}>Total Remitted</TableCell>
+                  <TableCell sx={{ fontWeight: 800, color: "#475569", textAlign: "center" }}>Spreadsheet Rows</TableCell>
+                  <TableCell sx={{ fontWeight: 800, color: "#475569" }}>Uploaded By</TableCell>
+                  <TableCell sx={{ fontWeight: 800, color: "#475569", textAlign: "center" }}>Audit Breakdown</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {loadingBatches ? (
+                  <TableRow>
+                    <TableCell colSpan={8} sx={{ textAlign: "center", py: 4 }}>
+                      <CircularProgress size={28} />
+                      <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                        Loading upload batches...
+                      </Typography>
+                    </TableCell>
+                  </TableRow>
+                ) : batches.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={8} sx={{ textAlign: "center", py: 4 }}>
+                      <Typography variant="body2" color="text.secondary">
+                        No check-off remittance batches recorded yet.
+                      </Typography>
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  batches.map((b) => (
+                    <TableRow key={b.id} hover>
+                      <TableCell sx={{ fontWeight: 700, fontFamily: "monospace", color: "#1e293b" }}>
+                        {b.batch_no}
+                      </TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>
+                        {MONTHS.find((m) => m.value === b.month)?.label || b.month} {b.year}
+                      </TableCell>
+                      <TableCell sx={{ textTransform: "capitalize" }}>{b.paid_thro}</TableCell>
+                      <TableCell>{b.date_paid}</TableCell>
+                      <TableCell sx={{ textAlign: "right", fontWeight: 800, color: "#0f172a" }}>
+                        KES {formatMoney(b.total_amount)}
+                      </TableCell>
+                      <TableCell sx={{ textAlign: "center" }}>
+                        <Chip
+                          label={`${b.success_count} / ${b.row_count} allocated`}
+                          size="small"
+                          sx={{
+                            fontWeight: 700,
+                            bgcolor: b.error_count > 0 ? "#fef3c7" : "#ecfdf5",
+                            color: b.error_count > 0 ? "#b45309" : "#059669",
+                          }}
+                        />
+                      </TableCell>
+                      <TableCell sx={{ color: "#64748b" }}>{b.uploaded_by_name || "System"}</TableCell>
+                      <TableCell sx={{ textAlign: "center" }}>
+                        <Button
+                          variant="contained"
+                          size="small"
+                          onClick={() => handleOpenBatchItems(b.id)}
+                          sx={{
+                            bgcolor: "#0284c7",
+                            color: "#ffffff",
+                            fontWeight: 700,
+                            borderRadius: 1.5,
+                            textTransform: "none",
+                            py: 0.5,
+                            px: 1.5,
+                            fontSize: "0.75rem",
+                            "&:hover": { bgcolor: "#0369a1" },
+                          }}
+                        >
+                          View Upload &amp; Usage
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </Card>
+
+        {/* Detailed Modal: 1. What was Uploaded in Excel vs 2. What was Used / Settled */}
+        <Dialog
+          open={batchItemsModalOpen}
+          onClose={() => setBatchItemsModalOpen(false)}
+          maxWidth="xl"
+          fullWidth
+          PaperProps={{ sx: { borderRadius: 3, maxHeight: "90vh" } }}
+        >
+          <DialogTitle sx={{ bgcolor: "#022c22", color: "#ffffff", p: 2.5 }}>
+            <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" alignItems={{ xs: "flex-start", sm: "center" }} spacing={1.5}>
+              <Box>
+                <Typography variant="h6" fontWeight={800} color="#ffffff">
+                  Remittance Line-Item Audit: {selectedBatchDetails?.batch_no || "Batch Details"}
+                </Typography>
+                <Typography variant="body2" sx={{ color: "#a7f3d0", mt: 0.25 }}>
+                  Detailed comparison: 1. Data uploaded from employer Excel sheet vs 2. Amount used to settle loans, savings, charges, and shares
+                </Typography>
+              </Box>
+              <Chip
+                label={`KES ${formatMoney(selectedBatchDetails?.total_amount)} Total`}
+                sx={{ bgcolor: "#065f46", color: "#ffffff", fontWeight: 800, border: "1px solid #10b981" }}
+              />
+            </Stack>
+          </DialogTitle>
+
+          <DialogContent sx={{ p: 3 }}>
+            {/* Filter toolbar */}
+            <Stack direction={{ xs: "column", sm: "row" }} spacing={2} alignItems="center" justifyContent="space-between" sx={{ mb: 2.5, mt: 1 }}>
+              <Stack direction="row" spacing={2} alignItems="center" sx={{ width: { xs: "100%", sm: "auto" } }}>
+                <TextField
+                  size="small"
+                  placeholder="Search employee no, name..."
+                  value={searchItemText}
+                  onChange={(e) => setSearchItemText(e.target.value)}
+                  sx={{ width: { xs: "100%", sm: 260 } }}
+                />
+                <FormControl size="small" sx={{ minWidth: 140 }}>
+                  <InputLabel>Status</InputLabel>
+                  <Select
+                    label="Status"
+                    value={filterItemStatus}
+                    onChange={(e) => setFilterItemStatus(e.target.value)}
+                  >
+                    <MenuItem value="all">All Items</MenuItem>
+                    <MenuItem value="success">Success</MenuItem>
+                    <MenuItem value="failed">Failed</MenuItem>
+                  </Select>
+                </FormControl>
+              </Stack>
+
+              {/* Universal ExportButton for Audit Log */}
+              <ExportButton
+                data={batchItems.map((item) => ({
+                  row_number: item.row_number,
+                  raw_employee_no: item.raw_employee_no || "—",
+                  raw_employee_name: item.raw_employee_name || "—",
+                  raw_total_ded: Number(item.raw_total_ded).toFixed(2),
+                  amount_charges: Number(item.amount_charges).toFixed(2),
+                  amount_loan_interest: Number(item.amount_loan_interest).toFixed(2),
+                  amount_loan_principal: Number(item.amount_loan_principal).toFixed(2),
+                  amount_savings: Number(item.amount_savings).toFixed(2),
+                  amount_shares: Number(item.amount_shares).toFixed(2),
+                  amount_surplus: Number(item.amount_surplus).toFixed(2),
+                  status: (item.status || "").toUpperCase(),
+                  error_message: item.error_message || "—",
+                }))}
+                columns={[
+                  { header: "Row #", key: "row_number" },
+                  { header: "Uploaded Emp No", key: "raw_employee_no" },
+                  { header: "Uploaded Name", key: "raw_employee_name" },
+                  { header: "Uploaded Remittance (KES)", key: "raw_total_ded" },
+                  { header: "Charges Used (KES)", key: "amount_charges" },
+                  { header: "Loan Interest Used (KES)", key: "amount_loan_interest" },
+                  { header: "Loan Principal Used (KES)", key: "amount_loan_principal" },
+                  { header: "Savings Credited (KES)", key: "amount_savings" },
+                  { header: "Shares Credited (KES)", key: "amount_shares" },
+                  { header: "Surplus (KES)", key: "amount_surplus" },
+                  { header: "Status", key: "status" },
+                  { header: "Error Note", key: "error_message" },
+                ]}
+                filename={`batch_audit_${selectedBatchDetails?.batch_no || "log"}`}
+                title={`Check-off Remittance Audit - ${selectedBatchDetails?.batch_no || ""}`}
+                size="small"
+              />
+            </Stack>
+
+            {loadingBatchItems ? (
+              <Box sx={{ py: 6, textAlign: "center" }}>
+                <CircularProgress size={36} />
+                <Typography variant="body2" color="text.secondary" sx={{ mt: 1.5 }}>
+                  Loading line-item allocation records...
+                </Typography>
+              </Box>
+            ) : (
+              <TableContainer sx={{ border: "1px solid #e2e8f0", borderRadius: 2, maxHeight: 480 }}>
+                <Table size="small" stickyHeader>
+                  <TableHead>
+                    <TableRow sx={{ "& th": { bgcolor: "#f1f5f9", fontWeight: 800, fontSize: "0.75rem", textTransform: "uppercase" } }}>
+                      <TableCell sx={{ width: 50 }}>Row</TableCell>
+                      {/* Section 1: Uploaded in Excel */}
+                      <TableCell sx={{ bgcolor: "#eff6ff !important", color: "#1d4ed8" }}>Uploaded Emp No</TableCell>
+                      <TableCell sx={{ bgcolor: "#eff6ff !important", color: "#1d4ed8" }}>Uploaded Name</TableCell>
+                      <TableCell align="right" sx={{ bgcolor: "#eff6ff !important", color: "#1d4ed8" }}>
+                        Uploaded TOTAL DED
+                      </TableCell>
+                      {/* Section 2: What was used */}
+                      <TableCell align="right" sx={{ bgcolor: "#f0fdf4 !important", color: "#15803d" }}>Charges</TableCell>
+                      <TableCell align="right" sx={{ bgcolor: "#f0fdf4 !important", color: "#15803d" }}>Loan Interest</TableCell>
+                      <TableCell align="right" sx={{ bgcolor: "#f0fdf4 !important", color: "#15803d" }}>Loan Principal</TableCell>
+                      <TableCell align="right" sx={{ bgcolor: "#f0fdf4 !important", color: "#15803d" }}>Savings</TableCell>
+                      <TableCell align="right" sx={{ bgcolor: "#f0fdf4 !important", color: "#15803d" }}>Shares</TableCell>
+                      <TableCell align="right" sx={{ bgcolor: "#f0fdf4 !important", color: "#15803d" }}>Surplus</TableCell>
+                      <TableCell align="center">Status</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {batchItems
+                      .filter((item) => {
+                        if (filterItemStatus !== "all" && item.status !== filterItemStatus) return false;
+                        if (searchItemText.trim()) {
+                          const q = searchItemText.toLowerCase();
+                          return (
+                            item.raw_employee_no?.toLowerCase().includes(q) ||
+                            item.raw_employee_name?.toLowerCase().includes(q) ||
+                            item.member_name?.toLowerCase().includes(q)
+                          );
+                        }
+                        return true;
+                      })
+                      .map((item, idx) => (
+                        <TableRow key={item.id || idx} hover sx={{ "&:nth-of-type(even)": { bgcolor: "#fafbfc" } }}>
+                          <TableCell sx={{ fontWeight: 600 }}>{item.row_number}</TableCell>
+                          <TableCell sx={{ fontFamily: "monospace", fontWeight: 700, bgcolor: "#f8fafc" }}>
+                            {item.raw_employee_no || "—"}
+                          </TableCell>
+                          <TableCell sx={{ fontWeight: 600, bgcolor: "#f8fafc" }}>
+                            {item.raw_employee_name || item.member_name || "—"}
+                          </TableCell>
+                          <TableCell align="right" sx={{ fontWeight: 800, color: "#1d4ed8", bgcolor: "#f8fafc" }}>
+                            KES {formatMoney(item.raw_total_ded)}
+                          </TableCell>
+                          <TableCell align="right">{formatMoney(item.amount_charges)}</TableCell>
+                          <TableCell align="right">{formatMoney(item.amount_loan_interest)}</TableCell>
+                          <TableCell align="right" sx={{ fontWeight: 600 }}>{formatMoney(item.amount_loan_principal)}</TableCell>
+                          <TableCell align="right" sx={{ color: "#0284c7", fontWeight: 600 }}>
+                            {formatMoney(item.amount_savings)}
+                          </TableCell>
+                          <TableCell align="right" sx={{ color: "#059669", fontWeight: 600 }}>
+                            {formatMoney(item.amount_shares)}
+                          </TableCell>
+                          <TableCell align="right" sx={{ color: "#d97706" }}>
+                            {formatMoney(item.amount_surplus)}
+                          </TableCell>
+                          <TableCell align="center">
+                            <Tooltip title={item.error_message || "Successfully reconciled and posted"}>
+                              <Chip
+                                label={item.status.toUpperCase()}
+                                size="small"
+                                sx={{
+                                  fontWeight: 800,
+                                  fontSize: "0.68rem",
+                                  bgcolor: item.status === "success" ? "#ecfdf5" : "#fee2e2",
+                                  color: item.status === "success" ? "#059669" : "#dc2626",
+                                  border: `1px solid ${item.status === "success" ? "#a7f3d0" : "#fca5a5"}`,
+                                }}
+                              />
+                            </Tooltip>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            )}
+          </DialogContent>
+
+          <DialogActions sx={{ p: 2, bgcolor: "#f8fafc", borderTop: "1px solid #e2e8f0" }}>
+            <Button
+              variant="outlined"
+              onClick={() => setBatchItemsModalOpen(false)}
+              sx={{ fontWeight: 700, borderRadius: 2, textTransform: "none" }}
+            >
+              Close Audit Log
+            </Button>
+          </DialogActions>
+        </Dialog>
       </Box>
+
 
       {/* Notifications */}
       <Snackbar

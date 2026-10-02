@@ -27,9 +27,13 @@ export interface SharePayment {
   remarks?: string;
   recorded_by?: number;
   recorded_by_username?: string;
+  is_reversed?: boolean;
+  reversed_at?: string;
+  reversal_reason?: string;
   created_at: string;
   updated_at: string;
 }
+
 
 export interface CreateSharePaymentPayload {
   member: number;

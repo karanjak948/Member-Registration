@@ -116,15 +116,10 @@ class MemberService:
             else None
         )
 
-        # Convert any remaining non-JSON-safe date objects.
-        for key, value in data.items():
-            if isinstance(
-                value,
-                (datetime, date),
-            ):
-                data[key] = value.isoformat()
-
-        return data
+        # Convert all fields into JSON-serializable primitives (Decimals, datetimes, dates, UUIDs)
+        import json
+        from django.core.serializers.json import DjangoJSONEncoder
+        return json.loads(json.dumps(data, cls=DjangoJSONEncoder))
 
     @staticmethod
     def _create_audit_log(
@@ -138,13 +133,18 @@ class MemberService:
         """
         Create an audit trail record.
         """
+        import json
+        from django.core.serializers.json import DjangoJSONEncoder
+
+        safe_old_data = json.loads(json.dumps(old_data, cls=DjangoJSONEncoder)) if old_data else None
+        safe_new_data = json.loads(json.dumps(new_data, cls=DjangoJSONEncoder)) if new_data else None
 
         MemberAudit.objects.create(
             member=member,
             action=action,
             changed_by=user,
-            old_data=old_data,
-            new_data=new_data,
+            old_data=safe_old_data,
+            new_data=safe_new_data,
         )
 
     @staticmethod
@@ -198,6 +198,54 @@ class MemberService:
                 member
             ),
         )
+
+        # If member submitted upfront financial contributions at registration, effect accounts immediately
+        try:
+            from decimal import Decimal
+            from apps.savings.models import SavingsPayment
+            from apps.shares.models import SharePayment
+
+            today = timezone.now().date()
+            channel = (member.payment_channel or "CASH").upper()
+
+            # 1. Initial Savings Contribution
+            if member.initial_savings_amount and member.initial_savings_amount > Decimal("0.00"):
+                SavingsPayment.objects.create(
+                    organization=organization,
+                    member=member,
+                    savings_type=SavingsPayment.SavingsType.NORMAL,
+                    transaction_type=SavingsPayment.TransactionType.MONEY_IN,
+                    amount=member.initial_savings_amount,
+                    payment_mode=channel,
+                    transaction_no=member.payment_reference or f"REG-SAV-{member.membership_number}",
+                    paid_on=today,
+                    month=today.month,
+                    year=today.year,
+                    paid_by=member.full_name,
+                    remarks=f"Initial savings deposit at registration - {member.membership_number}",
+                    recorded_by=user,
+                )
+
+            # 2. Initial Share Capital Contribution
+            if member.initial_shares_amount and member.initial_shares_amount > Decimal("0.00"):
+                num_shares = (member.initial_shares_amount / Decimal("100.00")).quantize(Decimal("0.01"))
+                SharePayment.objects.create(
+                    organization=organization,
+                    member=member,
+                    share_type=SharePayment.ShareType.CAPITAL,
+                    number_of_shares=num_shares,
+                    share_price=Decimal("100.00"),
+                    total_amount=member.initial_shares_amount,
+                    payment_mode=channel,
+                    transaction_no=member.payment_reference or f"REG-SHR-{member.membership_number}",
+                    paid_on=today,
+                    month=today.month,
+                    year=today.year,
+                    remarks=f"Initial share capital contribution at registration - {member.membership_number}",
+                    created_by=user,
+                )
+        except Exception as exc:
+            print(f"Warning: Failed to create initial registration financial records: {exc}")
 
         if member.phone_number:
             try:

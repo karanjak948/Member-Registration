@@ -51,6 +51,8 @@ import {
   IconReceipt2,
   IconRefresh,
   IconShieldLock,
+  IconArrowBackUp,
+  IconArrowsExchange,
 } from "@tabler/icons-react";
 import { usePermissions } from "@/hooks/usePermissions";
 import { PERMISSIONS } from "@/constants/permissions";
@@ -97,6 +99,11 @@ export default function SharesPaymentsPage() {
   // View Receipt Voucher Modal
   const [viewPayment, setViewPayment] = useState<SharePayment | null>(null);
 
+  // Reversal modal state
+  const [reversingPayment, setReversingPayment] = useState<SharePayment | null>(null);
+  const [reversalReason, setReversalReason] = useState("");
+  const [reversingLoading, setReversingLoading] = useState(false);
+
   // Delete modal state
   const [deleteTarget, setDeleteTarget] = useState<SharePayment | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -123,6 +130,27 @@ export default function SharesPaymentsPage() {
       console.error("Failed to load shares data:", err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleConfirmReverse = async () => {
+    if (!reversingPayment) return;
+    if (!reversalReason.trim()) {
+      setAlertInfo({ type: "error", message: "Please provide a valid reason for reversing this shares payment." });
+      return;
+    }
+    setReversingLoading(true);
+    try {
+      await sharesService.reversePayment(reversingPayment.id, reversalReason.trim());
+      setAlertInfo({ type: "success", message: `Share payment #${reversingPayment.document_no} successfully reversed!` });
+      setReversingPayment(null);
+      setReversalReason("");
+      await loadData();
+    } catch (err: any) {
+      console.error("Reversal error:", err);
+      setAlertInfo({ type: "error", message: err?.response?.data?.error || "Failed to reverse share payment." });
+    } finally {
+      setReversingLoading(false);
     }
   };
 
@@ -320,6 +348,22 @@ export default function SharesPaymentsPage() {
             </Typography>
           </Box>
           <Stack direction="row" spacing={1.5} alignItems="center">
+            <Button
+              component={Link}
+              href="/shares/transfers"
+              variant="outlined"
+              startIcon={<IconArrowsExchange size={18} />}
+              sx={{
+                borderColor: "#059669",
+                color: "#059669",
+                fontWeight: 700,
+                textTransform: "none",
+                borderRadius: 2,
+                "&:hover": { borderColor: "#047857", bgcolor: "#ecfdf5" },
+              }}
+            >
+              Shares Transfers
+            </Button>
             <Button
               variant="outlined"
               startIcon={<IconUpload size={18} />}
@@ -696,13 +740,43 @@ export default function SharesPaymentsPage() {
                       {p.transaction_no || "—"}
                     </TableCell>
                     <TableCell align="center">
-                      <Stack direction="row" spacing={0.5} justifyContent="center">
+                      <Stack direction="row" spacing={0.5} justifyContent="center" alignItems="center">
                         <Tooltip title="View Certificate Voucher">
                           <IconButton size="small" onClick={() => setViewPayment(p)} color="primary">
                             <IconEye size={18} />
                           </IconButton>
                         </Tooltip>
-                        {isAdmin && (
+                        {p.is_reversed ? (
+                          <Tooltip title={`Reversed: ${p.reversal_reason || "Reversed"}`}>
+                            <Chip
+                              label="REVERSED"
+                              size="small"
+                              sx={{
+                                bgcolor: "#fee2e2",
+                                color: "#991b1b",
+                                fontWeight: 800,
+                                fontSize: "0.68rem",
+                                height: 24,
+                              }}
+                            />
+                          </Tooltip>
+                        ) : (
+                          isAdmin && (
+                            <Tooltip title="Reverse Share Payment">
+                              <IconButton
+                                size="small"
+                                onClick={() => {
+                                  setReversingPayment(p);
+                                  setReversalReason("");
+                                }}
+                                sx={{ color: "#d97706" }}
+                              >
+                                <IconArrowBackUp size={18} />
+                              </IconButton>
+                            </Tooltip>
+                          )
+                        )}
+                        {isAdmin && !p.is_reversed && (
                           <Tooltip title="Delete Transaction">
                             <IconButton size="small" onClick={() => setDeleteTarget(p)} sx={{ color: "#ef4444" }}>
                               <IconTrash size={18} />
@@ -953,6 +1027,64 @@ export default function SharesPaymentsPage() {
             </DialogActions>
           </Dialog>
         )}
+
+        {/* Reversal Confirmation Dialog */}
+        <Dialog
+          open={Boolean(reversingPayment)}
+          onClose={() => !reversingLoading && setReversingPayment(null)}
+          maxWidth="sm"
+          fullWidth
+          PaperProps={{ sx: { borderRadius: 3 } }}
+        >
+          <DialogTitle sx={{ fontWeight: 800, color: "#991b1b", display: "flex", alignItems: "center", gap: 1 }}>
+            <IconArrowBackUp size={22} color="#dc2626" />
+            Reverse Share Capital Payment
+          </DialogTitle>
+          <DialogContent dividers>
+            <Typography variant="body1" mb={2}>
+              Are you sure you want to reverse share payment <strong>#{reversingPayment?.document_no}</strong> for{" "}
+              <strong>{reversingPayment?.member_name}</strong>?
+            </Typography>
+            <Alert severity="warning" sx={{ mb: 2.5, fontWeight: 500 }}>
+              Reversing this transaction will deduct{" "}
+              <strong>{reversingPayment?.number_of_shares} shares (KES {Number(reversingPayment?.total_amount || 0).toLocaleString()})</strong>{" "}
+              from the member&apos;s share ledger and trigger an automated audit log.
+            </Alert>
+            <TextField
+              label="Reversal Reason *"
+              fullWidth
+              multiline
+              rows={3}
+              value={reversalReason}
+              onChange={(e) => setReversalReason(e.target.value)}
+              placeholder="e.g. Erroneous bank transfer capture, duplicate share entry, bounced cheque..."
+            />
+          </DialogContent>
+          <DialogActions sx={{ p: 2 }}>
+            <Button
+              onClick={() => setReversingPayment(null)}
+              disabled={reversingLoading}
+              variant="outlined"
+              sx={{ borderRadius: 2, textTransform: "none", color: "#64748b" }}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="contained"
+              onClick={handleConfirmReverse}
+              disabled={reversingLoading || !reversalReason.trim()}
+              sx={{
+                bgcolor: "#dc2626",
+                "&:hover": { bgcolor: "#b91c1c" },
+                fontWeight: 700,
+                textTransform: "none",
+                borderRadius: 2,
+              }}
+            >
+              {reversingLoading ? "Reversing..." : "Confirm & Reverse Shares"}
+            </Button>
+          </DialogActions>
+        </Dialog>
 
         {/* Bulk Upload Modal */}
         <Dialog

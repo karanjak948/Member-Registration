@@ -58,6 +58,26 @@ class SharePaymentViewSet(viewsets.ModelViewSet):
         ).delete()
         return super().destroy(request, *args, **kwargs)
 
+    @action(detail=True, methods=["post"], url_path="reverse")
+    def reverse(self, request, pk=None):
+        """
+        Reverse a share payment.
+        Sets is_reversed=True and records trigger audit log.
+        """
+        payment = self.get_object()
+        reason = request.data.get("reason", "Share payment reversed by user action")
+        from apps.common.triggers import reverse_share_payment
+        try:
+            reversed_payment = reverse_share_payment(payment, user=request.user, reason=reason)
+            return Response({
+                "success": True,
+                "message": f"Share payment #{reversed_payment.document_no} successfully reversed.",
+                "payment": SharePaymentSerializer(reversed_payment).data,
+            })
+        except ValueError as err:
+            return Response({"error": str(err)}, status=status.HTTP_400_BAD_REQUEST)
+
+
     def get_queryset(self):
         qs = super().get_queryset()
         user = self.request.user
@@ -358,3 +378,87 @@ class SharePaymentViewSet(viewsets.ModelViewSet):
             "errors": [],
             "message": f"Successfully imported {created_count} share payments totalling KES {total_amount:,.2f}.",
         })
+
+
+class ShareTransferViewSet(viewsets.ModelViewSet):
+    """
+    CRUD API endpoints for Share Transfers & Withdrawals matching Jimanage SACCO system.
+    Supports member-to-member transfers and exit redemptions to SACCO capital pool.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    search_fields = [
+        "from_member__first_name",
+        "from_member__other_names",
+        "from_member__membership_number",
+        "to_member__first_name",
+        "to_member__other_names",
+        "to_member__membership_number",
+        "remarks",
+        "share_type",
+    ]
+    ordering_fields = ["date_transferred", "created_at", "total_amount", "number_of_shares"]
+    ordering = ["-date_transferred", "-created_at"]
+
+    def get_serializer_class(self):
+        from apps.shares.serializers import ShareTransferSerializer
+        return ShareTransferSerializer
+
+    def get_queryset(self):
+        from apps.shares.models import ShareTransfer
+        from apps.organizations.models import Organization
+        org = getattr(self.request.user, "organization", None)
+        if not org:
+            org = Organization.objects.first()
+        qs = ShareTransfer.objects.select_related("from_member", "to_member", "organization").all()
+        if org:
+            qs = qs.filter(organization=org)
+
+        # Filters
+        from_member = self.request.query_params.get("from_member")
+        to_member = self.request.query_params.get("to_member")
+        start_date = self.request.query_params.get("start_date")
+        end_date = self.request.query_params.get("end_date")
+        share_type = self.request.query_params.get("share_type")
+
+        if from_member:
+            qs = qs.filter(from_member_id=from_member)
+        if to_member:
+            qs = qs.filter(to_member_id=to_member)
+        if start_date:
+            qs = qs.filter(date_transferred__gte=start_date)
+        if end_date:
+            qs = qs.filter(date_transferred__lte=end_date)
+        if share_type and share_type != "all":
+            qs = qs.filter(share_type=share_type)
+
+        return qs
+
+    def perform_create(self, serializer):
+        from apps.organizations.models import Organization
+        from_member = serializer.validated_data.get("from_member")
+        org = (
+            getattr(from_member, "organization", None)
+            or getattr(self.request.user, "organization", None)
+            or Organization.objects.first()
+        )
+        user = self.request.user if getattr(self.request, "user", None) and self.request.user.is_authenticated else None
+        serializer.save(
+            organization=org,
+            created_by=user,
+            updated_by=user,
+            recorded_by=user,
+        )
+
+    def perform_update(self, serializer):
+        serializer.save(updated_by=self.request.user)
+
+    def destroy(self, request, *args, **kwargs):
+        transfer = self.get_object()
+        transfer.is_active = False
+        transfer.save()
+        return Response(
+            {"message": f"Share transfer #{transfer.id} marked inactive."},
+            status=status.HTTP_200_OK,
+        )
+

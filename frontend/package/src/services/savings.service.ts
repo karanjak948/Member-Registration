@@ -58,7 +58,45 @@ class SavingsService {
     });
     return response.data;
   }
+
+  async reversePayment(id: number, reason: string): Promise<any> {
+    const response = await api.post(`/savings-payments/${id}/reverse/`, { reason });
+    return response.data;
+  }
+
+  async getWithdrawals(params?: {
+    start_date?: string;
+    end_date?: string;
+    withdrawal_type?: string;
+    member?: number;
+    search?: string;
+  }): Promise<any[]> {
+    const response = await api.get("/savings-withdrawals/", { params });
+    const data = response.data;
+    if (Array.isArray(data)) return data;
+    if (Array.isArray(data?.results)) return data.results;
+    return [];
+  }
+
+  async createWithdrawal(payload: {
+    member: number;
+    withdrawal_type: string;
+    amount: number | string;
+    date_withdrawn: string;
+    savings_drawn_from: string;
+    bank: string;
+    document_code?: string;
+    reason?: string;
+  }): Promise<any> {
+    const response = await api.post("/savings-withdrawals/", payload);
+    return response.data;
+  }
+
+  async deleteWithdrawal(id: number): Promise<void> {
+    await api.delete(`/savings-withdrawals/${id}/`);
+  }
 }
+
 
 const savingsService = new SavingsService();
 export default savingsService;

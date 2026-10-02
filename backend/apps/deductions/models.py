@@ -218,3 +218,70 @@ class MonthlyDeductionBatch(AuditModel):
 
     def __str__(self):
         return f"Batch {self.batch_no} ({self.month}/{self.year}) - KES {self.total_amount}"
+
+
+class MonthlyDeductionItemLog(AuditModel):
+    """
+    Line-item log for bulk deductions upload.
+    Explicitly tracks:
+    1. What was uploaded in the Excel sheet (Employee No, Name, Total Remittance)
+    2. What was used / allocated (Loan principal, Loan interest, Charges, Savings, Shares, Others, Surplus)
+    """
+    class ItemStatus(models.TextChoices):
+        SUCCESS = "success", "Success"
+        PARTIAL = "partial", "Partial"
+        FAILED = "failed", "Failed"
+
+    batch = models.ForeignKey(
+        MonthlyDeductionBatch,
+        on_delete=models.CASCADE,
+        related_name="item_logs",
+        db_index=True,
+    )
+    deduction = models.ForeignKey(
+        MonthlyDeduction,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="upload_logs",
+    )
+    member = models.ForeignKey(
+        "members.Member",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="deduction_upload_logs",
+        db_index=True,
+    )
+    row_number = models.PositiveIntegerField(default=1)
+
+    # 1. What was uploaded in excel sheet
+    raw_employee_no = models.CharField(max_length=100, blank=True, default="")
+    raw_employee_name = models.CharField(max_length=255, blank=True, default="")
+    raw_total_ded = models.DecimalField(max_digits=15, decimal_places=2, default=Decimal("0.00"))
+
+    # 2. What was used / allocated
+    amount_charges = models.DecimalField(max_digits=15, decimal_places=2, default=Decimal("0.00"))
+    amount_loan_interest = models.DecimalField(max_digits=15, decimal_places=2, default=Decimal("0.00"))
+    amount_loan_principal = models.DecimalField(max_digits=15, decimal_places=2, default=Decimal("0.00"))
+    amount_savings = models.DecimalField(max_digits=15, decimal_places=2, default=Decimal("0.00"))
+    amount_shares = models.DecimalField(max_digits=15, decimal_places=2, default=Decimal("0.00"))
+    amount_others = models.DecimalField(max_digits=15, decimal_places=2, default=Decimal("0.00"))
+    amount_surplus = models.DecimalField(max_digits=15, decimal_places=2, default=Decimal("0.00"))
+
+    status = models.CharField(
+        max_length=20,
+        choices=ItemStatus.choices,
+        default=ItemStatus.SUCCESS,
+        db_index=True,
+    )
+    error_message = models.TextField(blank=True, default="")
+
+    class Meta:
+        db_table = "tbl_monthly_deduction_item_logs"
+        ordering = ["batch", "row_number"]
+        verbose_name = "Monthly Deduction Item Log"
+        verbose_name_plural = "Monthly Deduction Item Logs"
+
+    def __str__(self):
+        return f"Batch {self.batch.batch_no} Row {self.row_number} - {self.raw_employee_name} ({self.raw_total_ded})"

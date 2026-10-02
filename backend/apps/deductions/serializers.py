@@ -114,3 +114,38 @@ class MonthlyDeductionBatchSerializer(serializers.ModelSerializer):
             "created_at",
         ]
         read_only_fields = fields
+
+
+class MonthlyDeductionItemLogSerializer(serializers.ModelSerializer):
+    member_name = serializers.CharField(source="member.full_name", read_only=True, default="")
+    membership_number = serializers.CharField(source="member.membership_number", read_only=True, default="")
+    batch_no = serializers.CharField(source="batch.batch_no", read_only=True)
+
+    class Meta:
+        from apps.deductions.models import MonthlyDeductionItemLog
+        model = MonthlyDeductionItemLog
+        fields = [
+            "id",
+            "batch",
+            "batch_no",
+            "deduction",
+            "member",
+            "member_name",
+            "membership_number",
+            "row_number",
+            "raw_employee_no",
+            "raw_employee_name",
+            "raw_total_ded",
+            "amount_charges",
+            "amount_loan_interest",
+            "amount_loan_principal",
+            "amount_savings",
+            "amount_shares",
+            "amount_others",
+            "amount_surplus",
+            "status",
+            "error_message",
+            "created_at",
+        ]
+        read_only_fields = fields
+

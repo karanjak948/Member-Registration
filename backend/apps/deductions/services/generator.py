@@ -95,7 +95,11 @@ def generate_monthly_deductions(
                             loan_principal += approx_p
                             loan_interest += approx_i
 
+            # If member has not paid registration fee upfront, schedule it for payroll deduction
             registration_fee = Decimal("0.00")
+            if not getattr(member, "registration_fee_paid", False):
+                registration_fee = Decimal(str(getattr(member, "registration_fee_amount", 1000.00) or 1000.00))
+
             savings = default_savings
             shares = default_shares
             others = Decimal("0.00")

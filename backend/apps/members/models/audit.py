@@ -1,6 +1,8 @@
 from django.conf import settings
 from django.db import models
 
+from django.core.serializers.json import DjangoJSONEncoder
+
 from .member import Member
 
 
@@ -43,11 +45,13 @@ class MemberAudit(models.Model):
     old_data = models.JSONField(
         null=True,
         blank=True,
+        encoder=DjangoJSONEncoder,
     )
 
     new_data = models.JSONField(
         null=True,
         blank=True,
+        encoder=DjangoJSONEncoder,
     )
 
     created_at = models.DateTimeField(

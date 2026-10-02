@@ -1,4 +1,6 @@
-from rest_framework import viewsets, permissions, filters
+from rest_framework import viewsets, permissions, filters, status
+from rest_framework.decorators import action
+from rest_framework.response import Response
 from apps.loans.models import Repayment
 from apps.loans.serializers import RepaymentSerializer
 
@@ -35,3 +37,23 @@ class RepaymentViewSet(viewsets.ModelViewSet):
         if end_date:
             qs = qs.filter(payment_date__lte=end_date)
         return qs
+
+    @action(detail=True, methods=["post"], url_path="reverse")
+    def reverse(self, request, pk=None):
+        """
+        Reverse a loan repayment.
+        Sets is_reversed=True, rolls back schedule entries, and records trigger audit log.
+        """
+        repayment = self.get_object()
+        reason = request.data.get("reason", "Loan repayment reversed by user action")
+        from apps.common.triggers import reverse_loan_repayment
+        try:
+            reversed_repayment = reverse_loan_repayment(repayment, user=request.user, reason=reason)
+            return Response({
+                "success": True,
+                "message": f"Repayment #{reversed_repayment.repayment_number} successfully reversed.",
+                "repayment": RepaymentSerializer(reversed_repayment).data,
+            })
+        except ValueError as err:
+            return Response({"error": str(err)}, status=status.HTTP_400_BAD_REQUEST)
+
